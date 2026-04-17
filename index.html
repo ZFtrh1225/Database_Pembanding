@@ -507,6 +507,46 @@ button:disabled, .btn-disabled {
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
+// --- KODE BARU: JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2qboXhulMHhHRVntqDGdGdVUnrUqA97EqfIMtJ40BpzF8p6E8tEevfMVhCnQBM-Jx/exec";
+
+// Membuat tiruan 'google.script.run' agar HTML lama tidak perlu dirombak
+const google = {
+  script: {
+    get run() { return new GasRunner(); }
+  }
+};
+
+class GasRunner {
+  constructor() {
+    this._success = function(){};
+    this._failure = function(){};
+  }
+  withSuccessHandler(cb) { this._success = cb; return this; }
+  withFailureHandler(cb) { this._failure = cb; return this; }
+
+  _post(action, args) {
+    fetch(SCRIPT_URL, {
+      redirect: "follow",
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: action, args: args })
+    })
+    .then(response => response.json())
+    .then(data => this._success(data))
+    .catch(error => this._failure(error));
+  }
+
+  // Daftar fungsi backend
+  checkLogin(u, p) { this._post('checkLogin', [u, p]); }
+  searchData(params) { this._post('searchData', [params]); }
+  addData(rowData, user) { this._post('addData', [rowData, user]); }
+  editData(rowData, user) { this._post('editData', [rowData, user]); }
+  uploadFoto(dataUrl, filename) { this._post('uploadFoto', [dataUrl, filename]); }
+  updateFoto(koordinat, fotoUrl) { this._post('updateFoto', [koordinat, fotoUrl]); }
+}
+
+<script>
 // ── KONFIGURASI ───────────────────────────────────────────────
 var ENABLE_GPS = true; // Ubah menjadi "true" untuk mengaktifkan tombol GPS
 
