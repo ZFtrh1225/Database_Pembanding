@@ -11,8 +11,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
 :root {
@@ -486,7 +485,8 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  
 <script>
 // --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2qboXhulMHhHRVntqDGdGdVUnrUqA97EqfIMtJ40BpzF8p6E8tEevfMVhCnQBM-Jx/exec";
@@ -678,18 +678,57 @@ function collectParams() {
 // ── SISTEM PENCARIAN ──────────────────────────────────────────
 function doSearch() {
   var btn = document.getElementById('btnCari');
-  btn.classList.add('loading'); btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
+  btn.classList.add('loading');
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
   var params = collectParams();
-
+  
   google.script.run
     .withSuccessHandler(function (res) {
-      btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
+      btn.classList.remove('loading');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
+      
       if (res.success) {
-        currentData = res.data; document.getElementById('resultCount').textContent = res.total; calculateAnalytics(res.data); renderMarkers(res.data, params); renderTable(res.data); toast(res.total + ' data ditemukan', 'success');
-        if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
+        
+        // --- KODE BARU: AUTO KALKULASI INDIKASI NILAI ---
+        // Sistem mencegat data sebelum ditampilkan untuk mengecek bagian yang kosong
+        currentData = res.data.map(function(row) {
+          // Cek apakah indikasi nilai kosong atau 0
+          var indStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
+          if (!indStr || parseInt(indStr) === 0) {
+            // Ambil angka Harga dan Luas Tanah
+            var hrg = parseFloat(String(row.harga || '').replace(/[^0-9]/g, '')) || 0;
+            var lt = parseFloat(String(row.luasTanah || '').replace(/[^0-9.]/g, '')) || 0;
+            
+            // Jika harga dan luas tanah ada isinya, lakukan pembagian (Harga / Luas Tanah)
+            if (hrg > 0 && lt > 0) { 
+              row.indikasiNilai = Math.round(hrg / lt); 
+            }
+          }
+          return row;
+        });
+        // ------------------------------------------------
+
+        document.getElementById('resultCount').textContent = res.total;
+        
+        // Menggunakan currentData yang sudah dikalkulasi otomatis
+        calculateAnalytics(currentData);
+        renderMarkers(currentData, params);
+        renderTable(currentData);
+        toast(res.total + ' data ditemukan', 'success');
+
+        // Jika layar kecil (HP), otomatis tutup panel filter setelah mencari
+        if (window.innerWidth <= 768) {
+          document.querySelector('.panel-filter').classList.add('collapsed');
+          setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350);
+        }
+
       } else { toast('Error: ' + res.error, 'error'); }
     })
-    .withFailureHandler(function (err) { btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari'; toast('Gagal memuat data dari server: ' + err.message, 'error'); })
+    .withFailureHandler(function (err) {
+      btn.classList.remove('loading');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
+      toast('Gagal: ' + err.message, 'error');
+    })
     .searchData(params);
 }
 
