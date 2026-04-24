@@ -851,16 +851,29 @@ function removeFoto() {
 }
 
 function collectParams() {
-  function get(group) { return Array.from(document.querySelectorAll('.cb-item[data-group="' + group + '"].checked')).map(function (el) { return el.dataset.val; }); }
+  function get(group) { 
+    return Array.from(document.querySelectorAll('.cb-item[data-group="' + group + '"].checked'))
+                .map(function (el) { return el.dataset.val; }); 
+  }
+  
+  // Membaca status yang dipilih (Lengkap/Tidak Lengkap)
+  var statusEl = document.querySelector('input[name="statusData"]:checked');
+  var statusVal = statusEl ? statusEl.value : 'Lengkap';
+
   var ci = document.getElementById('mapSearch').value.trim(), cLat = null, cLng = null;
   var coord = _parseCoordJS(ci);
   if (coord) { cLat = coord.lat; cLng = coord.lng; }
+  
   return {
-    jenisProprti: get('jenisProprti'), legalitas: get('legalitas'),
-    jenisData: get('jenisData'), tahun: get('tahun'),
+    jenisProprti: get('jenisProprti'),
+    legalitas: get('legalitas'),
+    jenisData: get('jenisData'),
+    tahun: get('tahun'),
     rowJalan: document.getElementById('rowJalan').value,
+    statusData: statusVal, // Dikirim ke Apps Script
     radiusKm: document.getElementById('radius').value || null,
-    centerLat: cLat, centerLng: cLng
+    centerLat: cLat,
+    centerLng: cLng
   };
 }
 
