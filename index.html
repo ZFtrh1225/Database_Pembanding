@@ -10,6 +10,10 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 <style>
 :root {
   --navy:      #1e3a5f;
@@ -147,7 +151,7 @@ button:disabled, .btn-disabled {
 .leaflet-control-layers { border-radius: 8px !important; border: 1px solid var(--border) !important; box-shadow: var(--shadow) !important; font-family: var(--font) !important; font-size: 12px !important; }
 
 /* CSS MULTI FOTO & POPUP */
-.iw-wrap { font-family: 'Plus Jakarta Sans', sans-serif; min-width: 240px; max-width: 300px; font-size: 12px; }
+.iw-wrap { font-family: 'Plus Jakarta Sans', sans-serif; min-width: 240px; max-width: 320px; font-size: 12px; }
 .iw-foto-container { position: relative; width: 100%; height: 170px; background: #e8ecf0; overflow: hidden; }
 .iw-foto-slider { display: flex; transition: transform 0.3s ease; height: 100%; }
 .iw-foto-slider img { width: 100%; height: 100%; object-fit: cover; flex-shrink: 0; }
@@ -207,6 +211,17 @@ button:disabled, .btn-disabled {
 .toast.success { background: var(--green); }
 .toast.error   { background: var(--red); }
 
+/* FLOATING BAR UNTUK A/B COMPARISON */
+.compare-bar { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: var(--navy); color: white; padding: 12px 24px; border-radius: 30px; box-shadow: var(--shadow-lg); display: none; align-items: center; gap: 15px; z-index: 9999; font-weight: 600; font-size: 13px; animation: slideUp .3s ease; }
+.compare-bar button { background: #A9D08E; border: none; color: var(--navy); padding: 6px 16px; border-radius: 20px; cursor: pointer; font-weight: 800; font-family: var(--font); font-size: 12px;}
+.compare-bar button.cancel { background: #ea4335; color: white; }
+
+/* TABEL COMPARISON */
+.compare-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.compare-table th, .compare-table td { padding: 10px; border: 1px solid var(--border); text-align: center; }
+.compare-table th { background: var(--bg); color: var(--text-sub); text-align: left; font-weight: 600; width: 120px; }
+.compare-table img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; }
+
 /* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS (MODE PONSEL)
    ========================================================= */
@@ -233,6 +248,8 @@ button:disabled, .btn-disabled {
   .modal-grid { grid-template-columns: 1fr; }
   .modal-grid .span-2 { grid-column: span 1; }
   .iw-wrap { width: 240px; }
+  .compare-bar { width: 90%; justify-content: space-between; padding: 10px; font-size: 11px; bottom: 10px;}
+  .compare-bar button { padding: 6px 10px;}
 }
 </style>
 </head>
@@ -373,6 +390,7 @@ button:disabled, .btn-disabled {
           <div><span style="color:#5a6a7e">Terendah:</span> <strong id="minPrice" style="color:#ea4335">Rp 0</strong></div>
           <div><span style="color:#5a6a7e">Tertinggi:</span> <strong id="maxPrice" style="color:#2d6be4">Rp 0</strong></div>
         </div>
+        <canvas id="chartProperti" width="200" height="200" style="margin-top: 15px;"></canvas>
       </div>
 
       <div class="result-badge">
@@ -400,6 +418,7 @@ button:disabled, .btn-disabled {
       </div>
       <div class="view-toggle">
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
+        <button class="btn-view" id="btnHeatmap" onclick="toggleHeatmap()" style="color:#ea4335; border-color:#ea4335;">🔥 Heatmap</button>
         <button class="btn-view active" id="btnViewMap" onclick="setView('map')">🗺 Peta</button>
         <button class="btn-view" id="btnViewTable" onclick="setView('table')">☰ Tabel</button>
       </div>
@@ -416,14 +435,16 @@ button:disabled, .btn-disabled {
         <table class="data-table">
           <thead>
             <tr>
-              <th>ID</th><th>Tipe Bangunan</th><th>Alamat</th><th>Kota</th>
+              <th>ID</th>
+              <th>Aksi</th>
+              <th>Tipe Bangunan</th><th>Alamat</th><th>Kota</th>
               <th>Legalitas</th><th>LT (m²)</th><th>LB (m²)</th>
               <th>Harga</th><th>Ind. Nilai/m²</th><th style="text-align: center;">ROW Jalan (m)</th>
               <th>Status Harga</th><th>Waktu Data</th><th>Sumber</th>
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr><td colspan="13" class="empty-state"><p>Klik "Cari" untuk memuat data</p></td></tr>
+            <tr><td colspan="14" class="empty-state"><p>Klik "Cari" untuk memuat data</p></td></tr>
           </tbody>
         </table>
       </div>
@@ -501,13 +522,34 @@ button:disabled, .btn-disabled {
   </div>
 </div>
 
+<div class="compare-bar" id="compareBar">
+  <span id="compareCount">0 Properti Terpilih</span>
+  <button onclick="showCompareModal()">Bandingkan</button>
+  <button class="cancel" onclick="clearCompare()">Batal</button>
+</div>
+
+<div class="modal-overlay" id="compareOverlay" onclick="if(event.target===this) document.getElementById('compareOverlay').classList.remove('open')">
+  <div class="modal" style="max-width: 800px;">
+    <div class="modal-header">
+      <span class="modal-title">⚖️ Perbandingan Properti</span>
+      <button class="btn-close" onclick="document.getElementById('compareOverlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-x: auto;">
+      <table class="compare-table" id="compareTableContent">
+        </table>
+    </div>
+  </div>
+</div>
+
+<div id="pdfTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:800px; background:white;"></div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-// --- KODE BARU: JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
+// --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2qboXhulMHhHRVntqDGdGdVUnrUqA97EqfIMtJ40BpzF8p6E8tEevfMVhCnQBM-Jx/exec";
 
 // Membuat tiruan 'google.script.run' agar HTML lama tidak perlu dirombak
@@ -537,7 +579,6 @@ class GasRunner {
     .catch(error => this._failure(error));
   }
 
-  // Daftar fungsi backend
   checkLogin(u, p) { this._post('checkLogin', [u, p]); }
   searchData(params) { this._post('searchData', [params]); }
   addData(rowData, user) { this._post('addData', [rowData, user]); }
@@ -547,7 +588,7 @@ class GasRunner {
 }
 
 // ── KONFIGURASI ───────────────────────────────────────────────
-var ENABLE_GPS = true; // Ubah menjadi "true" untuk mengaktifkan tombol GPS
+var ENABLE_GPS = true; 
 
 // ── VARIABEL GLOBAL ───────────────────────────────────────────
 var _originalKoordinat = null;
@@ -556,6 +597,11 @@ var currentData = [], currentView = 'map', _iconCounter = 0;
 var _fotoDataUrl = null, _fotoFilename = null;
 var _editingId = null, _editingFoto = '';
 var _pickingLocation = false;
+
+// KODE BARU: Variabel untuk fitur lanjutan
+var heatLayer = null, isHeatmap = false;
+var myChart = null;
+var compareList = [];
 
 var activeRole = sessionStorage.getItem('userRole');
 var activeUsername = sessionStorage.getItem('userName');
@@ -567,13 +613,11 @@ var PIN_COLORS = {
 
 // ── INIT & EVENT LISTENERS TAMBAHAN ───────────────────────────
 document.addEventListener("DOMContentLoaded", function() {
-  // Sembunyikan tombol close filter mobile jika di desktop
   if (window.innerWidth > 768) {
     var closeBtn = document.querySelector('.close-mobile-filter');
     if(closeBtn) closeBtn.style.display = 'none';
   }
 
-  // --- 1. FORMATTING TEKS PROPER & DKI ---
   function toProperCase(str) {
     return str.replace(/\w\S*/g, function(txt){
       return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
@@ -592,7 +636,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
-  // Khusus Kota: proper case tapi ganti "Dki" jadi "DKI"
   var fKota = document.getElementById('f_kota');
   if (fKota) {
     fKota.addEventListener('input', function() {
@@ -605,7 +648,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  // --- 2. VALIDASI HANYA ANGKA ---
   var numFields = ['f_hp', 'f_lt', 'f_lb', 'f_tahunBangun', 'f_harga', 'f_frontage', 'f_row', 'f_waktuData', 'f_indikasi'];
   numFields.forEach(function(id) {
     var el = document.getElementById(id);
@@ -619,7 +661,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
-  // Elevasi bisa menerima angka, titik, dan minus
   var fElevasi = document.getElementById('f_elevasi');
   if (fElevasi) {
     fElevasi.addEventListener('input', function() {
@@ -680,13 +721,11 @@ function applyPermissions(role) {
   var btnAddMap = document.getElementById('btnAddMap');
   var btnTable = document.getElementById('btnViewTable');
 
-  // Reset keadaan tombol agar aktif semua
   if(btnExport) btnExport.disabled = false;
   if(btnAddTop) btnAddTop.disabled = false;
   if(btnAddMap) btnAddMap.disabled = false;
   if(btnTable) btnTable.disabled = false;
 
-  // Terapkan Disable
   if (role === 'Surveyor') {
     if(btnExport) btnExport.disabled = true;
   } 
@@ -725,9 +764,13 @@ function toggleSidebar() {
   setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350);
 }
 
+// KODE BARU: ANALITIK DENGAN CHART.JS
 function calculateAnalytics(data) {
   var total = 0, count = 0, min = Infinity, max = 0;
+  var counts = { 'Tanah Bangunan':0, 'Tanah Kosong':0, 'Ruko':0, 'Office/Retail/Unit Apartemen':0 };
+
   data.forEach(function(row) {
+    if (counts[row.objek] !== undefined) counts[row.objek]++;
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
     if (!isNaN(price) && price > 0) {
@@ -736,11 +779,28 @@ function calculateAnalytics(data) {
       if (price > max) max = price;
     }
   });
+  
   var avg = count > 0 ? Math.round(total / count) : 0;
   if (count === 0) min = 0;
   document.getElementById('avgPrice').textContent = formatRupiah(avg);
   document.getElementById('minPrice').textContent = formatRupiah(min);
   document.getElementById('maxPrice').textContent = formatRupiah(max);
+
+  // Update Chart
+  var ctx = document.getElementById('chartProperti').getContext('2d');
+  if (myChart) myChart.destroy();
+  myChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { 
+      labels: Object.keys(counts), 
+      datasets: [{ data: Object.values(counts), backgroundColor: ['#0f9d58','#4285f4','#ab47bc','#f4b400'], borderWidth: 0 }] 
+    },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false, 
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10, family: 'Plus Jakarta Sans' }, boxWidth: 10 } } } 
+    }
+  });
 }
 
 function formatRupiah(val) {
@@ -856,7 +916,6 @@ function collectParams() {
                 .map(function (el) { return el.dataset.val; }); 
   }
   
-  // Membaca status yang dipilih (Lengkap/Tidak Lengkap)
   var statusEl = document.querySelector('input[name="statusData"]:checked');
   var statusVal = statusEl ? statusEl.value : 'Lengkap';
 
@@ -870,46 +929,67 @@ function collectParams() {
     jenisData: get('jenisData'),
     tahun: get('tahun'),
     rowJalan: document.getElementById('rowJalan').value,
-    statusData: statusVal, // Dikirim ke Apps Script
+    statusData: statusVal,
     radiusKm: document.getElementById('radius').value || null,
     centerLat: cLat,
     centerLng: cLng
   };
 }
 
+// KODE BARU: SISTEM CACHING & OFFLINE RINGAN
 function doSearch() {
   var btn = document.getElementById('btnCari');
   btn.classList.add('loading');
   btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
   var params = collectParams();
+
+  // 1. Cek Data Cache (Tampilkan Instan)
+  var cached = localStorage.getItem('webgis_cache');
+  if (cached && currentData.length === 0) {
+    try {
+      currentData = JSON.parse(cached);
+      calculateAnalytics(currentData);
+      renderMarkers(currentData, params);
+      renderTable(currentData);
+      document.getElementById('resultCount').textContent = currentData.length;
+      toast('Menampilkan memori sementara...', 'success');
+    } catch(e) {}
+  }
+
+  // 2. Tarik Data Terbaru
   google.script.run
     .withSuccessHandler(function (res) {
       btn.classList.remove('loading');
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
         currentData = res.data;
+        localStorage.setItem('webgis_cache', JSON.stringify(currentData)); // Update Cache
+
         document.getElementById('resultCount').textContent = res.total;
         calculateAnalytics(res.data);
         renderMarkers(res.data, params);
         renderTable(res.data);
         toast(res.total + ' data ditemukan', 'success');
 
-        // --- TAMBAHAN KODE UNTUK MODE MOBILE ---
-        // Jika layar kecil (HP), otomatis tutup panel filter setelah mencari
         if (window.innerWidth <= 768) {
           document.querySelector('.panel-filter').classList.add('collapsed');
           setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350);
         }
-        // ----------------------------------------
-
       } else { toast('Error: ' + res.error, 'error'); }
     })
     .withFailureHandler(function (err) {
       btn.classList.remove('loading');
       btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
-      toast('Gagal: ' + err.message, 'error');
+      toast('Koneksi terputus. Memakai Mode Offline.', 'error');
     })
     .searchData(params);
+}
+
+// KODE BARU: TOGGLE HEATMAP
+function toggleHeatmap() {
+  isHeatmap = !isHeatmap;
+  document.getElementById('btnHeatmap').classList.toggle('active', isHeatmap);
+  renderMarkers(currentData, collectParams()); // Refresh map
 }
 
 function renderMarkers(data, params) {
@@ -917,12 +997,23 @@ function renderMarkers(data, params) {
   markerGroup.clearLayers();
   if (circleObj)    { gMap.removeLayer(circleObj);    circleObj    = null; }
   if (centerMarker) { gMap.removeLayer(centerMarker); centerMarker = null; }
+  
+  // Hapus heatmap jika ada
+  if (heatLayer) { gMap.removeLayer(heatLayer); heatLayer = null; }
 
   var bounds = [];
+  var heatData = [];
+
   data.forEach(function (row) {
     var coord = _parseCoordJS(row.koordinat);
     if (!coord) return; 
 
+    // Siapkan data untuk Heatmap
+    var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
+    var price = parseFloat(priceStr) || 0;
+    if(price > 0) heatData.push([coord.lat, coord.lng, price]);
+
+    // Siapkan Pin Biasa
     var color  = PIN_COLORS[row.objek] || '#9e9e9e';
     var label  = _getPinLabel(row.id);
     var marker = L.marker([coord.lat, coord.lng], { icon: makePinIcon(color, label), title: row.alamat });
@@ -930,6 +1021,18 @@ function renderMarkers(data, params) {
     markerGroup.addLayer(marker);
     bounds.push([coord.lat, coord.lng]);
   });
+
+  // Eksekusi Heatmap vs Pin
+  if (isHeatmap && heatData.length > 0) {
+    gMap.removeLayer(markerGroup); // Sembunyikan pin
+    var maxPrice = Math.max.apply(Math, heatData.map(function(d){ return d[2]; }));
+    var normalizedHeat = heatData.map(function(d){ 
+      return [d[0], d[1], maxPrice > 0 ? d[2]/maxPrice : 0.5]; 
+    });
+    heatLayer = L.heatLayer(normalizedHeat, {radius: 30, blur: 20, maxZoom: 15, gradient: {0.2: 'blue', 0.5: 'lime', 0.8: 'yellow', 1.0: 'red'}}).addTo(gMap);
+  } else {
+    gMap.addLayer(markerGroup); // Pastikan pin muncul
+  }
 
   if (params && params.centerLat != null && params.centerLng != null) {
     centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
@@ -979,12 +1082,15 @@ function buildPopup(row) {
   var gmapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(f(row.koordinat));
   var svUrl = coordJS ? 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + coordJS.lat + ',' + coordJS.lng : '#';
 
+  // KODE BARU: TOMBOL COMPARE & PDF DI POPUP HEADER
   return '<div class="iw-wrap">'
     + fotoHtml
     + '<div class="iw-header">'
-    + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f(row.id) + ' — ' + f(row.objek) + '</span>'
+    + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f(row.id) + '</span>'
     + '<span class="iw-badge">' + f(row.legalitas) + '</span>'
     + '<div style="display:flex; gap:4px;">'
+    + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + f(row.id) + '\')" title="Bandingkan" ' + disabledAttr + '>⚖️</button>'
+    + '<button class="iw-foto-btn" style="background:#ec4899; border-color:#ec4899;" onclick="downloadPDF(\'' + f(row.id) + '\')" title="Download PDF Brief" ' + disabledAttr + '>📄</button>'
     + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\', \'' + f(row.koordinat) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
     + '<button class="iw-foto-btn" onclick="triggerFotoUpdate(\'' + f(row.id) + '\',\'' + f(row.koordinat) + '\',\'' + esc(row.sumber) + '\')" title="Tambah Foto" ' + disabledAttr + '>+</button>'
     + '</div></div><div class="iw-body">'
@@ -1007,13 +1113,17 @@ function buildPopup(row) {
 }
 function _iwr(k, v) { return '<div class="iw-row"><span class="iw-key">' + k + '</span><span class="iw-val">' + v + '</span></div>'; }
 
+// KODE BARU: RENDER TABLE DENGAN TOMBOL COMPARE
 function renderTable(data) {
   var tbody = document.getElementById('tableBody');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="13" class="empty-state"><p>Tidak ada data sesuai filter</p></td></tr>'; return; }
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state"><p>Tidak ada data sesuai filter</p></td></tr>'; return; }
   function bc(obj) { if (obj === 'Tanah Bangunan') return 'badge-tanah-bangunan'; if (obj === 'Tanah Kosong') return 'badge-tanah-kosong'; if (obj === 'Ruko') return 'badge-ruko'; return 'badge-office'; }
   function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
+  
   tbody.innerHTML = data.map(function (row) {
-    return '<tr><td>' + f(row.id) + '</td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>';
+    return '<tr><td>' + f(row.id) + '</td>'
+      + '<td><button onclick="toggleCompare(\'' + row.id + '\')" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;">⚖️</button></td>'
+      + '<td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>';
   }).join('');
 }
 
@@ -1059,7 +1169,7 @@ function resetFilter() {
 
 function openModalNew() {
   _editingId = null; _editingFoto = '';
-  _originalKoordinat = null; // Tambahkan ini bersama _editingId dan _editingFoto
+  _originalKoordinat = null; 
   document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding';
   document.getElementById('f_id').disabled = false;
   document.getElementById('btnSubmit').textContent = '💾 Simpan Data';
@@ -1104,8 +1214,11 @@ function openEditModal(id, koordinat) {
   document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding';
   document.getElementById('btnSubmit').textContent = '💾 Update Data';
   document.getElementById('f_id').disabled = true; 
-  if (_editingFoto) { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } 
-  else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; }
+  if (_editingFoto && _editingFoto !== '–') { 
+    document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; 
+  } else { 
+    document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; 
+  }
   removeFoto();
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -1212,6 +1325,109 @@ function triggerFotoUpdate(rowId, koordinat, sumber) {
       }; img.src = ev.target.result;
     }; reader.readAsDataURL(file);
   }; inp.click();
+}
+
+// ── KODE BARU: FUNGSI A/B COMPARISON & CETAK PDF ────────────────
+
+function toggleCompare(id) {
+  var idx = compareList.indexOf(id);
+  if (idx > -1) {
+    compareList.splice(idx, 1);
+  } else {
+    if (compareList.length >= 3) { toast('Maksimal 3 properti untuk dibandingkan', 'error'); return; }
+    compareList.push(id);
+  }
+  updateCompareUI();
+}
+
+function updateCompareUI() {
+  var bar = document.getElementById('compareBar');
+  if (compareList.length > 0) { 
+    bar.style.display = 'flex'; 
+    document.getElementById('compareCount').textContent = compareList.length + ' Properti Terpilih'; 
+  } else { 
+    bar.style.display = 'none'; 
+  }
+}
+
+function clearCompare() { 
+  compareList = []; 
+  updateCompareUI(); 
+}
+
+function showCompareModal() {
+  var table = document.getElementById('compareTableContent');
+  var props = compareList.map(function(id) { 
+    return currentData.find(function(r) { return r.id === id; }); 
+  }).filter(function(x) { return x; });
+  
+  var head = '<tr><th>Spesifikasi</th>' + props.map(function(p) {
+    return '<th><b>' + p.id + '</b><br><span style="font-size:10px;font-weight:normal;">' + p.objek + '</span></th>';
+  }).join('') + '</tr>';
+  
+  function tr(label, key, isRp) {
+    return '<tr><th>' + label + '</th>' + props.map(function(p) {
+      var val = (p[key] && p[key] !== '–') ? p[key] : '-';
+      return '<td>' + (isRp ? formatRupiah(val) : val) + '</td>';
+    }).join('') + '</tr>';
+  }
+
+  var imgRow = '<tr><th>Foto</th>' + props.map(function(p) {
+      var img = (p.foto && p.foto !== '–') ? '<img src="' + p.foto.split(',')[0] + '">' : '<div style="height:100px;background:#eee;display:grid;place-items:center;">No Photo</div>';
+      return '<td>' + img + '</td>';
+  }).join('') + '</tr>';
+
+  table.innerHTML = head + imgRow 
+    + tr('Legalitas', 'legalitas') 
+    + tr('Luas Tanah (m²)', 'luasTanah') 
+    + tr('Luas Bangunan (m²)', 'luasBangunan') 
+    + tr('Lebar Jalan (m)', 'lebarJalanROW') 
+    + tr('Bentuk', 'bentuk') 
+    + tr('Harga', 'harga', true) 
+    + tr('Indikasi /m²', 'indikasiNilai', true) 
+    + tr('Waktu Data', 'waktuData');
+  
+  document.getElementById('compareOverlay').classList.add('open');
+}
+
+function downloadPDF(id) {
+  var row = currentData.find(function(r) { return r.id === id; }); 
+  if (!row) return;
+  
+  toast('Menyiapkan file PDF...', 'loading');
+  
+  var template = document.getElementById('pdfTemplate');
+  var imgHtml = '';
+  if (row.foto && row.foto !== '–') {
+    imgHtml = '<img src="' + row.foto.split(',')[0] + '" style="width:100%; max-height:400px; object-fit:cover; border-radius:8px; margin-bottom:20px;">';
+  }
+  
+  function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
+
+  template.innerHTML = 
+    '<h1 style="color:#1e3a5f; border-bottom:3px solid #16a34a; padding-bottom:10px;">Brief Penilaian: ' + f(row.id) + '</h1>' +
+    '<p style="color:#5a6a7e; margin-bottom:20px;">Dicetak pada: ' + new Date().toLocaleString() + ' (Appraisal: ' + activeUsername + ')</p>' +
+    imgHtml +
+    '<table style="width:100%; border-collapse:collapse; font-size:14px; margin-top:20px;">' +
+      '<tr><td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold; width:35%;">Alamat</td><td style="padding:10px; border-bottom:1px solid #ddd;">' + f(row.alamat) + ', ' + f(row.kota) + '</td></tr>' +
+      '<tr><td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">Jenis Properti</td><td style="padding:10px; border-bottom:1px solid #ddd;">' + f(row.objek) + ' (' + f(row.legalitas) + ')</td></tr>' +
+      '<tr><td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">Dimensi (LT / LB)</td><td style="padding:10px; border-bottom:1px solid #ddd;">' + f(row.luasTanah) + ' m² / ' + f(row.luasBangunan) + ' m²</td></tr>' +
+      '<tr><td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">ROW Jalan</td><td style="padding:10px; border-bottom:1px solid #ddd;">' + f(row.lebarJalanROW) + ' meter</td></tr>' +
+      '<tr><td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">Harga ' + f(row.statusHarga) + '</td><td style="padding:10px; border-bottom:1px solid #ddd; color:#16a34a; font-weight:bold; font-size:16px;">' + formatRupiah(row.harga) + '</td></tr>' +
+      '<tr><td style="padding:10px; font-weight:bold;">Indikasi Nilai Pasar</td><td style="padding:10px; color:#2d6be4; font-weight:bold; font-size:16px;">' + formatRupiah(row.indikasiNilai) + ' / m²</td></tr>' +
+    '</table>';
+  
+  template.style.display = 'block'; 
+  html2pdf().set({ 
+    margin: 10, 
+    filename: 'Brief_Properti_' + row.id + '.pdf', 
+    image: { type: 'jpeg', quality: 0.98 }, 
+    html2canvas: { scale: 2 }, 
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+  }).from(template).save().then(function() {
+    template.style.display = 'none'; 
+    toast('PDF Berhasil Diunduh!', 'success');
+  });
 }
 
 function toast(msg, type) {
