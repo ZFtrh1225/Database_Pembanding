@@ -541,7 +541,7 @@ class GasRunner {
   checkLogin(u, p) { this._post('checkLogin', [u, p]); }
   searchData(params) { this._post('searchData', [params]); }
   addData(rowData, user) { this._post('addData', [rowData, user]); }
-  editData(rowData, user) { this._post('editData', [rowData, user]); }
+  editData(rowData, user, originalCoord) { this._post('editData', [rowData, user, originalCoord]); }
   uploadFoto(dataUrl, filename) { this._post('uploadFoto', [dataUrl, filename]); }
   updateFoto(koordinat, fotoUrl) { this._post('updateFoto', [koordinat, fotoUrl]); }
 }
@@ -550,6 +550,7 @@ class GasRunner {
 var ENABLE_GPS = true; // Ubah menjadi "true" untuk mengaktifkan tombol GPS
 
 // ── VARIABEL GLOBAL ───────────────────────────────────────────
+var _originalKoordinat = null;
 var gMap = null, markerGroup = null, centerMarker = null, circleObj = null;
 var currentData = [], currentView = 'map', _iconCounter = 0;
 var _fotoDataUrl = null, _fotoFilename = null;
@@ -971,7 +972,7 @@ function buildPopup(row) {
     + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f(row.id) + ' — ' + f(row.objek) + '</span>'
     + '<span class="iw-badge">' + f(row.legalitas) + '</span>'
     + '<div style="display:flex; gap:4px;">'
-    + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
+    + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\', \'' + f(row.koordinat) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
     + '<button class="iw-foto-btn" onclick="triggerFotoUpdate(\'' + f(row.id) + '\',\'' + f(row.koordinat) + '\',\'' + esc(row.sumber) + '\')" title="Tambah Foto" ' + disabledAttr + '>+</button>'
     + '</div></div><div class="iw-body">'
     + _iwr('Alamat',        f(row.alamat))
@@ -1045,6 +1046,7 @@ function resetFilter() {
 
 function openModalNew() {
   _editingId = null; _editingFoto = '';
+  _originalKoordinat = null; // Tambahkan ini bersama _editingId dan _editingFoto
   document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding';
   document.getElementById('f_id').disabled = false;
   document.getElementById('btnSubmit').textContent = '💾 Simpan Data';
@@ -1055,10 +1057,10 @@ function openModalNew() {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
-function openEditModal(id) {
-  var row = currentData.find(function(r) { return r.id === id; });
+function openEditModal(id, koordinat) {
+  var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; });
   if (!row) return;
-  _editingId = row.id; _editingFoto = row.foto;
+  _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat;
   document.getElementById('f_id').value = row.id;
   document.getElementById('f_sumber').value = row.sumber;
   document.getElementById('f_hp').value = row.hp;
@@ -1145,7 +1147,7 @@ function _doSubmitRow(fotoUrl, g, num, btn) {
       else { toast(res.error, 'error'); }
     })
     .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal: ' + err.message, 'error'); })
-    [action](row, activeUsername);
+    [action](row, activeUsername, _originalKoordinat);
 }
 
 function exportData() {
