@@ -687,7 +687,7 @@ function calculateAnalytics(data) {
   }
 
   // 4. Update Angka ke Layar
-  document.getElementById('avgPrice').textContent = formatRupiah(cleanMedian);
+  document.getElementById('avgPrice').textContent = formatRupiah(Math.round(cleanMedian));
   document.getElementById('minPrice').textContent = formatRupiah(min);
   document.getElementById('maxPrice').textContent = formatRupiah(max);
 
