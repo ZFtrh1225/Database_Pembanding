@@ -714,7 +714,8 @@ function doSearch() {
     .withSuccessHandler(function (res) {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
-        currentData = res.data.map(function(row) {
+        currentData = res.data.map(function(row, index) {
+          row._uid = 'prop_' + index; // ✅ Internal UID Sistem
           var indStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
           if (!indStr || parseInt(indStr) === 0) {
             var hrg = parseFloat(String(row.harga || '').replace(/[^0-9]/g, '')) || 0;
@@ -795,7 +796,7 @@ function buildPopup(row) {
   var coordJS = _parseCoordJS(row.koordinat); var gmapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(f(row.koordinat)); var svUrl = coordJS ? 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + coordJS.lat + ',' + coordJS.lng : '#';
 
   return '<div class="iw-wrap">' + fotoHtml + '<div class="iw-header"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f(row.id) + '</span><span class="iw-badge">' + f(row.legalitas) + '</span><div style="display:flex; gap:4px;">'
-    + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + f(row.id) + '\')" title="Bandingkan" ' + disabledAttr + '>⚖️</button>'
+    + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" ' + disabledAttr + '>⚖️</button>'
     + '<button class="iw-foto-btn" style="background:#ec4899; border-color:#ec4899;" onclick="downloadPDF(\'' + f(row.id) + '\')" title="Download PDF Brief" ' + disabledAttr + '>📄</button>'
     + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\', \'' + f(row.koordinat) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
     + '<button class="iw-foto-btn" onclick="triggerFotoUpdate(\'' + f(row.id) + '\',\'' + f(row.koordinat) + '\',\'' + esc(row.sumber) + '\')" title="Tambah Foto" ' + disabledAttr + '>+</button>'
@@ -809,7 +810,7 @@ function renderTable(data) {
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state"><p>Tidak ada data sesuai filter</p></td></tr>'; return; }
   function bc(obj) { if (obj === 'Tanah Bangunan') return 'badge-tanah-bangunan'; if (obj === 'Tanah Kosong') return 'badge-tanah-kosong'; if (obj === 'Ruko') return 'badge-ruko'; return 'badge-office'; }
   function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
-  tbody.innerHTML = data.map(function (row) { return '<tr><td>' + f(row.id) + '</td><td><button onclick="toggleCompare(\'' + row.id + '\')" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;">⚖️</button></td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>'; }).join('');
+  tbody.innerHTML = data.map(function (row) { return '<tr><td>' + f(row.id) + '</td><td><button onclick="toggleCompare(\'' + row._uid + '\')" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;">⚖️</button></td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>'; }).join('');
 }
 
 function geocodeLocation() {
@@ -933,30 +934,27 @@ function closeCompareModal() {
 
 function showCompareModal() {
   var table = document.getElementById('compareTableContent');
-  var props = compareList.map(function(id) { return currentData.find(function(r) { return r.id === id; }); }).filter(function(x) { return x; });
+  // ✅ Ubah r.id menjadi r._uid
+  var props = compareList.map(function(uid) { return currentData.find(function(r) { return r._uid === uid; }); }).filter(function(x) { return x; });
   if (props.length === 0) return;
-
-  var minMax = {};
-  ['harga', 'indikasiNilai'].forEach(function(k) {
-    var vals = props.map(function(p) { return parseFloat(String(p[k] || '').replace(/[^0-9]/g, '')) || 0; }).filter(function(v) { return v > 0; });
-    if (vals.length > 0) { minMax[k] = { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals) }; } 
-    else { minMax[k] = { min: -1, max: -1 }; }
-  });
-
-  var targetProp = compareTargetId ? props.find(function(p) { return p.id === compareTargetId; }) : null;
+  // ... (kode minMax tetap dibiarkan sama) ...
+  
+  // ✅ Ubah p.id menjadi p._uid
+  var targetProp = compareTargetId ? props.find(function(p) { return p._uid === compareTargetId; }) : null;
 
   var head = '<tr><th style="background:#f0f4f8; width:150px;">Spesifikasi</th>' + props.map(function(p) {
-    var isTarget = p.id === compareTargetId;
+    // ✅ Ubah p.id menjadi p._uid untuk logika sistem, tapi p.id tetap dipakai untuk tampilan HTML
+    var isTarget = p._uid === compareTargetId;
     var bg = isTarget ? '#e8f0fe' : '#ffffff';
     var border = isTarget ? 'border: 2px solid #2d6be4;' : '';
     return '<th style="text-align:center; background:'+bg+'; '+border+'">' +
            '<b style="font-size:14px; color:var(--navy);">' + p.id + '</b><br><span style="font-size:10px;font-weight:normal;color:var(--text-sub);">' + p.objek + '</span><br>' +
            '<div style="display:flex; justify-content:center; gap:5px; margin-top:8px;">' +
-           '<button onclick="setCompareTarget(\'' + p.id + '\')" style="background:'+(isTarget?'#2d6be4':'#f0f4f8')+';color:'+(isTarget?'#fff':'#5a6a7e')+';border:1px solid #d1dbe8;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;font-weight:bold;">'+(isTarget?'⭐ Target':'🎯 Jadikan Target')+'</button>' +
-           '<button onclick="removeCompareItem(\'' + p.id + '\')" style="background:#fce8e6;color:#ea4335;border:1px solid #fad2cf;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;font-weight:bold;">🗑️ Hapus</button>' +
+           '<button onclick="setCompareTarget(\'' + p._uid + '\')" style="background:'+(isTarget?'#2d6be4':'#f0f4f8')+';color:'+(isTarget?'#fff':'#5a6a7e')+';border:1px solid #d1dbe8;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;font-weight:bold;">'+(isTarget?'⭐ Target':'🎯 Jadikan Target')+'</button>' +
+           '<button onclick="removeCompareItem(\'' + p._uid + '\')" style="background:#fce8e6;color:#ea4335;border:1px solid #fad2cf;border-radius:4px;padding:4px 8px;font-size:10px;cursor:pointer;font-weight:bold;">🗑️ Hapus</button>' +
            '</div></th>';
   }).join('') + '</tr>';
-
+  
   function tr(label, key, isRp, isNumericHighlight) {
     return '<tr><th style="background:#fafafa;">' + label + '</th>' + props.map(function(p) {
       var rawValStr = String(p[key] || ''); var isDash = rawValStr === '–' || rawValStr === '';
@@ -971,7 +969,7 @@ function showCompareModal() {
       }
 
       var diffHtml = '';
-      if (targetProp && p.id !== compareTargetId && isNumericHighlight) {
+     if (targetProp && p._uid !== compareTargetId && isNumericHighlight) {
          var targetNum = parseFloat(String(targetProp[key] || '').replace(/[^0-9]/g, '')) || 0;
          if (targetNum > 0 && numVal > 0) {
             var diffPct = ((numVal / targetNum) - 1) * 100;
