@@ -215,6 +215,11 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .compare-table th { background: var(--bg); color: var(--text-sub); text-align: left; font-weight: 600; width: 120px; }
 .compare-table img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; }
 
+/* SCORE BAR AVM */
+.avm-score-bar { width: 100%; height: 10px; background: var(--border); border-radius: 5px; margin-top: 10px; overflow: hidden; }
+.avm-score-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+.avm-insight { font-size: 12px; background: var(--bg); border-left: 4px solid var(--blue); padding: 12px; border-radius: 4px; margin-top: 15px; color: var(--text); line-height: 1.5; text-align: left;}
+
 /* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS
    ========================================================= */
@@ -411,29 +416,46 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 </div>
 
 <div class="modal-overlay" id="analyticsOverlay" onclick="if(event.target===this)closeAnalyticsModal()">
-  <div class="modal" style="max-width: 480px;">
+  <div class="modal" style="max-width: 580px;">
     <div class="modal-header">
       <span class="modal-title" style="color:var(--navy); font-size:16px;">📊 Hasil Analisa Pasar (Radius)</span>
       <button class="btn-close" onclick="closeAnalyticsModal()">✕</button>
     </div>
     <div class="modal-body" style="padding: 25px;">
-      <div class="analitik-box" style="border: 1px solid var(--border);">
-        <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Tengah (Median) Pasar /m²</div>
-        <div class="analitik-val" id="modalMedianPrice" style="font-size:32px; margin: 10px 0; color:#2d6be4;">Rp 0</div>
-        
-        <div id="modalOutlierInfo" style="font-size:11px; color:#ea4335; margin-bottom:15px; font-weight: 700; background:#fce8e6; padding:6px 12px; border-radius:20px; display:inline-block;"></div>
-        
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
-          <div style="background: #f0f4f8; padding: 10px; border-radius: 8px;">
-            <div style="font-size: 11px; color: var(--text-sub);">Standar Deviasi (σ)</div>
-            <strong id="modalStdev" style="font-size: 15px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
-          </div>
-          <div style="background: #f0f4f8; padding: 10px; border-radius: 8px;">
-            <div style="font-size: 11px; color: var(--text-sub);">Deviasi Min-Max</div>
-            <strong id="modalDeviasi" style="font-size: 15px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
-          </div>
+      
+      <div style="display: flex; justify-content: space-between; align-items:flex-end;">
+        <div>
+          <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Tengah (Median) Pasar /m²</div>
+          <div class="analitik-val" id="modalMedianPrice" style="font-size:36px; margin: 5px 0 0 0; color:#2d6be4;">Rp 0</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size:12px; color:var(--text-sub); font-weight:600; margin-bottom:5px;">Skor Kepercayaan</div>
+          <strong id="modalScoreText" style="font-size:18px; color:var(--green);">Tinggi</strong>
         </div>
       </div>
+      
+      <div class="avm-score-bar"><div id="modalScoreFill" class="avm-score-fill" style="width:0%; background:var(--green);"></div></div>
+      
+      <div class="avm-insight" id="modalSmartInsight">Menganalisa data...</div>
+
+      <div style="margin-top: 25px;">
+        <div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:10px; text-align:center;">Distribusi Frekuensi Harga</div>
+        <div style="position: relative; height: 160px; width: 100%;">
+          <canvas id="chartHistogram"></canvas>
+        </div>
+      </div>
+
+      <div style="margin-top: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
+        <div style="background: #f0f4f8; padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: var(--text-sub);">Standar Deviasi (σ)</div>
+          <strong id="modalStdev" style="font-size: 16px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
+        </div>
+        <div style="background: #f0f4f8; padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: var(--text-sub);">Deviasi Min-Max</div>
+          <strong id="modalDeviasi" style="font-size: 16px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
+        </div>
+      </div>
+
     </div>
     <div class="modal-footer" style="justify-content: space-between; align-items: center; background: #fafafa;">
       <span id="modalDataCount" style="font-size: 12px; font-weight: 700; color: var(--text-sub);">0 Data Valid</span>
@@ -559,7 +581,8 @@ var _editingId = null, _editingFoto = '';
 var _pickingLocation = false;
 
 var heatLayer = null, isHeatmap = false;
-var myChart = null;
+var myChart = null; // Doughnut chart (Sidebar)
+var histChart = null; // Bar chart (Modal)
 
 // VARIABEL COMPARE & AGING FLAG
 var compareList = [];
@@ -682,7 +705,7 @@ function calculateSidebarStats(data) {
   myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#0f9d58','#4285f4','#ab47bc','#f4b400'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10, family: 'Plus Jakarta Sans' }, boxWidth: 10 } } } } });
 }
 
-// ✅ MODAL ANALISA (STATISTIK AVM KHUSUS MEDIAN & OUTLIER)
+// ✅ MODAL ANALISA (STATISTIK AVM LENGKAP)
 function showAnalyticsModal() {
   if (!currentData || currentData.length === 0) {
     toast('Lakukan pencarian data terlebih dahulu!', 'error');
@@ -714,22 +737,20 @@ function showAnalyticsModal() {
   var cleanMedian = 0;
   var outliersRemoved = 0;
 
-  // Logika Filter IQR
+  // 1. Logika Filter IQR
   if (rawPrices.length >= 4) {
     var q1 = getMedian(rawPrices.slice(0, Math.floor(rawPrices.length / 2)));
     var q3 = getMedian(rawPrices.slice(Math.ceil(rawPrices.length / 2)));
     var iqr = q3 - q1;
-    
     var lowerBound = q1 - (1.5 * iqr);
     var upperBound = q3 + (1.5 * iqr);
 
     cleanPrices = rawPrices.filter(function(p) { return p >= lowerBound && p <= upperBound; });
     outliersRemoved = rawPrices.length - cleanPrices.length;
   }
-  
   cleanMedian = getMedian(cleanPrices);
 
-  // Kalkulasi Stdev & Deviasi pada data yang sudah bersih dari Outlier
+  // 2. Kalkulasi Stdev & Deviasi (Pada data bersih)
   var n = cleanPrices.length;
   var stdevPct = 0;
   var devPct = 0;
@@ -746,33 +767,104 @@ function showAnalyticsModal() {
       devPct = ((cMax - cMin) / cMin) * 100;
   }
 
-  // Tampilkan Hasil di Modal AVM
+  // 3. Tampilkan Angka Dasar
   document.getElementById('modalMedianPrice').textContent = formatRupiah(Math.round(cleanMedian));
-  document.getElementById('modalDataCount').textContent = n + " Data Valid";
+  document.getElementById('modalDataCount').textContent = n + " Data Wajar Dievaluasi";
 
-  var outlierEl = document.getElementById('modalOutlierInfo');
-  if (outliersRemoved > 0) {
-    outlierEl.innerHTML = '✨ ' + outliersRemoved + ' data ekstrem/anomali otomatis diabaikan';
-    outlierEl.style.color = '#ea4335';
-    outlierEl.style.background = '#fce8e6';
-    outlierEl.style.display = 'inline-block';
+  // 4. Logika Kepercayaan (Confidence Score) & Insight Teks
+  var scoreText = "Tinggi";
+  var scoreColor = "#16a34a"; // Hijau
+  var scoreFill = 90;
+  var insightMsg = "";
+
+  if (stdevPct <= 15) {
+      scoreText = "Tinggi"; scoreColor = "#16a34a"; scoreFill = Math.max(80, 100 - stdevPct);
+      insightMsg = "<strong>Sangat Ideal.</strong> Data pembanding di area ini sangat seragam. Nilai tengah yang dihasilkan memiliki tingkat akurasi yang sangat tinggi dan layak dijadikan patokan utama.";
+  } else if (stdevPct <= 30) {
+      scoreText = "Sedang"; scoreColor = "#eab308"; scoreFill = Math.max(50, 80 - (stdevPct-15));
+      insightMsg = "<strong>Wajar.</strong> Terdapat sedikit variasi harga di area ini (mungkin karena perbedaan spesifikasi minor). Nilai tengah masih cukup relevan sebagai acuan dasar.";
   } else {
-    outlierEl.innerHTML = '✅ Distribusi harga terpantau stabil (tidak ada nilai ekstrem)';
-    outlierEl.style.color = '#16a34a';
-    outlierEl.style.background = '#e6f4ea';
-    outlierEl.style.display = 'inline-block';
+      scoreText = "Rendah"; scoreColor = "#dc2626"; scoreFill = Math.max(10, 50 - (stdevPct-30));
+      insightMsg = "<strong>Peringatan!</strong> Data di radius ini sangat heterogen/bervariasi (seperti campuran tanah di gang sempit dan jalan raya). <em>Disarankan untuk mempersempit radius pencarian atau memfilter lebar jalan.</em>";
   }
 
-  var stdevColor = stdevPct <= 4 ? '#22c55e' : (stdevPct <= 7 ? '#eab308' : '#ef4444');
-  var devColor = devPct <= 9 ? '#22c55e' : (devPct < 14 ? '#eab308' : '#ef4444');
+  // Jika ada Outlier, tambahkan peringatan
+  if (outliersRemoved > 0) {
+      insightMsg += "<br><br><span style='color:#dc2626;'><em>✨ Sistem telah membuang " + outliersRemoved + " harga ekstrem (indikasi Jual BU / Spekulan) untuk melindungi akurasi rata-rata.</em></span>";
+  }
+
+  document.getElementById('modalScoreText').textContent = scoreText;
+  document.getElementById('modalScoreText').style.color = scoreColor;
+  document.getElementById('modalScoreFill').style.width = scoreFill + "%";
+  document.getElementById('modalScoreFill').style.background = scoreColor;
+  
+  document.getElementById('modalSmartInsight').innerHTML = insightMsg;
+  document.getElementById('modalSmartInsight').style.borderLeftColor = scoreColor;
 
   document.getElementById('modalStdev').textContent = stdevPct.toFixed(2) + '%';
-  document.getElementById('modalStdev').style.color = stdevColor;
+  document.getElementById('modalStdev').style.color = (stdevPct <= 15) ? '#16a34a' : (stdevPct <= 30 ? '#eab308' : '#dc2626');
   
   document.getElementById('modalDeviasi').textContent = devPct.toFixed(2) + '%';
-  document.getElementById('modalDeviasi').style.color = devColor;
+  document.getElementById('modalDeviasi').style.color = (devPct <= 30) ? '#16a34a' : (devPct <= 50 ? '#eab308' : '#dc2626');
+
+  // 5. Render Histogram Chart
+  renderHistogram(cleanPrices);
 
   document.getElementById('analyticsOverlay').classList.add('open');
+}
+
+function renderHistogram(prices) {
+    if(prices.length === 0) return;
+    
+    var min = Math.min.apply(null, prices);
+    var max = Math.max.apply(null, prices);
+    var bins = 5;
+    var binSize = (max - min) / bins;
+    
+    var labels = [];
+    var counts = [0, 0, 0, 0, 0];
+
+    // Jika semua harga sama persis
+    if (binSize === 0) {
+        labels = [formatRupiah(min)];
+        counts = [prices.length];
+    } else {
+        for(var i=0; i<bins; i++) {
+            var bStart = min + (i * binSize);
+            var bEnd = min + ((i+1) * binSize);
+            labels.push(formatRupiah(Math.round(bStart)) + " - " + formatRupiah(Math.round(bEnd)));
+        }
+        prices.forEach(function(p) {
+            var idx = Math.floor((p - min) / binSize);
+            if(idx >= bins) idx = bins - 1; // Tangkap nilai max absolut
+            counts[idx]++;
+        });
+    }
+
+    var ctx = document.getElementById('chartHistogram').getContext('2d');
+    if (histChart) histChart.destroy();
+    
+    histChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Jumlah Properti',
+                data: counts,
+                backgroundColor: '#4882f5',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                x: { ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
 }
 
 function closeAnalyticsModal() {
@@ -848,7 +940,7 @@ function doSearch() {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
         currentData = res.data.map(function(row, index) {
-          row._uid = 'prop_' + index; // Internal UID Sistem
+          row._uid = 'prop_' + index; // ✅ Internal UID Sistem
           var indStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
           if (!indStr || parseInt(indStr) === 0) {
             var hrg = parseFloat(String(row.harga || '').replace(/[^0-9]/g, '')) || 0;
@@ -976,12 +1068,7 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
 function submitData() {
   function g(id) { return document.getElementById(id).value.trim(); } function num(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
   
-  // ✅ Validasi Jenis Properti (f_objek) dihapus agar bisa dikosongkan
-
-  // ✅ Validasi Koordinat tetap wajib
   if (!g('f_koordinat')){ toast('Koordinat wajib diisi!', 'error'); return; }
-  
-  // ✅ Validasi Foto wajib khusus untuk penambahan data baru
   if (!_editingId && !_fotoDataUrl) { toast('Foto Properti wajib diupload untuk data awal!', 'error'); return; }
 
   var btn = document.getElementById('btnSubmit'); btn.disabled = true; btn.textContent = '⏳ Menyimpan…';
