@@ -570,6 +570,20 @@ document.addEventListener("DOMContentLoaded", function() {
   if (fElevasi) { fElevasi.addEventListener('input', function() { if (/[^\d.-]/.test(this.value)) { toast('Hanya menerima input angka', 'error'); this.value = this.value.replace(/[^\d.-]/g, ''); } }); }
 });
 
+ // === TAMBAHAN BARU: Auto-format koordinat dari koma ke titik ===
+  var fCoord = document.getElementById('f_koordinat');
+  if (fCoord) {
+    fCoord.addEventListener('blur', function() {
+      var s = this.value.trim();
+      // Deteksi format salah seperti: -6,9405699, 107,6085114
+      var matches = s.match(/(-?\d+),(\d+)[\s,]+(-?\d+),(\d+)/);
+      if (matches) {
+        // Ubah menjadi: -6.9405699, 107.6085114
+        this.value = matches[1] + '.' + matches[2] + ', ' + matches[3] + '.' + matches[4];
+        toast('Format koordinat otomatis dirapikan', 'success');
+      }
+    });
+  } 
 // ── LOGIKA LOGIN ──────────────────────────────────────────────
 if (!sessionStorage.getItem('isLoggedIn')) { document.getElementById('loginOverlay').classList.add('open'); } 
 else { document.getElementById('loginOverlay').classList.remove('open'); setTimeout(function() { applyPermissions(activeRole); safeInitMap(); }, 300); }
@@ -817,13 +831,33 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
 
 function submitData() {
   function g(id) { return document.getElementById(id).value.trim(); } function num(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
-  if (!g('f_objek')) { toast('Jenis Properti wajib diisi!', 'error'); return; } if (!g('f_koordinat')){ toast('Koordinat wajib diisi!', 'error'); return; }
+  
+  // ✅ Validasi Jenis Properti (f_objek) dihapus agar bisa dikosongkan
+
+  // ✅ Validasi Koordinat tetap wajib
+  if (!g('f_koordinat')){ toast('Koordinat wajib diisi!', 'error'); return; }
+  
+  // ✅ Validasi Foto wajib khusus untuk penambahan data baru
+  if (!_editingId && !_fotoDataUrl) { toast('Foto Properti wajib diupload untuk data awal!', 'error'); return; }
+
   var btn = document.getElementById('btnSubmit'); btn.disabled = true; btn.textContent = '⏳ Menyimpan…';
+  
   if (_fotoDataUrl) {
     document.getElementById('fotoStatus').textContent = '⏳ Mengupload foto…';
     var cleanSumber = g('f_sumber') ? g('f_sumber').replace(/[\/\\]/g, '-') : 'Foto'; var newFilename = cleanSumber + ' - ' + (g('f_id') || 'Baru') + '.jpg';
-    google.script.run.withSuccessHandler(function (res) { if (res.success) { document.getElementById('fotoStatus').textContent = '✅ Foto diupload.'; _doSubmitRow(res.url, g, num, btn); } else { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal upload foto: ' + res.error, 'error'); } }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal: ' + err.message, 'error'); }).uploadFoto(_fotoDataUrl, newFilename); 
-  } else { _doSubmitRow('', g, num, btn); }
+    google.script.run.withSuccessHandler(function (res) { 
+      if (res.success) { 
+        document.getElementById('fotoStatus').textContent = '✅ Foto diupload.'; 
+        _doSubmitRow(res.url, g, num, btn); 
+      } else { 
+        btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal upload foto: ' + res.error, 'error'); 
+      } 
+    }).withFailureHandler(function (err) { 
+      btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal: ' + err.message, 'error'); 
+    }).uploadFoto(_fotoDataUrl, newFilename); 
+  } else { 
+    _doSubmitRow('', g, num, btn); 
+  }
 }
 
 function _doSubmitRow(fotoUrl, g, num, btn) {
