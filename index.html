@@ -81,14 +81,14 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .form-input:focus, .form-select:focus { border-color: var(--blue); background: #fff; }
 
 .btn-search { width: 100%; background: #A9D08E; color: var(--navy); border: none; border-radius: 8px; padding: 10px 0; font-family: var(--font); font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: all .2s; }
-.btn-search:hover { background: #92b876; transform: translateY(-1px); box-shadow: var(--shadow); }
-.btn-search:active { transform: none; }
+.btn-search:hover:not(:disabled) { background: #92b876; transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn-search:active:not(:disabled) { transform: none; }
 .btn-search.loading { opacity: .75; pointer-events: none; }
 .btn-reset { width: 100%; background: transparent; color: var(--text-sub); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 0; font-family: var(--font); font-size: 12px; cursor: pointer; transition: all .2s; margin-top: 8px; }
 .btn-reset:hover { border-color: var(--red); color: var(--red); }
 
-/* ANALITIK BOX PRO */
-.analitik-box { background: #ffffff; border-radius: 8px; text-align: center; }
+/* ANALITIK BOX PENCARIAN (SIDEBAR) */
+.analitik-box { background: #ffffff; border-radius: 8px; border: 1px solid var(--border); text-align: center; padding: 12px; }
 .analitik-val { font-size: 17px; font-weight: 800; color: #16a34a; margin-top: 5px; }
 .analitik-minmax { display: flex; justify-content: space-between; margin-top: 8px; border-top: 1px dashed #d1dbe8; padding-top: 8px; font-size: 10.5px; }
 .analitik-minmax div { display: flex; flex-direction: column; text-align: left; }
@@ -344,9 +344,21 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 
       <div style="display: flex; gap: 8px;">
         <button class="btn-search" id="btnCari" onclick="doSearch()" style="flex: 2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari</button>
-        <button class="btn-search" id="btnAnalisa" onclick="showAnalyticsModal()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
+        <button class="btn-search" id="btnAnalisa" onclick="showAnalyticsModal()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
       </div>
       <button class="btn-reset" onclick="resetFilter()">↺ Reset Filter</button>
+
+      <div class="analitik-box" style="margin-top: 15px;">
+        <div class="result-label">Rata-rata Indikasi Nilai /m²</div>
+        <div class="analitik-val" id="sideAvgPrice">Rp 0</div>
+        <div class="analitik-minmax">
+          <div><span style="color:#5a6a7e">Terendah:</span> <strong id="sideMinPrice" style="color:#ea4335">Rp 0</strong></div>
+          <div><span style="color:#5a6a7e">Tertinggi:</span> <strong id="sideMaxPrice" style="color:#2d6be4">Rp 0</strong></div>
+        </div>
+        <div style="position: relative; height: 180px; width: 100%; margin-top: 15px;">
+          <canvas id="sideChart"></canvas>
+        </div>
+      </div>
 
       <div class="result-badge" style="margin-top: 15px;">
         <div><div class="result-count" id="resultCount">–</div><div class="result-label">data ditemukan</div></div>
@@ -405,23 +417,27 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
       <button class="btn-close" onclick="closeAnalyticsModal()">✕</button>
     </div>
     <div class="modal-body" style="padding: 25px;">
-      <div class="analitik-box">
+      <div class="analitik-box" style="border: 1px solid var(--border);">
         <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Tengah (Median) Pasar /m²</div>
-        <div class="analitik-val" id="avgPrice" style="font-size:32px; margin: 10px 0;">Rp 0</div>
+        <div class="analitik-val" id="modalMedianPrice" style="font-size:32px; margin: 10px 0; color:#2d6be4;">Rp 0</div>
         
-        <div id="outlierInfo" style="font-size:11px; color:#ea4335; margin-bottom:15px; font-weight: 700; background:#fce8e6; padding:6px 12px; border-radius:20px; display:inline-block;"></div>
+        <div id="modalOutlierInfo" style="font-size:11px; color:#ea4335; margin-bottom:15px; font-weight: 700; background:#fce8e6; padding:6px 12px; border-radius:20px; display:inline-block;"></div>
         
-        <div class="analitik-minmax" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
-          <div><span style="color:#5a6a7e; font-size:11px;">Harga Terendah:</span> <strong id="minPrice" style="color:#ea4335; font-size:15px; display:block; margin-top:4px;">Rp 0</strong></div>
-          <div style="text-align:right;"><span style="color:#5a6a7e; font-size:11px;">Harga Tertinggi:</span> <strong id="maxPrice" style="color:#2d6be4; font-size:15px; display:block; margin-top:4px;">Rp 0</strong></div>
-        </div>
-        <div style="position: relative; height: 220px; width: 100%; margin-top: 30px;">
-          <canvas id="chartProperti"></canvas>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
+          <div style="background: #f0f4f8; padding: 10px; border-radius: 8px;">
+            <div style="font-size: 11px; color: var(--text-sub);">Standar Deviasi (σ)</div>
+            <strong id="modalStdev" style="font-size: 15px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
+          </div>
+          <div style="background: #f0f4f8; padding: 10px; border-radius: 8px;">
+            <div style="font-size: 11px; color: var(--text-sub);">Deviasi Min-Max</div>
+            <strong id="modalDeviasi" style="font-size: 15px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
+          </div>
         </div>
       </div>
     </div>
-    <div class="modal-footer" style="justify-content: center;">
-      <button class="btn-submit" onclick="closeAnalyticsModal()" style="width: 100%;">Tutup Analisa</button>
+    <div class="modal-footer" style="justify-content: space-between; align-items: center; background: #fafafa;">
+      <span id="modalDataCount" style="font-size: 12px; font-weight: 700; color: var(--text-sub);">0 Data Valid</span>
+      <button class="btn-submit" onclick="closeAnalyticsModal()" style="width: auto;">Tutup Analisa</button>
     </div>
   </div>
 </div>
@@ -545,6 +561,7 @@ var _pickingLocation = false;
 var heatLayer = null, isHeatmap = false;
 var myChart = null;
 
+// VARIABEL COMPARE & AGING FLAG
 var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
@@ -554,6 +571,7 @@ var activeUsername = sessionStorage.getItem('userName');
 
 var PIN_COLORS = { 'Tanah Kosong': '#4285f4', 'Tanah Bangunan': '#0f9d58', 'Ruko': '#ab47bc', 'Office/Retail/Unit Apartemen': '#f4b400' };
 
+// ── FUNGSI TIME AGING (DATA USANG) ─────────────────────────────
 function getAgingFlag(yrStr) {
   var yr = parseInt(String(yrStr));
   if (!isNaN(yr) && yr <= _currentYear - 2) {
@@ -562,6 +580,7 @@ function getAgingFlag(yrStr) {
   return '';
 }
 
+// ── INIT & EVENT LISTENERS ────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function() {
   if (window.innerWidth > 768) { var closeBtn = document.querySelector('.close-mobile-filter'); if(closeBtn) closeBtn.style.display = 'none'; }
 
@@ -597,6 +616,7 @@ document.addEventListener("DOMContentLoaded", function() {
   } 
 });
 
+// ── LOGIKA LOGIN ──────────────────────────────────────────────
 if (!sessionStorage.getItem('isLoggedIn')) { document.getElementById('loginOverlay').classList.add('open'); } 
 else { document.getElementById('loginOverlay').classList.remove('open'); setTimeout(function() { applyPermissions(activeRole); safeInitMap(); }, 300); }
 
@@ -625,6 +645,7 @@ function applyPermissions(role) {
   else if (role === 'Viewer') { if(btnExport) btnExport.disabled = true; if(btnAddTop) btnAddTop.disabled = true; if(btnAddMap) btnAddMap.disabled = true; if(btnTable)  btnTable.disabled = true; }
 }
 
+// ── FUNGSI UI & MAPS ──────────────────────────────────────────
 function locateMe() {
   if (!gMap) return; toast('Mencari sinyal GPS...', 'loading');
   gMap.locate({setView: false, enableHighAccuracy: true});
@@ -638,37 +659,45 @@ function pickLocation() {
 
 function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
 
-// ✅ MODAL ANALISA (Dipisah dari Pencarian)
+// ✅ KALKULASI SIDEBAR PENCARIAN (HANYA RATA-RATA BIASA & GRAFIK)
+function calculateSidebarStats(data) {
+  var total = 0, count = 0, min = Infinity, max = 0;
+  var counts = { 'Tanah Bangunan':0, 'Tanah Kosong':0, 'Ruko':0, 'Office/Retail/Unit Apartemen':0 };
+
+  data.forEach(function(row) {
+    if (counts[row.objek] !== undefined) counts[row.objek]++;
+    var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
+    var price = parseFloat(priceStr);
+    if (!isNaN(price) && price > 0) { total += price; count++; if (price < min) min = price; if (price > max) max = price; }
+  });
+  
+  var avg = count > 0 ? Math.round(total / count) : 0; if (count === 0) min = 0;
+  
+  document.getElementById('sideAvgPrice').textContent = formatRupiah(avg); 
+  document.getElementById('sideMinPrice').textContent = formatRupiah(min); 
+  document.getElementById('sideMaxPrice').textContent = formatRupiah(max);
+
+  var ctx = document.getElementById('sideChart').getContext('2d');
+  if (myChart) myChart.destroy();
+  myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#0f9d58','#4285f4','#ab47bc','#f4b400'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10, family: 'Plus Jakarta Sans' }, boxWidth: 10 } } } } });
+}
+
+// ✅ MODAL ANALISA (STATISTIK AVM KHUSUS MEDIAN & OUTLIER)
 function showAnalyticsModal() {
   if (!currentData || currentData.length === 0) {
     toast('Lakukan pencarian data terlebih dahulu!', 'error');
     return;
   }
 
-  var data = currentData;
-  var counts = { 'Tanah Bangunan':0, 'Tanah Kosong':0, 'Ruko':0, 'Office/Retail/Unit Apartemen':0 };
   var rawPrices = [];
-  var min = Infinity, max = 0;
-
-  data.forEach(function(row) {
-    if (counts[row.objek] !== undefined) counts[row.objek]++;
+  currentData.forEach(function(row) {
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
-    
-    if (!isNaN(price) && price > 0) { 
-      rawPrices.push(price);
-      if (price < min) min = price; 
-      if (price > max) max = price; 
-    }
+    if (!isNaN(price) && price > 0) rawPrices.push(price);
   });
 
   if (rawPrices.length === 0) {
-    document.getElementById('avgPrice').textContent = 'Rp 0';
-    document.getElementById('minPrice').textContent = 'Rp 0';
-    document.getElementById('maxPrice').textContent = 'Rp 0';
-    document.getElementById('outlierInfo').textContent = '';
-    document.getElementById('outlierInfo').style.display = 'none';
-    document.getElementById('analyticsOverlay').classList.add('open');
+    toast('Tidak ada data valid dengan nilai indikasi untuk dianalisa.', 'error');
     return;
   }
 
@@ -681,9 +710,11 @@ function showAnalyticsModal() {
     return (arr[mid - 1] + arr[mid]) / 2;
   }
 
+  var cleanPrices = rawPrices;
   var cleanMedian = 0;
   var outliersRemoved = 0;
 
+  // Logika Filter IQR
   if (rawPrices.length >= 4) {
     var q1 = getMedian(rawPrices.slice(0, Math.floor(rawPrices.length / 2)));
     var q3 = getMedian(rawPrices.slice(Math.ceil(rawPrices.length / 2)));
@@ -692,22 +723,34 @@ function showAnalyticsModal() {
     var lowerBound = q1 - (1.5 * iqr);
     var upperBound = q3 + (1.5 * iqr);
 
-    var cleanPrices = rawPrices.filter(function(p) {
-      return p >= lowerBound && p <= upperBound;
-    });
-
+    cleanPrices = rawPrices.filter(function(p) { return p >= lowerBound && p <= upperBound; });
     outliersRemoved = rawPrices.length - cleanPrices.length;
-    cleanMedian = getMedian(cleanPrices);
-  } else {
-    cleanMedian = getMedian(rawPrices);
+  }
+  
+  cleanMedian = getMedian(cleanPrices);
+
+  // Kalkulasi Stdev & Deviasi pada data yang sudah bersih dari Outlier
+  var n = cleanPrices.length;
+  var stdevPct = 0;
+  var devPct = 0;
+  
+  if (n > 1) {
+      var sum = cleanPrices.reduce(function(a,b){return a+b}, 0);
+      var mean = sum / n;
+      var sumSq = cleanPrices.reduce(function(a,b){return a + Math.pow(b - mean, 2)}, 0);
+      var stdevS = Math.sqrt(sumSq / (n - 1));
+      stdevPct = (stdevS / mean) * 100;
+
+      var cMax = Math.max.apply(null, cleanPrices);
+      var cMin = Math.min.apply(null, cleanPrices);
+      devPct = ((cMax - cMin) / cMin) * 100;
   }
 
-  // Tampilkan Hasil di Modal
-  document.getElementById('avgPrice').textContent = formatRupiah(Math.round(cleanMedian));
-  document.getElementById('minPrice').textContent = formatRupiah(min);
-  document.getElementById('maxPrice').textContent = formatRupiah(max);
+  // Tampilkan Hasil di Modal AVM
+  document.getElementById('modalMedianPrice').textContent = formatRupiah(Math.round(cleanMedian));
+  document.getElementById('modalDataCount').textContent = n + " Data Valid";
 
-  var outlierEl = document.getElementById('outlierInfo');
+  var outlierEl = document.getElementById('modalOutlierInfo');
   if (outliersRemoved > 0) {
     outlierEl.innerHTML = '✨ ' + outliersRemoved + ' data ekstrem/anomali otomatis diabaikan';
     outlierEl.style.color = '#ea4335';
@@ -720,9 +763,14 @@ function showAnalyticsModal() {
     outlierEl.style.display = 'inline-block';
   }
 
-  var ctx = document.getElementById('chartProperti').getContext('2d');
-  if (myChart) myChart.destroy();
-  myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#0f9d58','#4285f4','#ab47bc','#f4b400'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Plus Jakarta Sans' }, boxWidth: 12 } } } } });
+  var stdevColor = stdevPct <= 4 ? '#22c55e' : (stdevPct <= 7 ? '#eab308' : '#ef4444');
+  var devColor = devPct <= 9 ? '#22c55e' : (devPct < 14 ? '#eab308' : '#ef4444');
+
+  document.getElementById('modalStdev').textContent = stdevPct.toFixed(2) + '%';
+  document.getElementById('modalStdev').style.color = stdevColor;
+  
+  document.getElementById('modalDeviasi').textContent = devPct.toFixed(2) + '%';
+  document.getElementById('modalDeviasi').style.color = devColor;
 
   document.getElementById('analyticsOverlay').classList.add('open');
 }
@@ -789,7 +837,7 @@ function collectParams() {
   return { jenisProprti: get('jenisProprti'), legalitas: get('legalitas'), jenisData: get('jenisData'), tahun: get('tahun'), rowJalan: document.getElementById('rowJalan').value, statusData: statusVal, radiusKm: document.getElementById('radius').value || null, centerLat: cLat, centerLng: cLng };
 }
 
-// ✅ PENCARIAN (TANPA ANALISA OTOMATIS)
+// ── SISTEM PENCARIAN ──────────────────────────────────────────
 function doSearch() {
   var btn = document.getElementById('btnCari');
   btn.classList.add('loading'); btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
@@ -812,8 +860,11 @@ function doSearch() {
 
         document.getElementById('resultCount').textContent = res.total; 
         
-        // PENTING: Kalkulasi Otomatis Dihapus dari sini
-        // calculateAnalytics(currentData); 
+        // ✅ Hitung statistik sidebar (Rata-rata/Mean & Chart)
+        calculateSidebarStats(currentData); 
+
+        // ✅ Aktifkan tombol Analisa karena data sudah tersedia
+        document.getElementById('btnAnalisa').disabled = false;
 
         renderMarkers(currentData, params); 
         renderTable(currentData); 
@@ -916,7 +967,7 @@ function geocodeLocation() {
 }
 
 function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), tableEl = document.getElementById('tableView'); if (v === 'map') { mapEl.style.display = 'block'; tableEl.classList.remove('active'); if (gMap) setTimeout(function () { gMap.invalidateSize(); }, 50); } else { mapEl.style.display = 'none'; tableEl.classList.add('active'); } }
-function resetFilter() { document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; toast('Filter direset', ''); }
+function resetFilter() { document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; toast('Filter direset', ''); }
 
 function openModalNew() { _editingId = null; _editingFoto = ''; _originalKoordinat = null; document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding'; document.getElementById('f_id').disabled = false; document.getElementById('btnSubmit').textContent = '💾 Simpan Data'; document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; document.querySelectorAll('.modal .form-input, .modal .form-select').forEach(function(i) { i.value = ''; }); removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
 function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; document.getElementById('f_objek').value = row.objek; document.getElementById('f_tipe').value = row.tipeBangunan; document.getElementById('f_legalitas').value = row.legalitas; document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; document.getElementById('f_statusHarga').value = row.statusHarga; document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
@@ -925,7 +976,12 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
 function submitData() {
   function g(id) { return document.getElementById(id).value.trim(); } function num(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
   
+  // ✅ Validasi Jenis Properti (f_objek) dihapus agar bisa dikosongkan
+
+  // ✅ Validasi Koordinat tetap wajib
   if (!g('f_koordinat')){ toast('Koordinat wajib diisi!', 'error'); return; }
+  
+  // ✅ Validasi Foto wajib khusus untuk penambahan data baru
   if (!_editingId && !_fotoDataUrl) { toast('Foto Properti wajib diupload untuk data awal!', 'error'); return; }
 
   var btn = document.getElementById('btnSubmit'); btn.disabled = true; btn.textContent = '⏳ Menyimpan…';
