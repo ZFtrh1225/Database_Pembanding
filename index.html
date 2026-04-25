@@ -900,7 +900,7 @@ function toggleCompare(id) {
     compareList.splice(idx, 1); 
     if (compareTargetId === id) compareTargetId = null;
   } else { 
-    if (compareList.length >= 3) { toast('Maksimal 3 properti', 'error'); return; } 
+    if (compareList.length >= 4) { toast('Maksimal 4 properti', 'error'); return; } 
     compareList.push(id); 
   }
   updateCompareUI();
