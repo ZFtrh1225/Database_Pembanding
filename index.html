@@ -346,8 +346,10 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
       <button class="btn-reset" onclick="resetFilter()">↺ Reset Filter</button>
 
       <div class="analitik-box">
-        <div class="result-label">Rata-rata Indikasi Nilai /m²</div>
+        <div class="result-label" style="font-weight:bold; color:var(--navy);">Nilai Tengah (Median) Pasar /m²</div>
         <div class="analitik-val" id="avgPrice">Rp 0</div>
+        <div id="outlierInfo" style="font-size:10px; color:#ea4335; margin-top:3px; font-weight: 600;"></div>
+        
         <div class="analitik-minmax">
           <div><span style="color:#5a6a7e">Terendah:</span> <strong id="minPrice" style="color:#ea4335">Rp 0</strong></div>
           <div><span style="color:#5a6a7e">Tertinggi:</span> <strong id="maxPrice" style="color:#2d6be4">Rp 0</strong></div>
@@ -527,7 +529,6 @@ var _pickingLocation = false;
 var heatLayer = null, isHeatmap = false;
 var myChart = null;
 
-// VARIABEL COMPARE & AGING FLAG
 var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
@@ -537,16 +538,14 @@ var activeUsername = sessionStorage.getItem('userName');
 
 var PIN_COLORS = { 'Tanah Kosong': '#4285f4', 'Tanah Bangunan': '#0f9d58', 'Ruko': '#ab47bc', 'Office/Retail/Unit Apartemen': '#f4b400' };
 
-// ── FUNGSI TIME AGING (DATA USANG) ─────────────────────────────
 function getAgingFlag(yrStr) {
   var yr = parseInt(String(yrStr));
   if (!isNaN(yr) && yr <= _currentYear - 2) {
-    return '&nbsp;<span style="font-size:10.5px; color:#dc2626; cursor:help;" title="Data Lama (> 1 Tahun)">⏳</span>';
+    return ' <span style="font-size:10.5px; color:#dc2626; cursor:help;" title="Data Lama (> 1 Tahun)">⏳</span>';
   }
   return '';
 }
 
-// ── INIT & EVENT LISTENERS ────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function() {
   if (window.innerWidth > 768) { var closeBtn = document.querySelector('.close-mobile-filter'); if(closeBtn) closeBtn.style.display = 'none'; }
 
@@ -568,23 +567,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
   var fElevasi = document.getElementById('f_elevasi');
   if (fElevasi) { fElevasi.addEventListener('input', function() { if (/[^\d.-]/.test(this.value)) { toast('Hanya menerima input angka', 'error'); this.value = this.value.replace(/[^\d.-]/g, ''); } }); }
-});
 
- // === TAMBAHAN BARU: Auto-format koordinat dari koma ke titik ===
   var fCoord = document.getElementById('f_koordinat');
   if (fCoord) {
     fCoord.addEventListener('blur', function() {
       var s = this.value.trim();
-      // Deteksi format salah seperti: -6,9405699, 107,6085114
       var matches = s.match(/(-?\d+),(\d+)[\s,]+(-?\d+),(\d+)/);
       if (matches) {
-        // Ubah menjadi: -6.9405699, 107.6085114
         this.value = matches[1] + '.' + matches[2] + ', ' + matches[3] + '.' + matches[4];
         toast('Format koordinat otomatis dirapikan', 'success');
       }
     });
   } 
-// ── LOGIKA LOGIN ──────────────────────────────────────────────
+});
+
 if (!sessionStorage.getItem('isLoggedIn')) { document.getElementById('loginOverlay').classList.add('open'); } 
 else { document.getElementById('loginOverlay').classList.remove('open'); setTimeout(function() { applyPermissions(activeRole); safeInitMap(); }, 300); }
 
@@ -613,7 +609,6 @@ function applyPermissions(role) {
   else if (role === 'Viewer') { if(btnExport) btnExport.disabled = true; if(btnAddTop) btnAddTop.disabled = true; if(btnAddMap) btnAddMap.disabled = true; if(btnTable)  btnTable.disabled = true; }
 }
 
-// ── FUNGSI UI & MAPS ──────────────────────────────────────────
 function locateMe() {
   if (!gMap) return; toast('Mencari sinyal GPS...', 'loading');
   gMap.locate({setView: false, enableHighAccuracy: true});
@@ -627,20 +622,81 @@ function pickLocation() {
 
 function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
 
+// ✅ AVM LOGIC: KALKULASI MEDIAN & OUTLIER IQR DIPROSES DI SINI 
 function calculateAnalytics(data) {
-  var total = 0, count = 0, min = Infinity, max = 0;
   var counts = { 'Tanah Bangunan':0, 'Tanah Kosong':0, 'Ruko':0, 'Office/Retail/Unit Apartemen':0 };
+  var rawPrices = [];
+  var min = Infinity, max = 0;
 
+  // 1. Ekstrak data Harga per meter persegi
   data.forEach(function(row) {
     if (counts[row.objek] !== undefined) counts[row.objek]++;
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
-    if (!isNaN(price) && price > 0) { total += price; count++; if (price < min) min = price; if (price > max) max = price; }
+    
+    if (!isNaN(price) && price > 0) { 
+      rawPrices.push(price);
+      if (price < min) min = price; 
+      if (price > max) max = price; 
+    }
   });
-  
-  var avg = count > 0 ? Math.round(total / count) : 0; if (count === 0) min = 0;
-  document.getElementById('avgPrice').textContent = formatRupiah(avg); document.getElementById('minPrice').textContent = formatRupiah(min); document.getElementById('maxPrice').textContent = formatRupiah(max);
 
+  // Jika tidak ada data yang valid
+  if (rawPrices.length === 0) {
+    document.getElementById('avgPrice').textContent = 'Rp 0';
+    document.getElementById('minPrice').textContent = 'Rp 0';
+    document.getElementById('maxPrice').textContent = 'Rp 0';
+    document.getElementById('outlierInfo').textContent = '';
+    return;
+  }
+
+  // 2. Urutkan Array Harga (Kecil ke Besar)
+  rawPrices.sort(function(a, b){ return a - b; });
+
+  // Fungsi pembantu menghitung Median
+  function getMedian(arr) {
+    if (arr.length === 0) return 0;
+    var mid = Math.floor(arr.length / 2);
+    if (arr.length % 2 !== 0) return arr[mid]; // Ganjil
+    return (arr[mid - 1] + arr[mid]) / 2;      // Genap
+  }
+
+  // 3. Logika Filter IQR (Interquartile Range) untuk membuang Spekulan / Data BU
+  var cleanMedian = 0;
+  var outliersRemoved = 0;
+
+  if (rawPrices.length >= 4) { // IQR butuh minimal data yang cukup
+    var q1 = getMedian(rawPrices.slice(0, Math.floor(rawPrices.length / 2)));
+    var q3 = getMedian(rawPrices.slice(Math.ceil(rawPrices.length / 2)));
+    var iqr = q3 - q1;
+    
+    // Batas Toleransi Normal (1.5 adalah standar statistik AVM)
+    var lowerBound = q1 - (1.5 * iqr);
+    var upperBound = q3 + (1.5 * iqr);
+
+    // Menyaring data yang wajar
+    var cleanPrices = rawPrices.filter(function(p) {
+      return p >= lowerBound && p <= upperBound;
+    });
+
+    outliersRemoved = rawPrices.length - cleanPrices.length;
+    cleanMedian = getMedian(cleanPrices);
+  } else {
+    // Jika data terlalu sedikit, langsung gunakan Median mentah
+    cleanMedian = getMedian(rawPrices);
+  }
+
+  // 4. Update Angka ke Layar
+  document.getElementById('avgPrice').textContent = formatRupiah(cleanMedian);
+  document.getElementById('minPrice').textContent = formatRupiah(min);
+  document.getElementById('maxPrice').textContent = formatRupiah(max);
+
+  var outlierText = outliersRemoved > 0 ? 
+    '✨ ' + outliersRemoved + ' data ekstrem/anomali diabaikan' : 
+    '✅ Distribusi harga stabil (tidak ada ekstrem)';
+  document.getElementById('outlierInfo').textContent = outlierText;
+
+  // 5. Update Grafik Doughnut
   var ctx = document.getElementById('chartProperti').getContext('2d');
   if (myChart) myChart.destroy();
   myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#0f9d58','#4285f4','#ab47bc','#f4b400'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10, family: 'Plus Jakarta Sans' }, boxWidth: 10 } } } } });
@@ -704,7 +760,6 @@ function collectParams() {
   return { jenisProprti: get('jenisProprti'), legalitas: get('legalitas'), jenisData: get('jenisData'), tahun: get('tahun'), rowJalan: document.getElementById('rowJalan').value, statusData: statusVal, radiusKm: document.getElementById('radius').value || null, centerLat: cLat, centerLng: cLng };
 }
 
-// ── SISTEM PENCARIAN ──────────────────────────────────────────
 function doSearch() {
   var btn = document.getElementById('btnCari');
   btn.classList.add('loading'); btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
@@ -715,7 +770,7 @@ function doSearch() {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
         currentData = res.data.map(function(row, index) {
-          row._uid = 'prop_' + index; // ✅ Internal UID Sistem
+          row._uid = 'prop_' + index; // Internal UID Sistem
           var indStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
           if (!indStr || parseInt(indStr) === 0) {
             var hrg = parseFloat(String(row.harga || '').replace(/[^0-9]/g, '')) || 0;
@@ -892,8 +947,6 @@ function triggerFotoUpdate(rowId, koordinat, sumber) {
   }; inp.click();
 }
 
-// ── FUNGSI A/B COMPARISON (KALKULATOR SELISIH & STDEV) ────────────────
-
 function toggleCompare(id) {
   var idx = compareList.indexOf(id);
   if (idx > -1) { 
@@ -929,27 +982,23 @@ function setCompareTarget(id) {
 
 function closeCompareModal() {
   document.getElementById('compareOverlay').classList.remove('open');
-  updateCompareUI(); // Tampilkan kembali floating bar
+  updateCompareUI();
 }
 
 function showCompareModal() {
   var table = document.getElementById('compareTableContent');
-  // ✅ Ubah r.id menjadi r._uid
  var props = compareList.map(function(uid) { return currentData.find(function(r) { return r._uid === uid; }); }).filter(function(x) { return x; });
   if (props.length === 0) return;
   
-  // ✅ Mengembalikan kalkulasi minMax yang tidak sengaja terhapus
   var minMax = {};
   ['harga', 'indikasiNilai'].forEach(function(k) {
     var vals = props.map(function(p) { return parseFloat(String(p[k] || '').replace(/[^0-9]/g, '')) || 0; }).filter(function(v){ return v > 0; });
     if(vals.length > 0) minMax[k] = { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals) };
   });
 
-  // ✅ Ubah p.id menjadi p._uid
   var targetProp = compareTargetId ? props.find(function(p) { return p._uid === compareTargetId; }) : null;
 
   var head = '<tr><th style="background:#f0f4f8; width:150px;">Spesifikasi</th>' + props.map(function(p) {
-    // ✅ Ubah p.id menjadi p._uid untuk logika sistem, tapi p.id tetap dipakai untuk tampilan HTML
     var isTarget = p._uid === compareTargetId;
     var bg = isTarget ? '#e8f0fe' : '#ffffff';
     var border = isTarget ? 'border: 2px solid #2d6be4;' : '';
@@ -998,7 +1047,6 @@ function showCompareModal() {
       return '<td>' + img + '</td>';
   }).join('') + '</tr>';
 
-  // --- STATISTIK STDEV & DEVIASI ---
   var indVals = props.map(function(p) { return parseFloat(String(p.indikasiNilai || '').replace(/[^0-9]/g, '')) || 0; }).filter(function(v){ return v > 0; });
   var statHtml = '';
   if (indVals.length > 1) {
@@ -1038,7 +1086,7 @@ function showCompareModal() {
     + statHtml;
   
   document.getElementById('compareOverlay').classList.add('open');
-  document.getElementById('compareBar').style.display = 'none'; // Sembunyikan saat modal terbuka
+  document.getElementById('compareBar').style.display = 'none'; 
 }
 
 function downloadPDF(id) {
