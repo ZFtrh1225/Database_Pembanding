@@ -935,10 +935,16 @@ function closeCompareModal() {
 function showCompareModal() {
   var table = document.getElementById('compareTableContent');
   // ✅ Ubah r.id menjadi r._uid
-  var props = compareList.map(function(uid) { return currentData.find(function(r) { return r._uid === uid; }); }).filter(function(x) { return x; });
+ var props = compareList.map(function(uid) { return currentData.find(function(r) { return r._uid === uid; }); }).filter(function(x) { return x; });
   if (props.length === 0) return;
-  // ... (kode minMax tetap dibiarkan sama) ...
   
+  // ✅ Mengembalikan kalkulasi minMax yang tidak sengaja terhapus
+  var minMax = {};
+  ['harga', 'indikasiNilai'].forEach(function(k) {
+    var vals = props.map(function(p) { return parseFloat(String(p[k] || '').replace(/[^0-9]/g, '')) || 0; }).filter(function(v){ return v > 0; });
+    if(vals.length > 0) minMax[k] = { min: Math.min.apply(null, vals), max: Math.max.apply(null, vals) };
+  });
+
   // ✅ Ubah p.id menjadi p._uid
   var targetProp = compareTargetId ? props.find(function(p) { return p._uid === compareTargetId; }) : null;
 
