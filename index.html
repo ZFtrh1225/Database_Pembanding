@@ -923,16 +923,34 @@ function initMap() {
   markerGroup = typeof L.markerClusterGroup === 'function' ? L.markerClusterGroup({ maxClusterRadius: 50, spiderfyOnMaxZoom: true, showCoverageOnHover: false }) : L.layerGroup();
   gMap.addLayer(markerGroup);
   
-  // ✅ LOGIKA KLIK UNTUK MENGGAMBAR POLIGON DI PETA
+  // ✅ LOGIKA KLIK UNTUK MENGGAMBAR POLIGON & KLIK BEBAS DI PETA
   gMap.on('click', function(e) { 
     if (_pickingLocation) { 
+        // Kondisi 1: Sedang mengambil koordinat untuk form tambah/edit data
         _pickingLocation = false; document.getElementById('map').style.cursor = ''; 
         document.getElementById('f_koordinat').value = e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6); 
         document.getElementById('modalOverlay').classList.add('open'); 
     } else if (_drawingPolygon) {
+        // Kondisi 2: Sedang menggambar area kustom (Poligon)
         polyPoints.push(e.latlng);
         if (polyLayer) gMap.removeLayer(polyLayer);
         polyLayer = L.polygon(polyPoints, {color: '#f4b400', weight: 2, fillColor: '#f4b400', fillOpacity: 0.2}).addTo(gMap);
+    } else {
+        // ✅ Kondisi 3 (BARU): Klik bebas di peta ala Google Maps
+        var lat = e.latlng.lat.toFixed(6);
+        var lng = e.latlng.lng.toFixed(6);
+        var coordStr = lat + ',' + lng;
+
+        var popupContent = `
+            <div style="font-family:var(--font); text-align:center; padding:5px;">
+                <div style="font-size:11px; color:var(--text-sub); margin-bottom:5px;">📍 Koordinat Terpilih:</div>
+                <div style="font-size:13px; color:var(--navy); font-weight:800; user-select:all; margin-bottom:10px;">${coordStr}</div>
+                <button onclick="document.getElementById('mapSearch').value='${coordStr}'; doSearch(); gMap.closePopup();" style="background:var(--blue); color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:11px; font-weight:bold; width:100%; transition:0.2s;">
+                    🔍 Gunakan sbg Pusat Radius
+                </button>
+            </div>
+        `;
+        L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(gMap);
     }
   });
 
