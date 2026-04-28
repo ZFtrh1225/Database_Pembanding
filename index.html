@@ -220,6 +220,16 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .avm-score-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
 .avm-insight { font-size: 12px; background: var(--bg); border-left: 4px solid var(--blue); padding: 12px; border-radius: 4px; margin-top: 15px; color: var(--text); line-height: 1.5; text-align: left;}
 
+/* CSS UNTUK FITUR POI (OVERPASS) */
+.poi-container { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; font-size: 11px; }
+.poi-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f4f8; }
+.poi-item:last-child { border-bottom: none; }
+.poi-name { color: var(--navy); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.poi-dist { color: var(--blue); font-weight: 800; background: var(--sky); padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+.poi-btn { width: 100%; background: #e8f0fe; color: #2d6be4; border: 1px dashed #2d6be4; border-radius: 6px; padding: 8px; font-size: 11px; font-weight: 700; font-family: var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
+.poi-btn:hover:not(:disabled) { background: #2d6be4; color: #fff; border-style: solid; box-shadow: 0 4px 10px rgba(45,107,228,.2); }
+.poi-btn:disabled { opacity: 0.6; cursor: not-wait; border-style: solid; }
+
 /* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS
    ========================================================= */
@@ -235,17 +245,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .view-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; width: 100%; }
   .view-toggle .btn-view { justify-content: center; padding: 8px 5px; font-size: 11px; width: 100%; }
   .btn-add { width: 100%; justify-content: center; padding: 9px; font-size: 12px; margin-top: 2px;}
-  
-  /* --- PERBAIKAN MODAL & FOOTER TAMPILAN HP --- */
-  .modal { width: 95%; margin: 10px auto; max-height: 95vh; }
-  .modal-body { padding: 15px !important; }
-  #modalMedianPrice { font-size: 26px !important; }
-  .modal-footer { flex-direction: column; align-items: stretch !important; padding: 12px 15px !important; gap: 12px; }
-  #modalDataCount { text-align: center; width: 100%; display: block; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
-  .modal-footer > div { display: flex; gap: 8px; width: 100%; }
-  .modal-footer > div > button, .modal-footer > button { flex: 1; margin: 0 !important; padding: 10px 0 !important; justify-content: center; text-align: center; width: 100% !important; font-size: 12px; }
-  /* ------------------------------------------- */
-
+  .modal { width: 95%; padding: 15px; margin: 10px; }
   .modal-grid { grid-template-columns: 1fr; }
   .modal-grid .span-2 { grid-column: span 1; }
   .iw-wrap { width: 240px; }
@@ -603,6 +603,7 @@ var _pickingLocation = false;
 var heatLayer = null, isHeatmap = false;
 var myChart = null; 
 var histChart = null; 
+var poiLayerGroup = null; // TAMBAHAN: Global variabel untuk Layer POI (Garis Jarak)
 
 var compareList = [];
 var compareTargetId = null;
@@ -974,6 +975,15 @@ function initMap() {
     }
   });
 
+  // --- TAMBAHAN KODE UNTUK POI ---
+  // Hapus garis POI jika popup properti ditutup
+  gMap.on('popupclose', function() {
+      if(poiLayerGroup) {
+          gMap.removeLayer(poiLayerGroup);
+          poiLayerGroup = null;
+      }
+  });
+
   document.getElementById('mapLoading').style.display = 'none'; setTimeout(function () { gMap.invalidateSize(); }, 300); doSearch();
 }
 
@@ -1130,15 +1140,147 @@ function buildPopup(row) {
   if (photos.length > 0) { var imgs = photos.map(function(url) { return '<img src="' + url + '" alt="Foto"/>'; }).join(''); var navHtml = photos.length > 1 ? '<button class="iw-foto-nav iw-foto-prev" onclick="moveFoto(this, -1, ' + photos.length + ')">❮</button><button class="iw-foto-nav iw-foto-next" onclick="moveFoto(this, 1, ' + photos.length + ')">❯</button><div class="iw-foto-count">1/' + photos.length + '</div>' : ''; fotoHtml = '<div class="iw-foto-container">' + navHtml + '<div class="iw-foto-slider" data-idx="0">' + imgs + '</div></div>'; }
   var coordJS = _parseCoordJS(row.koordinat); var gmapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(f(row.koordinat)); var svUrl = coordJS ? 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + coordJS.lat + ',' + coordJS.lng : '#';
 
+  // --- TAMBAHAN KODE UNTUK POI ---
+  var poiHtml = '';
+  if (coordJS) {
+      poiHtml = '<div id="poi_wrap_' + row._uid + '" class="poi-container">' +
+                '<button class="poi-btn" id="btn_poi_' + row._uid + '" onclick="analyzePOI(' + coordJS.lat + ', ' + coordJS.lng + ', \'' + row._uid + '\')">📡 Analisis Jarak POI (Overpass)</button>' +
+                '<div id="poi_res_' + row._uid + '"></div></div>';
+  }
+
   return '<div class="iw-wrap">' + fotoHtml + '<div class="iw-header"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f(row.id) + '</span><span class="iw-badge">' + f(row.legalitas) + '</span><div style="display:flex; gap:4px;">'
     + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" ' + disabledAttr + '>⚖️</button>'
     + '<button class="iw-foto-btn" style="background:#ec4899; border-color:#ec4899;" onclick="downloadPDF(\'' + f(row.id) + '\')" title="Download PDF Brief" ' + disabledAttr + '>📄</button>'
     + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\', \'' + f(row.koordinat) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
     + '<button class="iw-foto-btn" onclick="triggerFotoUpdate(\'' + f(row.id) + '\',\'' + f(row.koordinat) + '\',\'' + esc(row.sumber) + '\')" title="Tambah Foto" ' + disabledAttr + '>+</button>'
     + '</div></div><div class="iw-body">' + _iwr('Alamat', f(row.alamat)) + _iwr('Kota/Prov.', f(row.kota) + ' / ' + f(row.provinsi)) + _iwr('Tipe Bangunan', f(row.tipeBangunan)) + _iwr('Luas Tanah', f(row.luasTanah) !== '–' ? f(row.luasTanah) + ' m²' : '–') + _iwr('Luas Bangunan', f(row.luasBangunan) !== '–' ? f(row.luasBangunan) + ' m²' : '–') + _iwr('Harga', '<span class="iw-harga">' + formatRupiah(row.harga) + '</span>') + _iwr('Ind. Nilai/m²', '<span class="iw-harga">' + formatRupiah(row.indikasiNilai) + '</span>') + _iwr('ROW Jalan', f(row.lebarJalanROW) !== '–' ? f(row.lebarJalanROW) + ' m' : '–') + _iwr('Peruntukan', f(row.peruntukan)) + _iwr('Status Harga', f(row.statusHarga)) + _iwr('Waktu Data', f(row.waktuData) + getAgingFlag(row.waktuData)) + _iwr('Sumber / HP', f(row.sumber) + ' / ' + f(row.hp))
-    + '<div class="iw-footer"><a href="' + gmapsUrl + '" target="_blank" class="btn-gmaps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> Peta Google</a><a href="' + svUrl + '" target="_blank" class="btn-gmaps btn-streetview">👤 Street View</a></div></div></div>';
+    + '<div class="iw-footer"><a href="' + gmapsUrl + '" target="_blank" class="btn-gmaps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> Peta Google</a><a href="' + svUrl + '" target="_blank" class="btn-gmaps btn-streetview">👤 Street View</a></div>'
+    + poiHtml + '</div></div>';
 }
 function _iwr(k, v) { return '<div class="iw-row"><span class="iw-key">' + k + '</span><span class="iw-val">' + v + '</span></div>'; }
+
+// --- FUNGSI UTAMA ANALISIS POI (OVERPASS API) ---
+function analyzePOI(lat, lng, uid) {
+    var btn = document.getElementById('btn_poi_' + uid);
+    var resDiv = document.getElementById('poi_res_' + uid);
+    if(!btn || !resDiv) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px;margin:0;border-color:rgba(45,107,228,0.3);border-top-color:#2d6be4;"></div> Menarik Data Satelit...';
+    resDiv.innerHTML = '';
+
+    // Bersihkan garis POI sebelumnya jika ada
+    if(poiLayerGroup) { gMap.removeLayer(poiLayerGroup); }
+    poiLayerGroup = L.featureGroup().addTo(gMap);
+
+    var radius = 2500; // Radius pencarian 2.5 KM
+    
+    // Kueri Overpass QL: Mencari Gerbang Tol, RS, Sekolah, Mall, Stasiun
+    var query = `[out:json][timeout:15];
+    (
+      node["highway"="motorway_junction"](around:${radius},${lat},${lng});
+      node["amenity"="hospital"](around:${radius},${lat},${lng});
+      node["amenity"="school"](around:${radius},${lat},${lng});
+      node["shop"="mall"](around:${radius},${lat},${lng});
+      node["shop"="supermarket"](around:${radius},${lat},${lng});
+      node["railway"="station"](around:${radius},${lat},${lng});
+    );
+    out body;
+    >;
+    out skel qt;`;
+
+    var url = 'https://overpass-api.de/api/interpreter';
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: "data=" + encodeURIComponent(query)
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        btn.style.display = 'none'; // Sembunyikan tombol jika sukses
+
+        if(!data.elements || data.elements.length === 0) {
+            resDiv.innerHTML = '<div style="color:var(--text-sub); text-align:center; padding:10px 0;">Tidak ditemukan fasilitas utama dalam radius ' + (radius/1000) + ' KM.</div>';
+            return;
+        }
+
+        // Definisi Kategori dan Tag OSM-nya
+        var categories = {
+            'Gerbang Tol': { tags: ['highway', 'motorway_junction'], best: null },
+            'Rumah Sakit': { tags: ['amenity', 'hospital'], best: null },
+            'Pusat Belanja': { tags: [['shop', 'mall'], ['shop', 'supermarket']], best: null },
+            'Stasiun Kereta': { tags: ['railway', 'station'], best: null },
+            'Sekolah': { tags: ['amenity', 'school'], best: null }
+        };
+
+        var propLatLng = L.latLng(lat, lng);
+
+        // Parsing hasil dan cari yang paling dekat untuk setiap kategori
+        data.elements.forEach(function(el) {
+            if (el.type === 'node' && el.tags) {
+                var elLatLng = L.latLng(el.lat, el.lon);
+                var dist = gMap.distance(propLatLng, elLatLng); // Kalkulasi Jarak Euclidean bawaan Leaflet
+                var name = el.tags.name || el.tags.description || 'Tidak Bernama';
+
+                for (var cat in categories) {
+                    var match = false;
+                    var catDef = categories[cat].tags;
+                    
+                    // Cek pencocokan tag
+                    if (Array.isArray(catDef[0])) { // Jika ada multiple tag (misal mall/supermarket)
+                        for(var i=0; i<catDef.length; i++) { if(el.tags[catDef[i][0]] === catDef[i][1]) match = true; }
+                    } else {
+                        if(el.tags[catDef[0]] === catDef[1]) match = true;
+                    }
+
+                    if (match) {
+                        if (!categories[cat].best || dist < categories[cat].best.dist) {
+                            categories[cat].best = { name: name, dist: dist, lat: el.lat, lon: el.lon };
+                        }
+                    }
+                }
+            }
+        });
+
+        // Render HTML dan Gambar Garis di Peta
+        var html = '<div style="font-size:10px; color:var(--text-xs); margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">📍 Fasilitas Terdekat (Euclidean)</div>';
+        var foundAny = false;
+
+        for (var cat in categories) {
+            var item = categories[cat].best;
+            if (item) {
+                foundAny = true;
+                var distText = item.dist > 1000 ? (item.dist/1000).toFixed(2) + ' KM' : Math.round(item.dist) + ' M';
+                html += '<div class="poi-item">' +
+                        '<span class="poi-name" title="' + item.name + '">' + cat + ': ' + item.name + '</span>' +
+                        '<span class="poi-dist">' + distText + '</span></div>';
+
+                // Gambar Garis Hubung (Polyline) di Peta
+                L.polyline([[lat, lng], [item.lat, item.lon]], {color: '#2d6be4', dashArray: '5, 8', weight: 2, opacity: 0.7}).addTo(poiLayerGroup);
+                
+                // Gambar Titik POI
+                var marker = L.circleMarker([item.lat, item.lon], {radius: 5, color: '#1e3a5f', fillColor: '#FFD966', fillOpacity: 1, weight: 2}).addTo(poiLayerGroup);
+                marker.bindTooltip('<b>' + cat + '</b><br>' + item.name, {permanent: false, direction: 'top'});
+            }
+        }
+
+        if(!foundAny) { html += '<div style="color:var(--text-sub); text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
+        resDiv.innerHTML = html;
+
+        // Otomatis zoom-out agar properti dan semua POI terlihat di layar
+        if (foundAny) {
+             setTimeout(function() { gMap.fitBounds(poiLayerGroup.getBounds(), {padding: [40, 40], maxZoom: 16}); }, 200);
+        }
+
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = '⚠️ Gagal. Coba Lagi';
+        toast('Gagal menghubungi satelit Overpass: ' + err.message, 'error');
+    });
+}
+// ------------------------------------------------
 
 function renderTable(data) {
   var tbody = document.getElementById('tableBody');
