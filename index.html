@@ -235,7 +235,17 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .view-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; width: 100%; }
   .view-toggle .btn-view { justify-content: center; padding: 8px 5px; font-size: 11px; width: 100%; }
   .btn-add { width: 100%; justify-content: center; padding: 9px; font-size: 12px; margin-top: 2px;}
-  .modal { width: 95%; padding: 15px; margin: 10px; }
+  
+  /* --- PERBAIKAN MODAL & FOOTER TAMPILAN HP --- */
+  .modal { width: 95%; margin: 10px auto; max-height: 95vh; }
+  .modal-body { padding: 15px !important; }
+  #modalMedianPrice { font-size: 26px !important; }
+  .modal-footer { flex-direction: column; align-items: stretch !important; padding: 12px 15px !important; gap: 12px; }
+  #modalDataCount { text-align: center; width: 100%; display: block; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+  .modal-footer > div { display: flex; gap: 8px; width: 100%; }
+  .modal-footer > div > button, .modal-footer > button { flex: 1; margin: 0 !important; padding: 10px 0 !important; justify-content: center; text-align: center; width: 100% !important; font-size: 12px; }
+  /* ------------------------------------------- */
+
   .modal-grid { grid-template-columns: 1fr; }
   .modal-grid .span-2 { grid-column: span 1; }
   .iw-wrap { width: 240px; }
