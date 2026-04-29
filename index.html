@@ -1220,15 +1220,14 @@ function analyzePOI(lat, lng, uid) {
         data.elements.forEach(function(el) {
             if (el.type === 'node' && el.tags) {
                 var elLatLng = L.latLng(el.lat, el.lon);
-                var dist = gMap.distance(propLatLng, elLatLng); // Kalkulasi Jarak Euclidean bawaan Leaflet
+                var dist = gMap.distance(propLatLng, elLatLng); 
                 var name = el.tags.name || el.tags.description || 'Tidak Bernama';
 
                 for (var cat in categories) {
                     var match = false;
                     var catDef = categories[cat].tags;
                     
-                    // Cek pencocokan tag
-                    if (Array.isArray(catDef[0])) { // Jika ada multiple tag (misal mall/supermarket)
+                    if (Array.isArray(catDef[0])) { 
                         for(var i=0; i<catDef.length; i++) { if(el.tags[catDef[i][0]] === catDef[i][1]) match = true; }
                     } else {
                         if(el.tags[catDef[0]] === catDef[1]) match = true;
@@ -1256,11 +1255,23 @@ function analyzePOI(lat, lng, uid) {
                         '<span class="poi-name" title="' + item.name + '">' + cat + ': ' + item.name + '</span>' +
                         '<span class="poi-dist">' + distText + '</span></div>';
 
-                // Gambar Garis Hubung (Polyline) di Peta
-                L.polyline([[lat, lng], [item.lat, item.lon]], {color: '#2d6be4', dashArray: '5, 8', weight: 2, opacity: 0.7}).addTo(poiLayerGroup);
+                // PERBAIKAN 2: Garis Dipertebal, Kontras (Merah Terang), dan Opacity Solid
+                L.polyline([[lat, lng], [item.lat, item.lon]], {
+                    color: '#ea4335', 
+                    dashArray: '8, 8', 
+                    weight: 4, 
+                    opacity: 1
+                }).addTo(poiLayerGroup);
                 
-                // Gambar Titik POI
-                var marker = L.circleMarker([item.lat, item.lon], {radius: 5, color: '#1e3a5f', fillColor: '#FFD966', fillOpacity: 1, weight: 2}).addTo(poiLayerGroup);
+                // PERBAIKAN 3: Titik POI Diperbesar
+                var marker = L.circleMarker([item.lat, item.lon], {
+                    radius: 7, 
+                    color: '#ea4335', 
+                    fillColor: '#FFD966', 
+                    fillOpacity: 1, 
+                    weight: 3
+                }).addTo(poiLayerGroup);
+                
                 marker.bindTooltip('<b>' + cat + '</b><br>' + item.name, {permanent: false, direction: 'top'});
             }
         }
@@ -1268,10 +1279,8 @@ function analyzePOI(lat, lng, uid) {
         if(!foundAny) { html += '<div style="color:var(--text-sub); text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
         resDiv.innerHTML = html;
 
-        // Otomatis zoom-out agar properti dan semua POI terlihat di layar
-        if (foundAny) {
-             setTimeout(function() { gMap.fitBounds(poiLayerGroup.getBounds(), {padding: [40, 40], maxZoom: 16}); }, 200);
-        }
+        // PERBAIKAN 1: Auto zoom-out dihapus agar popup tidak tertutup oleh MarkerCluster
+        // Pengguna dapat melihat hasil di tabel popup dan zoom-out secara manual jika ingin melihat titik ujungnya.
 
     })
     .catch(function(err) {
