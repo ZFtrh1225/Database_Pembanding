@@ -215,11 +215,6 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .compare-table th { background: var(--bg); color: var(--text-sub); text-align: left; font-weight: 600; width: 120px; }
 .compare-table img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; }
 
-/* SCORE BAR AVM */
-.avm-score-bar { width: 100%; height: 10px; background: var(--border); border-radius: 5px; margin-top: 10px; overflow: hidden; }
-.avm-score-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
-.avm-insight { font-size: 12px; background: var(--bg); border-left: 4px solid var(--blue); padding: 12px; border-radius: 4px; margin-top: 15px; color: var(--text); line-height: 1.5; text-align: left;}
-
 /* CSS UNTUK FITUR POI (OVERPASS) */
 .poi-container { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; font-size: 11px; }
 .poi-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f4f8; }
@@ -229,10 +224,24 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .poi-btn { width: 100%; background: #e8f0fe; color: #2d6be4; border: 1px dashed #2d6be4; border-radius: 6px; padding: 8px; font-size: 11px; font-weight: 700; font-family: var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
 .poi-btn:hover:not(:disabled) { background: #2d6be4; color: #fff; border-style: solid; box-shadow: 0 4px 10px rgba(45,107,228,.2); }
 .poi-btn:disabled { opacity: 0.6; cursor: not-wait; border-style: solid; }
+.poi-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #2d6be4; border-radius: 6px; font-family: var(--font); font-size: 11px; color: var(--navy); box-shadow: 0 4px 8px rgba(0,0,0,0.25); padding: 5px 8px; }
+.poi-tooltip::before { border-top-color: #2d6be4 !important; }
 
-/* TAMBAHAN: CSS KHUSUS LABEL TOOLTIP PERMANEN POI */
-.poi-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #ea4335; border-radius: 6px; font-family: var(--font); font-size: 11px; color: var(--navy); box-shadow: 0 4px 8px rgba(0,0,0,0.25); padding: 5px 8px; }
-.poi-tooltip::before { border-top-color: #ea4335 !important; }
+/* CSS KHUSUS MODAL AVM LEVEL DEWA (SBM & AUDIT) */
+.avm-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+.avm-tab-btn { background: transparent; border: none; font-family: var(--font); font-size: 14px; font-weight: 700; color: var(--text-sub); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all 0.2s; }
+.avm-tab-btn.active { background: var(--sky); color: var(--blue); }
+.avm-tab-content { display: none; animation: slideUp 0.3s ease; }
+.avm-tab-content.active { display: block; }
+.audit-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; margin-top: 15px; }
+.audit-table th { background: #f0f4f8; padding: 8px; color: var(--navy); }
+.audit-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+.audit-row.excluded { background: #fce8e6; opacity: 0.8; }
+.audit-row.excluded td { color: var(--red); }
+.sbm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 15px; }
+.sbm-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+.sbm-card input { width: 100%; text-align: center; font-weight: bold; margin-top: 5px; }
+.ev-box { background: var(--navy); color: #fff; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; box-shadow: 0 4px 15px rgba(30,58,95,.2); }
 
 /* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS
@@ -255,6 +264,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .iw-wrap { width: 240px; }
   .compare-bar { width: 90%; justify-content: space-between; padding: 10px; font-size: 11px; bottom: 10px;}
   .compare-bar button { padding: 6px 10px;}
+  .sbm-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -369,7 +379,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 
       <div style="display: flex; gap: 8px;">
         <button class="btn-search" id="btnCari" onclick="doSearch()" style="flex: 2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari</button>
-        <button class="btn-search" id="btnAnalisa" onclick="showAnalyticsModal()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
+        <button class="btn-search" id="btnAnalisa" onclick="initAVMAnalysis()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
       </div>
       <button class="btn-reset" onclick="resetFilter()">↺ Reset Filter</button>
 
@@ -436,59 +446,106 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 </div>
 
 <div class="modal-overlay" id="analyticsOverlay" onclick="if(event.target===this)closeAnalyticsModal()">
-  <div class="modal" style="max-width: 580px;">
+  <div class="modal" style="max-width: 680px;">
     <div class="modal-header">
-      <span class="modal-title" style="color:var(--navy); font-size:16px;">📊 Hasil Analisis Pasar (AVM)</span>
+      <span class="modal-title" style="color:var(--navy); font-size:16px;">📊 AVM: Hybrid Scenario Based Method</span>
       <button class="btn-close" onclick="closeAnalyticsModal()">✕</button>
     </div>
-    <div class="modal-body" id="modalAnalisaContent" style="padding: 25px;">
+    
+    <div class="modal-body" id="modalAnalisaContent" style="padding: 20px;">
       
-      <div style="display: flex; justify-content: space-between; align-items:flex-end;">
-        <div>
-          <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Tengah (Median) Terkoreksi /m²</div>
-          <div class="analitik-val" id="modalMedianPrice" style="font-size:36px; margin: 5px 0 0 0; color:#2d6be4;">Rp 0</div>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size:12px; color:var(--text-sub); font-weight:600; margin-bottom:5px;">Skor Kepercayaan</div>
-          <strong id="modalScoreText" style="font-size:18px; color:var(--green);">Tinggi</strong>
-        </div>
-      </div>
-      
-      <div class="avm-score-bar"><div id="modalScoreFill" class="avm-score-fill" style="width:0%; background:var(--green);"></div></div>
-      
-      <div class="avm-insight" id="modalSmartInsight">Menganalisa data...</div>
-
-      <div style="margin-top: 25px; background:#fff; padding:10px; border-radius:8px;">
-        <div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:10px; text-align:center;">Distribusi Frekuensi Harga (Setelah Koreksi Waktu)</div>
-        <div style="position: relative; height: 160px; width: 100%;">
-          <canvas id="chartHistogram"></canvas>
-        </div>
+      <div class="avm-tabs">
+        <button class="avm-tab-btn active" onclick="switchAVMTab('sbm')">1. Proyeksi Skenario (SBM)</button>
+        <button class="avm-tab-btn" onclick="switchAVMTab('audit')">2. Audit Trail & Override</button>
       </div>
 
-      <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
-        <div style="background: #f0f4f8; padding: 12px; border-radius: 8px;">
-          <div style="font-size: 11px; color: var(--text-sub);">Standar Deviasi (σ)</div>
-          <strong id="modalStdev" style="font-size: 16px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
+      <div id="tab-sbm" class="avm-tab-content active">
+        <div style="display: flex; justify-content: space-between; align-items:flex-end;">
+          <div>
+            <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Dasar (Base Case Median)</div>
+            <div class="analitik-val" id="modalMedianPrice" style="font-size:28px; margin: 5px 0 0 0; color:#2d6be4;">Rp 0</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size:12px; color:var(--text-sub); font-weight:600; margin-bottom:5px;">Basis Valid</div>
+            <strong id="modalDataCount" style="font-size:18px; color:var(--green);">0 Data</strong>
+          </div>
         </div>
-        <div style="background: #f0f4f8; padding: 12px; border-radius: 8px;">
-          <div style="font-size: 11px; color: var(--text-sub);">Deviasi Min-Max</div>
-          <strong id="modalDeviasi" style="font-size: 16px; color: var(--text); display: block; margin-top: 5px;">0%</strong>
+        
+        <div class="avm-insight" id="modalSmartInsight">Menghitung skenario pasar...</div>
+        
+        <div style="margin-top: 20px; font-weight: 700; font-size: 13px; color: var(--navy); border-bottom: 1px solid var(--border); padding-bottom: 5px;">Input Asumsi Masa Depan (SBM / OPM)</div>
+        
+        <div class="sbm-grid">
+          <div class="sbm-card">
+            <div style="font-size:11px; color:var(--text-sub); font-weight:bold;">Skenario Pesimis</div>
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" style="font-size:10px;">Probabilitas (%)</label>
+              <input type="number" id="sbmProbPess" class="form-input" value="15" onchange="calculateSBM()">
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" style="font-size:10px;">Koreksi Harga (%)</label>
+              <input type="number" id="sbmAdjPess" class="form-input" value="-15" onchange="calculateSBM()">
+            </div>
+          </div>
+          <div class="sbm-card" style="border-color:#2d6be4; background:#e8f0fe;">
+            <div style="font-size:11px; color:#2d6be4; font-weight:bold;">Skenario Normal (Base)</div>
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" style="font-size:10px;">Probabilitas (%)</label>
+              <input type="number" id="sbmProbBase" class="form-input" value="60" onchange="calculateSBM()">
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" style="font-size:10px;">Koreksi Harga (%)</label>
+              <input type="number" id="sbmAdjBase" class="form-input" value="0" disabled style="background:#d1dbe8; color:#5a6a7e;">
+            </div>
+          </div>
+          <div class="sbm-card">
+            <div style="font-size:11px; color:var(--text-sub); font-weight:bold;">Skenario Optimis</div>
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" style="font-size:10px;">Probabilitas (%)</label>
+              <input type="number" id="sbmProbOpt" class="form-input" value="25" onchange="calculateSBM()">
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label class="form-label" style="font-size:10px;">Koreksi Harga (%)</label>
+              <input type="number" id="sbmAdjOpt" class="form-input" value="10" onchange="calculateSBM()">
+            </div>
+          </div>
+        </div>
+
+        <div class="ev-box">
+          <div style="font-size: 13px; color: #a9c6f5; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Nilai Harapan Hibrida (Expected Value)</div>
+          <div id="sbmExpectedValue" style="font-size: 34px; font-weight: 800; margin-top: 5px; color: #fff;">Rp 0</div>
+          <div id="sbmWarning" style="font-size: 11px; color: #fca5a5; margin-top: 8px; display: none;">⚠️ Total probabilitas harus 100%!</div>
         </div>
       </div>
-      
-      <div style="text-align:center; font-size:10px; color:#8a9ab0; margin-top:15px;" id="timeAdjNote"></div>
+
+      <div id="tab-audit" class="avm-tab-content">
+        <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 15px; line-height: 1.5;">
+          <strong>Kendali Mutu (Quality Control):</strong> Sistem mendeteksi outlier menggunakan metode IQR. Sebagai penilai, Anda memegang <em>Professional Judgement</em> untuk memaksa data masuk (Centang) atau membuangnya (Hapus Centang) dari perhitungan Base Case.
+        </div>
+        <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th style="width:40px; text-align:center;">Pakai</th>
+                <th>ID DP</th>
+                <th>Harga Terkoreksi (/m²)</th>
+                <th>Status AVM (IQR)</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              </tbody>
+          </table>
+        </div>
+      </div>
 
     </div>
-    <div class="modal-footer" style="justify-content: space-between; align-items: center; background: #fafafa;">
-      <span id="modalDataCount" style="font-size: 12px; font-weight: 700; color: var(--text-sub);">0 Data Valid</span>
-      <div>
+    
+    <div class="modal-footer" style="justify-content: flex-end; align-items: center; background: #fafafa;">
         <button class="btn-submit" onclick="closeAnalyticsModal()" style="width: auto; background:transparent; color:var(--text-sub); border:1px solid var(--border); margin-right:5px;">Tutup</button>
-        <button class="btn-submit" onclick="downloadAVMPDF()" style="width: auto; background:#f4b400; color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Unduh Laporan</button>
-      </div>
+        <button class="btn-submit" onclick="downloadAVMPDF()" style="width: auto; background:#f4b400; color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Unduh Laporan SBM</button>
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
   <div class="modal">
     <div class="modal-header">
@@ -606,14 +663,17 @@ var _pickingLocation = false;
 
 var heatLayer = null, isHeatmap = false;
 var myChart = null; 
-var histChart = null; 
-var poiLayerGroup = null; // Layer khusus POI
+var poiLayerGroup = null; 
 
 var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
 
-// ✅ VARIABEL POLIGON KUSTOM
+// Variabel SBM & Audit
+var _avmOverrideState = {}; // Menyimpan preferensi manual (UID: true/false)
+var _avmRawData = []; // Menyimpan data mentah AVM dengan harga terkoreksi
+var _avmCurrentMedian = 0;
+
 var _drawingPolygon = false;
 var polyPoints = [];
 var polyLayer = null;
@@ -639,7 +699,6 @@ document.addEventListener("DOMContentLoaded", function() {
   var fCoord = document.getElementById('f_koordinat');
   if (fCoord) { fCoord.addEventListener('blur', function() { var s = this.value.trim(); var matches = s.match(/(-?\d+),(\d+)[\s,]+(-?\d+),(\d+)/); if (matches) { this.value = matches[1] + '.' + matches[2] + ', ' + matches[3] + '.' + matches[4]; toast('Format koordinat otomatis dirapikan', 'success'); } }); } 
 
-  // ✅ LOGIKA MENAMPILKAN TOMBOL POLIGON KETIKA DIPILIH
   document.getElementById('radius').addEventListener('change', function() {
     var btnPoly = document.getElementById('btnDrawPoly');
     if (this.value === 'polygon') {
@@ -691,7 +750,6 @@ function pickLocation() {
   toast('📍 Klik satu titik di atas peta...', 'success'); document.getElementById('map').style.cursor = 'crosshair';
 }
 
-// ✅ FUNGSI MEMULAI GAMBAR POLIGON
 function startDrawingPolygon() {
   if (!gMap) return;
   _pickingLocation = false; _drawingPolygon = true;
@@ -725,192 +783,220 @@ function calculateSidebarStats(data) {
   myChart = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#0f9d58','#4285f4','#ab47bc','#f4b400'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10, family: 'Plus Jakarta Sans' }, boxWidth: 10 } } } } });
 }
 
-// ✅ MODAL ANALISA DENGAN KOREKSI WAKTU
-function showAnalyticsModal() {
-  if (!currentData || currentData.length === 0) { toast('Lakukan pencarian data terlebih dahulu!', 'error'); return; }
+/* =========================================================================
+   FUNGSI AVM TERBARU: SBM & AUDIT TRAIL
+========================================================================= */
 
-  // Tangkap nilai koreksi waktu
+function switchAVMTab(tabName) {
+  document.querySelectorAll('.avm-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.avm-tab-content').forEach(content => content.classList.remove('active'));
+  
+  if(tabName === 'sbm') {
+      document.querySelector('.avm-tab-btn:nth-child(1)').classList.add('active');
+      document.getElementById('tab-sbm').classList.add('active');
+  } else {
+      document.querySelector('.avm-tab-btn:nth-child(2)').classList.add('active');
+      document.getElementById('tab-audit').classList.add('active');
+  }
+}
+
+function initAVMAnalysis() {
+  if (!currentData || currentData.length === 0) { toast('Lakukan pencarian data terlebih dahulu!', 'error'); return; }
   var timeAdjRate = parseFloat(document.getElementById('timeAdjRate').value) || 0;
 
-  var rawPrices = [];
+  _avmOverrideState = {}; // Reset manual override
+  _avmRawData = [];
+
+  // Hitung nilai koreksi untuk semua data
   currentData.forEach(function(row) {
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
     if (!isNaN(price) && price > 0) { 
-      // ✅ LOGIKA COMPOUND INTEREST UNTUK KOREKSI WAKTU
       var rowYear = parseInt(row.waktuData) || _currentYear;
       var diffYears = _currentYear - rowYear;
       if (diffYears > 0 && timeAdjRate !== 0) {
           price = price * Math.pow(1 + (timeAdjRate / 100), diffYears);
       }
-      rawPrices.push(price);
+      _avmRawData.push({ uid: row._uid, id: row.id, price: price });
     }
   });
 
-  if (rawPrices.length === 0) { toast('Tidak ada data valid dengan nilai indikasi untuk dianalisa.', 'error'); return; }
+  if (_avmRawData.length === 0) { toast('Tidak ada data valid untuk dianalisa.', 'error'); return; }
 
-  rawPrices.sort(function(a, b){ return a - b; });
-
-  function getMedian(arr) {
-    if (arr.length === 0) return 0;
-    var mid = Math.floor(arr.length / 2);
-    if (arr.length % 2 !== 0) return arr[mid];
-    return (arr[mid - 1] + arr[mid]) / 2;
-  }
-
-  var cleanPrices = rawPrices;
-  var cleanMedian = 0;
-  var outliersRemoved = 0;
-
-  if (rawPrices.length >= 4) {
-    var q1 = getMedian(rawPrices.slice(0, Math.floor(rawPrices.length / 2)));
-    var q3 = getMedian(rawPrices.slice(Math.ceil(rawPrices.length / 2)));
-    var iqr = q3 - q1;
-    var lowerBound = q1 - (1.5 * iqr);
-    var upperBound = q3 + (1.5 * iqr);
-
-    cleanPrices = rawPrices.filter(function(p) { return p >= lowerBound && p <= upperBound; });
-    outliersRemoved = rawPrices.length - cleanPrices.length;
-  }
-  cleanMedian = getMedian(cleanPrices);
-
-  var n = cleanPrices.length;
-  var stdevPct = 0; var devPct = 0;
-  
-  if (n > 1) {
-      var sum = cleanPrices.reduce(function(a,b){return a+b}, 0);
-      var mean = sum / n;
-      var sumSq = cleanPrices.reduce(function(a,b){return a + Math.pow(b - mean, 2)}, 0);
-      var stdevS = Math.sqrt(sumSq / (n - 1));
-      stdevPct = (stdevS / mean) * 100;
-
-      var cMax = Math.max.apply(null, cleanPrices);
-      var cMin = Math.min.apply(null, cleanPrices);
-      devPct = ((cMax - cMin) / cMin) * 100;
-  }
-
-  document.getElementById('modalMedianPrice').textContent = formatRupiah(Math.round(cleanMedian));
-  document.getElementById('modalDataCount').textContent = n + " Data Wajar Dievaluasi";
-
-  var scoreText = "Tinggi"; var scoreColor = "#16a34a"; var scoreFill = 90; var insightMsg = "";
-
-  if (stdevPct <= 15) {
-      scoreText = "Tinggi"; scoreColor = "#16a34a"; scoreFill = Math.max(80, 100 - stdevPct);
-      insightMsg = "<strong>Sangat Ideal.</strong> Data pembanding di area ini sangat seragam. Nilai tengah yang dihasilkan memiliki tingkat akurasi yang sangat tinggi dan layak dijadikan patokan utama.";
-  } else if (stdevPct <= 30) {
-      scoreText = "Sedang"; scoreColor = "#eab308"; scoreFill = Math.max(50, 80 - (stdevPct-15));
-      insightMsg = "<strong>Wajar.</strong> Terdapat sedikit variasi harga di area ini (mungkin karena perbedaan spesifikasi minor). Nilai tengah masih cukup relevan sebagai acuan dasar.";
-  } else {
-      scoreText = "Rendah"; scoreColor = "#dc2626"; scoreFill = Math.max(10, 50 - (stdevPct-30));
-      insightMsg = "<strong>Peringatan!</strong> Data di radius ini sangat heterogen/bervariasi (seperti campuran tanah di gang sempit dan jalan raya). <em>Disarankan untuk mempersempit radius pencarian (atau gunakan poligon kustom) untuk memfilter zona yang tidak sepadan.</em>";
-  }
-
-  if (outliersRemoved > 0) insightMsg += "<br><br><span style='color:#dc2626;'><em>✨ Sistem telah membuang " + outliersRemoved + " harga ekstrem (indikasi Jual BU / Spekulan) untuk melindungi akurasi rata-rata.</em></span>";
-
-  document.getElementById('modalScoreText').textContent = scoreText; document.getElementById('modalScoreText').style.color = scoreColor;
-  document.getElementById('modalScoreFill').style.width = scoreFill + "%"; document.getElementById('modalScoreFill').style.background = scoreColor;
-  document.getElementById('modalSmartInsight').innerHTML = insightMsg; document.getElementById('modalSmartInsight').style.borderLeftColor = scoreColor;
-  document.getElementById('modalStdev').textContent = stdevPct.toFixed(2) + '%'; document.getElementById('modalStdev').style.color = (stdevPct <= 15) ? '#16a34a' : (stdevPct <= 30 ? '#eab308' : '#dc2626');
-  document.getElementById('modalDeviasi').textContent = devPct.toFixed(2) + '%'; document.getElementById('modalDeviasi').style.color = (devPct <= 30) ? '#16a34a' : (devPct <= 50 ? '#eab308' : '#dc2626');
-  
-  if(timeAdjRate !== 0) document.getElementById('timeAdjNote').textContent = "*Semua harga dasar data historis di atas telah dikoreksi sebesar " + timeAdjRate + "% per tahun ke nilai kini (Present Value).";
-  else document.getElementById('timeAdjNote').textContent = "";
-
-  renderHistogram(cleanPrices);
+  recalcAVM(); // Hitung IQR awal
+  switchAVMTab('sbm'); // Buka tab SBM sebagai default
   document.getElementById('analyticsOverlay').classList.add('open');
 }
 
-function renderHistogram(prices) {
-    if(prices.length === 0) return;
-    var min = Math.min.apply(null, prices); var max = Math.max.apply(null, prices);
-    var bins = 5; var binSize = (max - min) / bins;
-    var labels = []; var counts = [0, 0, 0, 0, 0];
+function recalcAVM() {
+  // Hitung IQR secara otomatis pada awal (tanpa memperdulikan override)
+  var allPrices = _avmRawData.map(d => d.price).sort((a, b) => a - b);
+  var lowerBound = 0, upperBound = Infinity;
 
-    if (binSize === 0) { labels = [formatRupiah(min)]; counts = [prices.length]; } 
-    else {
-        for(var i=0; i<bins; i++) {
-            var bStart = min + (i * binSize); var bEnd = min + ((i+1) * binSize);
-            labels.push(formatRupiah(Math.round(bStart)) + " - " + formatRupiah(Math.round(bEnd)));
-        }
-        prices.forEach(function(p) { var idx = Math.floor((p - min) / binSize); if(idx >= bins) idx = bins - 1; counts[idx]++; });
-    }
+  function getMed(arr) {
+    if (arr.length === 0) return 0;
+    var mid = Math.floor(arr.length / 2);
+    return arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+  }
 
-    var ctx = document.getElementById('chartHistogram').getContext('2d');
-    if (histChart) histChart.destroy();
-    
-    histChart = new Chart(ctx, {
-        type: 'bar', data: { labels: labels, datasets: [{ label: 'Jumlah Properti', data: counts, backgroundColor: '#4882f5', borderRadius: 4 }] },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } }, x: { ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } } }, plugins: { legend: { display: false } } }
-    });
+  if (allPrices.length >= 4) {
+    var q1 = getMed(allPrices.slice(0, Math.floor(allPrices.length / 2)));
+    var q3 = getMed(allPrices.slice(Math.ceil(allPrices.length / 2)));
+    var iqr = q3 - q1;
+    lowerBound = q1 - (1.5 * iqr);
+    upperBound = q3 + (1.5 * iqr);
+  }
+
+  // Tentukan mana data yang dipakai berdasar (Override ATAU IQR)
+  var finalPrices = [];
+  var htmlAudit = '';
+
+  _avmRawData.forEach(function(d) {
+      // Logika Sistem (IQR)
+      var systemIncluded = (d.price >= lowerBound && d.price <= upperBound);
+      var statusText = systemIncluded ? '<span style="color:#16a34a;font-weight:bold;">Sesuai Standar</span>' : '<span style="color:#dc2626;font-weight:bold;">Outlier (Di luar IQR)</span>';
+      
+      // Logika Override Manual
+      var isManuallyOverridden = _avmOverrideState.hasOwnProperty(d.uid);
+      var finalIncluded = isManuallyOverridden ? _avmOverrideState[d.uid] : systemIncluded;
+
+      if (finalIncluded) finalPrices.push(d.price);
+
+      var checkedAttr = finalIncluded ? 'checked' : '';
+      var rowClass = finalIncluded ? '' : 'excluded';
+
+      htmlAudit += '<tr class="audit-row ' + rowClass + '">' +
+                   '<td style="text-align:center;"><input type="checkbox" onchange="toggleAVMOverride(\'' + d.uid + '\', this.checked)" ' + checkedAttr + '></td>' +
+                   '<td><strong>' + d.id + '</strong></td>' +
+                   '<td>' + formatRupiah(Math.round(d.price)) + '</td>' +
+                   '<td>' + statusText + '</td></tr>';
+  });
+
+  document.getElementById('auditTableBody').innerHTML = htmlAudit;
+
+  // Hitung Nilai Harapan / Base Case Median
+  finalPrices.sort((a, b) => a - b);
+  _avmCurrentMedian = getMed(finalPrices);
+
+  document.getElementById('modalMedianPrice').textContent = formatRupiah(Math.round(_avmCurrentMedian));
+  document.getElementById('modalDataCount').textContent = finalPrices.length + " Data Valid";
+
+  var insightMsg = "Berdasarkan kendali mutu (Audit), Base Case senilai " + formatRupiah(Math.round(_avmCurrentMedian)) + " telah divalidasi. Masukkan asumsi skenario SBM untuk memproyeksikan Expected Value.";
+  document.getElementById('modalSmartInsight').innerHTML = insightMsg;
+  document.getElementById('modalSmartInsight').style.borderLeftColor = "#16a34a";
+
+  calculateSBM(); // Trigger hitung ulang SBM
+}
+
+function toggleAVMOverride(uid, isChecked) {
+  _avmOverrideState[uid] = isChecked;
+  recalcAVM(); // Hitung ulang median tiap ada centang berubah
+}
+
+function calculateSBM() {
+  var pPess = parseFloat(document.getElementById('sbmProbPess').value) || 0;
+  var aPess = parseFloat(document.getElementById('sbmAdjPess').value) || 0;
+
+  var pBase = parseFloat(document.getElementById('sbmProbBase').value) || 0;
+  var aBase = 0; // Base selalu 0% penyesuaian
+
+  var pOpt = parseFloat(document.getElementById('sbmProbOpt').value) || 0;
+  var aOpt = parseFloat(document.getElementById('sbmAdjOpt').value) || 0;
+
+  var totalProb = pPess + pBase + pOpt;
+  
+  if(totalProb !== 100) {
+      document.getElementById('sbmWarning').style.display = 'block';
+      document.getElementById('sbmExpectedValue').textContent = "ERROR";
+      document.getElementById('sbmExpectedValue').style.color = "#fca5a5";
+      return;
+  } else {
+      document.getElementById('sbmWarning').style.display = 'none';
+      document.getElementById('sbmExpectedValue').style.color = "#fff";
+  }
+
+  // Rumus OPM / SBM (Hybrid Value)
+  var valPess = _avmCurrentMedian * (1 + (aPess/100)) * (pPess/100);
+  var valBase = _avmCurrentMedian * (1 + (aBase/100)) * (pBase/100);
+  var valOpt  = _avmCurrentMedian * (1 + (aOpt/100))  * (pOpt/100);
+
+  var expectedValue = valPess + valBase + valOpt;
+
+  document.getElementById('sbmExpectedValue').textContent = formatRupiah(Math.round(expectedValue)) + " /m²";
 }
 
 function closeAnalyticsModal() { document.getElementById('analyticsOverlay').classList.remove('open'); }
 
-// ✅ FITUR EKSPOR PDF LAPORAN AVM
 function downloadAVMPDF() {
   toast('Membangun Laporan PDF AVM...', 'loading');
   var template = document.getElementById('pdfAVMTemplate');
   
-  var canvasImg = document.getElementById('chartHistogram').toDataURL('image/png');
   var medianRp = document.getElementById('modalMedianPrice').textContent;
-  var scoreTxt = document.getElementById('modalScoreText').textContent;
-  var stdev = document.getElementById('modalStdev').textContent;
-  var dev = document.getElementById('modalDeviasi').textContent;
   var dataCount = document.getElementById('modalDataCount').textContent;
-  var insightHtml = document.getElementById('modalSmartInsight').innerHTML;
-  var timeNote = document.getElementById('timeAdjNote').textContent;
+  var evRp = document.getElementById('sbmExpectedValue').textContent;
+
+  // Baca Input Skenario
+  var pPess = document.getElementById('sbmProbPess').value;
+  var aPess = document.getElementById('sbmAdjPess').value;
+  var pBase = document.getElementById('sbmProbBase').value;
+  var pOpt = document.getElementById('sbmProbOpt').value;
+  var aOpt = document.getElementById('sbmAdjOpt').value;
+
+  var auditHtml = document.getElementById('auditTableBody').innerHTML;
 
   template.innerHTML = `
     <div style="border-bottom: 3px solid #2d6be4; padding-bottom:15px; margin-bottom:20px;">
-      <h1 style="color:#1e3a5f; margin:0;">Laporan Analisis Pasar Berbasis Radius (AVM)</h1>
-      <p style="color:#5a6a7e; margin:5px 0 0 0;">Dihasilkan oleh WebGIS Appraisal System</p>
+      <h1 style="color:#1e3a5f; margin:0;">Laporan Valuasi Skenario Hibrida (SBM)</h1>
+      <p style="color:#5a6a7e; margin:5px 0 0 0;">Dihasilkan oleh WebGIS Appraisal System (IVS 200 Compliant)</p>
     </div>
     
     <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
       <tr>
         <td style="padding:15px; background:#f0f4f8; border-radius:8px 0 0 8px; width:50%;">
-          <div style="font-size:12px; color:#5a6a7e;">Nilai Tengah Pasar Terkoreksi</div>
-          <div style="font-size:28px; color:#2d6be4; font-weight:800; margin-top:5px;">${medianRp} /m²</div>
-          <div style="font-size:10px; color:#8a9ab0; margin-top:5px;">Basis: ${dataCount}</div>
+          <div style="font-size:12px; color:#5a6a7e;">Nilai Dasar (Base Case)</div>
+          <div style="font-size:24px; color:#1a2332; font-weight:800; margin-top:5px;">${medianRp}</div>
+          <div style="font-size:10px; color:#8a9ab0; margin-top:5px;">Data Divigilisasi: ${dataCount}</div>
         </td>
         <td style="padding:15px; background:#e8f0fe; border-radius:0 8px 8px 0; width:50%; text-align:right;">
-          <div style="font-size:12px; color:#5a6a7e;">Skor Kepercayaan</div>
-          <div style="font-size:22px; color:#16a34a; font-weight:800; margin-top:5px;">${scoreTxt}</div>
+          <div style="font-size:12px; color:#2d6be4; font-weight:700;">NILAI HARAPAN (EXPECTED VALUE)</div>
+          <div style="font-size:26px; color:#2d6be4; font-weight:800; margin-top:5px;">${evRp}</div>
         </td>
       </tr>
     </table>
 
-    <div style="background:#fff; border:1px solid #d1dbe8; border-left: 5px solid #2d6be4; padding:15px; margin-bottom:25px; border-radius:4px; font-size:13px; line-height:1.6; color:#1a2332;">
-      ${insightHtml}
-    </div>
-
-    <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Distribusi Frekuensi Harga</h3>
-    <div style="border:1px solid #d1dbe8; padding:15px; border-radius:8px; text-align:center; margin-bottom:25px;">
-      <img src="${canvasImg}" style="width:100%; max-height:250px; object-fit:contain;">
-      <div style="font-size:10px; color:#8a9ab0; margin-top:10px; text-align:left;">${timeNote}</div>
-    </div>
-
-    <table style="width:100%; border-collapse:collapse; text-align:center;">
+    <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Parameter Probabilitas (Scenario Based Method)</h3>
+    <table style="width:100%; border-collapse:collapse; text-align:center; font-size:12px; margin-bottom:25px;">
       <tr>
-        <td style="padding:15px; border:1px solid #d1dbe8; background:#f0f4f8; width:50%;">
-          <div style="font-size:12px; color:#5a6a7e;">Standar Deviasi ($\sigma$)</div>
-          <div style="font-size:18px; font-weight:800; margin-top:5px;">${stdev}</div>
-        </td>
-        <td style="padding:15px; border:1px solid #d1dbe8; background:#f0f4f8; width:50%;">
-          <div style="font-size:12px; color:#5a6a7e;">Deviasi Harga Min-Max</div>
-          <div style="font-size:18px; font-weight:800; margin-top:5px;">${dev}</div>
-        </td>
+        <th style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;">Skenario</th>
+        <th style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;">Probabilitas (%)</th>
+        <th style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;">Koreksi Risiko (%)</th>
       </tr>
+      <tr><td style="padding:8px; border:1px solid #d1dbe8;">Pesimis</td><td style="padding:8px; border:1px solid #d1dbe8;">${pPess}%</td><td style="padding:8px; border:1px solid #d1dbe8;">${aPess}%</td></tr>
+      <tr><td style="padding:8px; border:1px solid #d1dbe8; background:#e8f0fe; font-weight:bold;">Normal (Base)</td><td style="padding:8px; border:1px solid #d1dbe8; background:#e8f0fe;">${pBase}%</td><td style="padding:8px; border:1px solid #d1dbe8; background:#e8f0fe;">0%</td></tr>
+      <tr><td style="padding:8px; border:1px solid #d1dbe8;">Optimis</td><td style="padding:8px; border:1px solid #d1dbe8;">${pOpt}%</td><td style="padding:8px; border:1px solid #d1dbe8;">+${aOpt}%</td></tr>
+    </table>
+
+    <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Audit Trail Pembentuk Nilai Dasar</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
+      <thead><tr>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Digunakan</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">ID Data</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Harga</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Status Sistem</th>
+      </tr></thead>
+      <tbody>${auditHtml.replace(/<input type="checkbox"[^>]*checked[^>]*>/g, '✅').replace(/<input type="checkbox"[^>]*>/g, '❌')}</tbody>
     </table>
 
     <div style="margin-top:40px; font-size:11px; color:#5a6a7e; text-align:right;">
-      Dicetak oleh: ${activeUsername} | Tanggal: ${new Date().toLocaleString('id-ID')}
+      Disusun & Dikendalikan oleh: ${activeUsername} | Tanggal: ${new Date().toLocaleString('id-ID')}
     </div>
   `;
 
   template.style.display = 'block'; 
-  html2pdf().set({ margin: 15, filename: 'Laporan_AVM_' + new Date().toISOString().slice(0,10) + '.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(template).save().then(function() { template.style.display = 'none'; toast('Laporan PDF Berhasil Diunduh!', 'success'); });
+  html2pdf().set({ margin: 15, filename: 'Valuasi_SBM_' + new Date().toISOString().slice(0,10) + '.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(template).save().then(function() { template.style.display = 'none'; toast('Laporan SBM Berhasil Diunduh!', 'success'); });
 }
+
+/* ========================================================================= */
 
 function formatRupiah(val) { if (val === null || val === undefined || val === '') return '–'; var digits = String(val).replace(/[^0-9]/g, ''); if (!digits) return String(val); return 'Rp ' + digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 function _getPinLabel(id) { var s = String(id || '').toUpperCase().trim(); return s.indexOf('DP') !== -1 ? 'DP' : 'Ob'; }
@@ -937,7 +1023,6 @@ function initMap() {
   markerGroup = typeof L.markerClusterGroup === 'function' ? L.markerClusterGroup({ maxClusterRadius: 50, spiderfyOnMaxZoom: true, showCoverageOnHover: false }) : L.layerGroup();
   gMap.addLayer(markerGroup);
   
-  // ✅ LOGIKA KLIK UNTUK MENGGAMBAR POLIGON & KLIK BEBAS DI PETA
   gMap.on('click', function(e) { 
     if (_pickingLocation) { 
         _pickingLocation = false; document.getElementById('map').style.cursor = ''; 
@@ -965,7 +1050,6 @@ function initMap() {
     }
   });
 
-  // ✅ LOGIKA KLIK KANAN UNTUK SELESAI POLIGON ATAU MEMBERSIHKAN POI
   gMap.on('contextmenu', function(e) {
     if (_drawingPolygon) {
         _drawingPolygon = false;
@@ -973,7 +1057,6 @@ function initMap() {
         if (polyPoints.length >= 3) toast('Area kustom selesai! Silakan klik Cari.', 'success');
         else { toast('Gagal: Area butuh minimal 3 titik.', 'error'); if(polyLayer) gMap.removeLayer(polyLayer); polyPoints = []; }
     } else {
-        // PERBAIKAN: Fungsi menyapu bersih garis POI dipindah ke sini (Klik Kanan)
         if (poiLayerGroup) {
             gMap.removeLayer(poiLayerGroup);
             poiLayerGroup = null;
@@ -981,8 +1064,6 @@ function initMap() {
         }
     }
   });
-
-  // Catatan: gMap.on('popupclose') sudah dihapus dari sini agar garis tidak hilang otomatis
 
   document.getElementById('mapLoading').style.display = 'none'; setTimeout(function () { gMap.invalidateSize(); }, 300); doSearch();
 }
@@ -1113,7 +1194,6 @@ function renderMarkers(data, params) {
   if (params && params.centerLat != null && params.centerLng != null && params.radiusKm !== 'polygon') {
     centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
     
-    // PERBAIKAN: Menyuntikkan fitur Analisis POI ke popup Lokasi Aset
     var asetPoiHtml = '<div id="poi_wrap_aset" class="poi-container" style="margin-top:8px; border-top:1px dashed #d1dbe8; padding-top:10px;">' +
                       '<button class="poi-btn" id="btn_poi_aset" onclick="analyzePOI(' + params.centerLat + ', ' + params.centerLng + ', \'aset\')">📡 Analisis Jarak POI (Overpass)</button>' +
                       '<div id="poi_res_aset"></div></div>';
@@ -1165,7 +1245,6 @@ function buildPopup(row) {
 }
 function _iwr(k, v) { return '<div class="iw-row"><span class="iw-key">' + k + '</span><span class="iw-val">' + v + '</span></div>'; }
 
-// --- FUNGSI UTAMA ANALISIS POI (OVERPASS API) ---
 function analyzePOI(lat, lng, uid) {
     var btn = document.getElementById('btn_poi_' + uid);
     var resDiv = document.getElementById('poi_res_' + uid);
@@ -1175,7 +1254,6 @@ function analyzePOI(lat, lng, uid) {
     btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px;margin:0;border-color:rgba(45,107,228,0.3);border-top-color:#2d6be4;"></div> Menarik Data Satelit...';
     resDiv.innerHTML = '';
 
-    // Bersihkan garis POI sebelumnya jika ada
     if(poiLayerGroup) { gMap.removeLayer(poiLayerGroup); }
     poiLayerGroup = L.featureGroup().addTo(gMap);
 
@@ -1273,9 +1351,9 @@ function analyzePOI(lat, lng, uid) {
                 }).addTo(poiLayerGroup);
                 
                 var tooltipText = '<div style="text-align:center; line-height:1.2;">' +
-                                  '<span style="color:#ea4335; font-size:9px;">' + cat.toUpperCase() + '</span><br>' +
+                                  '<span style="color:#2d6be4; font-size:9px;">' + cat.toUpperCase() + '</span><br>' +
                                   '<span style="font-size:11px;">' + item.name + '</span><br>' +
-                                  '<span style="background:#ea4335; color:#fff; padding:1px 4px; border-radius:3px; font-size:9px;">' + distText + '</span>' +
+                                  '<span style="background:#2d6be4; color:#fff; padding:1px 4px; border-radius:3px; font-size:9px;">' + distText + '</span>' +
                                   '</div>';
                 
                 marker.bindTooltip(tooltipText, {
