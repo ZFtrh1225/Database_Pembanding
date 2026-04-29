@@ -215,6 +215,11 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .compare-table th { background: var(--bg); color: var(--text-sub); text-align: left; font-weight: 600; width: 120px; }
 .compare-table img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; }
 
+/* SCORE BAR AVM */
+.avm-score-bar { width: 100%; height: 10px; background: var(--border); border-radius: 5px; margin-top: 10px; overflow: hidden; }
+.avm-score-fill { height: 100%; border-radius: 5px; transition: width 0.5s ease; }
+.avm-insight { font-size: 12px; background: var(--bg); border-left: 4px solid var(--blue); padding: 12px; border-radius: 4px; margin-top: 15px; color: var(--text); line-height: 1.5; text-align: left;}
+
 /* CSS UNTUK FITUR POI (OVERPASS) */
 .poi-container { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; font-size: 11px; }
 .poi-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f4f8; }
@@ -418,6 +423,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
       <div class="view-toggle">
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
         <button class="btn-view" id="btnHeatmap" onclick="toggleHeatmap()" style="color:#ea4335; border-color:#ea4335;">🔥 Heatmap</button>
+        <button class="btn-view" id="btn3D" onclick="toggle3D()" style="color:#2d6be4; border-color:#2d6be4; font-weight:bold;">🏙️ 3D Twin</button>
         <button class="btn-view active" id="btnViewMap" onclick="setView('map')">🗺 Peta</button>
         <button class="btn-view" id="btnViewTable" onclick="setView('table')">☰ Tabel</button>
       </div>
@@ -629,6 +635,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>  
+<script src="https://cdn.osmbuildings.org/classic/0.2.2b/OSMBuildings-Leaflet.js"></script>
 
 <script>
 // --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
@@ -669,10 +676,15 @@ var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
 
-// Variabel SBM & Audit
-var _avmOverrideState = {}; // Menyimpan preferensi manual (UID: true/false)
-var _avmRawData = []; // Menyimpan data mentah AVM dengan harga terkoreksi
+// Variabel SBM, Audit & AI Agent Edge
+var _avmOverrideState = {}; 
+var _avmRawData = []; 
 var _avmCurrentMedian = 0;
+var _asetPOIData = null; // TAMBAHAN: Memori untuk AI Agent Edge
+
+// Variabel Virtual Twin 3D
+var osmb = null; 
+var is3D = false;
 
 var _drawingPolygon = false;
 var polyPoints = [];
@@ -761,6 +773,23 @@ function startDrawingPolygon() {
 
 function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
 
+function toggle3D() {
+  if(!osmb) { 
+      // Inisialisasi engine 3D dari satelit OSM
+      osmb = new OSMBuildings(gMap).load('https://{s}.data.osmbuildings.org/0.2/anonymous/tile/{z}/{x}/{y}.json'); 
+  }
+  is3D = !is3D;
+  document.getElementById('btn3D').classList.toggle('active', is3D);
+  if(is3D) {
+    osmb.addTo(gMap);
+    gMap.setZoom(17); // Harus di-zoom dekat agar bangunan 3D terlihat
+    toast('Virtual Twin 3D diaktifkan!', 'success');
+  } else {
+    gMap.removeLayer(osmb);
+    toast('Kembali ke mode 2D', 'success');
+  }
+}
+
 function calculateSidebarStats(data) {
   var total = 0, count = 0, min = Infinity, max = 0;
   var counts = { 'Tanah Bangunan':0, 'Tanah Kosong':0, 'Ruko':0, 'Office/Retail/Unit Apartemen':0 };
@@ -784,7 +813,7 @@ function calculateSidebarStats(data) {
 }
 
 /* =========================================================================
-   FUNGSI AVM TERBARU: SBM & AUDIT TRAIL
+   FUNGSI AVM TERBARU: SBM, AUDIT TRAIL, & AI AGENT EDGE
 ========================================================================= */
 
 function switchAVMTab(tabName) {
@@ -882,6 +911,29 @@ function recalcAVM() {
   document.getElementById('modalDataCount').textContent = finalPrices.length + " Data Valid";
 
   var insightMsg = "Berdasarkan kendali mutu (Audit), Base Case senilai " + formatRupiah(Math.round(_avmCurrentMedian)) + " telah divalidasi. Masukkan asumsi skenario SBM untuk memproyeksikan Expected Value.";
+  
+  // --- TAMBAHAN: LOGIKA AI AGENT EDGE NARRATIVE ---
+  if (_asetPOIData) {
+      var edgeNarrative = "<br><br><span style='color:#2d6be4;'><strong>🤖 AI Agent Edge Insight:</strong></span> Berdasarkan analisis spasial otomatis, aset berada di kawasan strategis yang didukung oleh ";
+      var facs = [];
+      
+      // Jika mendeteksi Gerbang Tol dalam radius 3 KM
+      if (_asetPOIData['Gerbang Tol'] && _asetPOIData['Gerbang Tol'].best && _asetPOIData['Gerbang Tol'].best.dist < 3000) {
+          facs.push("akses transportasi (" + (_asetPOIData['Gerbang Tol'].best.dist/1000).toFixed(2) + " KM dari " + _asetPOIData['Gerbang Tol'].best.name + ")");
+      }
+      // Jika mendeteksi Pusat Belanja dalam radius 3 KM
+      if (_asetPOIData['Pusat Belanja'] && _asetPOIData['Pusat Belanja'].best && _asetPOIData['Pusat Belanja'].best.dist < 3000) {
+          facs.push("pusat komersial (" + (_asetPOIData['Pusat Belanja'].best.dist/1000).toFixed(2) + " KM dari " + _asetPOIData['Pusat Belanja'].best.name + ")");
+      }
+      
+      // Jika ada fasilitas yang memenuhi syarat, gabungkan kalimatnya
+      if(facs.length > 0) {
+          edgeNarrative += facs.join(" dan ") + ". Hal ini sangat mendukung <em>Highest and Best Use (HBU)</em> dengan tingkat likuiditas pasar yang menjanjikan.";
+          insightMsg += edgeNarrative; // Gabungkan narasi AI ke dalam pesan utama
+      }
+  }
+  // -----------------------------------------------
+
   document.getElementById('modalSmartInsight').innerHTML = insightMsg;
   document.getElementById('modalSmartInsight').style.borderLeftColor = "#16a34a";
 
@@ -943,6 +995,7 @@ function downloadAVMPDF() {
   var aOpt = document.getElementById('sbmAdjOpt').value;
 
   var auditHtml = document.getElementById('auditTableBody').innerHTML;
+  var insightHtml = document.getElementById('modalSmartInsight').innerHTML;
 
   template.innerHTML = `
     <div style="border-bottom: 3px solid #2d6be4; padding-bottom:15px; margin-bottom:20px;">
@@ -963,6 +1016,10 @@ function downloadAVMPDF() {
         </td>
       </tr>
     </table>
+    
+    <div style="background:#fff; border:1px solid #d1dbe8; border-left: 5px solid #2d6be4; padding:15px; margin-bottom:25px; border-radius:4px; font-size:13px; line-height:1.6; color:#1a2332;">
+      ${insightHtml}
+    </div>
 
     <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Parameter Probabilitas (Scenario Based Method)</h3>
     <table style="width:100%; border-collapse:collapse; text-align:center; font-size:12px; margin-bottom:25px;">
@@ -1158,6 +1215,7 @@ function renderMarkers(data, params) {
   if (centerMarker) { gMap.removeLayer(centerMarker); centerMarker = null; }
   if (heatLayer)    { gMap.removeLayer(heatLayer);    heatLayer    = null; }
   
+  // Jika radius biasa, hilangkan polygon layer yang ada
   if (params && params.radiusKm !== 'polygon' && polyLayer) {
       gMap.removeLayer(polyLayer); polyLayer = null; polyPoints = [];
   }
@@ -1191,6 +1249,7 @@ function renderMarkers(data, params) {
     if (!gMap.hasLayer(markerGroup)) gMap.addLayer(markerGroup); 
   }
 
+  // Jika pencarian menggunakan lingkaran radius
   if (params && params.centerLat != null && params.centerLng != null && params.radiusKm !== 'polygon') {
     centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
     
@@ -1208,8 +1267,10 @@ function renderMarkers(data, params) {
     bounds.push([params.centerLat, params.centerLng]);
   }
   
+  // Jika pencarian menggunakan poligon, pastikan layer poligon terlihat
   if (params && params.radiusKm === 'polygon' && polyLayer) {
      if (!gMap.hasLayer(polyLayer)) polyLayer.addTo(gMap);
+     // Tambahkan titik poligon ke bounds agar kamera pas
      polyPoints.forEach(p => bounds.push([p.lat, p.lng]));
   }
 
@@ -1322,6 +1383,11 @@ function analyzePOI(lat, lng, uid) {
                 }
             }
         });
+
+        // TAMBAHAN: Jika yang dianalisis adalah "Lokasi Aset", simpan datanya ke memori AI
+        if (uid === 'aset') {
+            _asetPOIData = categories;
+        }
 
         var html = '<div style="font-size:10px; color:var(--text-xs); margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">📍 Fasilitas Terdekat (Euclidean)</div>';
         var foundAny = false;
