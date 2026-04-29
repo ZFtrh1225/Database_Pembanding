@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Database Pembanding</title>
+<title>Database Pembanding & Hybrid AVM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -452,9 +452,9 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 </div>
 
 <div class="modal-overlay" id="analyticsOverlay" onclick="if(event.target===this)closeAnalyticsModal()">
-  <div class="modal" style="max-width: 680px;">
+  <div class="modal" style="max-width: 820px;">
     <div class="modal-header">
-      <span class="modal-title" style="color:var(--navy); font-size:16px;">📊 AVM: Hybrid Scenario Based Method</span>
+      <span class="modal-title" style="color:var(--navy); font-size:16px;">📊 AVM: Hybrid Scenario Based Method (with RaLAT)</span>
       <button class="btn-close" onclick="closeAnalyticsModal()">✕</button>
     </div>
     
@@ -462,7 +462,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
       
       <div class="avm-tabs">
         <button class="avm-tab-btn active" onclick="switchAVMTab('sbm')">1. Proyeksi Skenario (SBM)</button>
-        <button class="avm-tab-btn" onclick="switchAVMTab('audit')">2. Audit Trail & Override</button>
+        <button class="avm-tab-btn" onclick="switchAVMTab('audit')">2. Audit Trail & RaLAT</button>
       </div>
 
       <div id="tab-sbm" class="avm-tab-content active">
@@ -526,7 +526,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 
       <div id="tab-audit" class="avm-tab-content">
         <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 15px; line-height: 1.5;">
-          <strong>Kendali Mutu (Quality Control):</strong> Sistem mendeteksi outlier menggunakan metode IQR. Sebagai penilai, Anda memegang <em>Professional Judgement</em> untuk memaksa data masuk (Centang) atau membuangnya (Hapus Centang) dari perhitungan Base Case.
+          <strong>Kendali Mutu (Quality Control):</strong> Harga di bawah telah melewati <em>Time Adjustment</em> dan <strong>RaLAT</strong> (Penyesuaian Spasial Ekonometrika). Centang untuk memaksakan data masuk ke perhitungan Base Case.
         </div>
         <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
           <table class="audit-table">
@@ -534,7 +534,8 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
               <tr>
                 <th style="width:40px; text-align:center;">Pakai</th>
                 <th>ID DP</th>
-                <th>Harga Terkoreksi (/m²)</th>
+                <th>Harga Terkoreksi (m²)</th>
+                <th>Penyesuaian RaLAT (Spasial)</th>
                 <th>Status AVM (IQR)</th>
               </tr>
             </thead>
@@ -676,11 +677,12 @@ var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
 
-// Variabel SBM, Audit & AI Agent Edge
+// Variabel SBM, Audit & AI Agent Edge (Dengan Dukungan Model Regresi)
 var _avmOverrideState = {}; 
 var _avmRawData = []; 
 var _avmCurrentMedian = 0;
-var _asetPOIData = null; // TAMBAHAN: Memori untuk AI Agent Edge
+var _asetPOIData = null; 
+window.regressionModels = {}; // Global var untuk menyimpan koefisien Ekonometrika
 
 // Variabel Virtual Twin 3D
 var osmb = null; 
@@ -775,14 +777,13 @@ function toggleSidebar() { document.querySelector('.panel-filter').classList.tog
 
 function toggle3D() {
   if(!osmb) { 
-      // Inisialisasi engine 3D dari satelit OSM
       osmb = new OSMBuildings(gMap).load('https://{s}.data.osmbuildings.org/0.2/anonymous/tile/{z}/{x}/{y}.json'); 
   }
   is3D = !is3D;
   document.getElementById('btn3D').classList.toggle('active', is3D);
   if(is3D) {
     osmb.addTo(gMap);
-    gMap.setZoom(17); // Harus di-zoom dekat agar bangunan 3D terlihat
+    gMap.setZoom(17); 
     toast('Virtual Twin 3D diaktifkan!', 'success');
   } else {
     gMap.removeLayer(osmb);
@@ -813,7 +814,7 @@ function calculateSidebarStats(data) {
 }
 
 /* =========================================================================
-   FUNGSI AVM TERBARU: SBM, AUDIT TRAIL, & AI AGENT EDGE
+   FUNGSI AVM TERBARU: SBM, AUDIT TRAIL, & RaLAT (EKONOMETRIKA)
 ========================================================================= */
 
 function switchAVMTab(tabName) {
@@ -831,12 +832,34 @@ function switchAVMTab(tabName) {
 
 function initAVMAnalysis() {
   if (!currentData || currentData.length === 0) { toast('Lakukan pencarian data terlebih dahulu!', 'error'); return; }
+  
+  // Cek ketersediaan model regresi dari server
+  var modelName = currentData[0].provinsi || "Nasional";
+  var activeModel = window.regressionModels ? window.regressionModels[modelName] : null;
+
+  if (!activeModel) {
+      console.warn('Model Ekonometrika ' + modelName + ' tidak ditemukan. Memakai perhitungan tanpa penyesuaian spasial.');
+  }
+
   var timeAdjRate = parseFloat(document.getElementById('timeAdjRate').value) || 0;
 
-  _avmOverrideState = {}; // Reset manual override
+  _avmOverrideState = {}; 
   _avmRawData = [];
 
-  // Hitung nilai koreksi untuk semua data
+  // Peta variabel CSV ke tag POI OSM
+  var poiMapping = {
+      'Gerbang Tol': 'ln_distance_to_toll_gate',
+      'Pusat Belanja': 'ln_distance_to_mall',
+      'Rumah Sakit': 'ln_distance_to_hospital',
+      'Stasiun Kereta': 'ln_distance_to_train_station'
+  };
+
+  var centerLatLng = null;
+  var inputSearch = document.getElementById('mapSearch').value.split(',');
+  if(inputSearch.length === 2 && !isNaN(parseFloat(inputSearch[0]))) {
+      centerLatLng = L.latLng(parseFloat(inputSearch[0]), parseFloat(inputSearch[1]));
+  }
+
   currentData.forEach(function(row) {
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
@@ -846,19 +869,54 @@ function initAVMAnalysis() {
       if (diffYears > 0 && timeAdjRate !== 0) {
           price = price * Math.pow(1 + (timeAdjRate / 100), diffYears);
       }
-      _avmRawData.push({ uid: row._uid, id: row.id, price: price });
+
+      // --- MESIN RaLAT (REGRESI) BEKERJA DI SINI ---
+      var ralatLog = [];
+      if (activeModel && _asetPOIData && row.koordinat && centerLatLng) {
+          var coordComp = _parseCoordJS(row.koordinat);
+          var coordAset = centerLatLng;
+
+          for (var poiName in poiMapping) {
+              var varName = poiMapping[poiName];
+              
+              if (activeModel[varName] && _asetPOIData[poiName] && _asetPOIData[poiName].best) {
+                  var koef = activeModel[varName].koefisien;
+                  var targetLatLng = L.latLng(_asetPOIData[poiName].best.lat, _asetPOIData[poiName].best.lon);
+
+                  var distAset = gMap.distance(coordAset, targetLatLng);
+                  var distComp = gMap.distance(L.latLng(coordComp.lat, coordComp.lng), targetLatLng);
+
+                  // Hindari ln(0)
+                  distAset = distAset <= 0 ? 1 : distAset;
+                  distComp = distComp <= 0 ? 1 : distComp;
+
+                  var selisihLn = Math.log(distAset) - Math.log(distComp);
+                  var adjPct = selisihLn * koef;
+
+                  price = price * (1 + adjPct);
+                  var sign = adjPct > 0 ? '+' : '';
+                  ralatLog.push(poiName + " (" + sign + (adjPct*100).toFixed(1) + "%)");
+              }
+          }
+      }
+
+      _avmRawData.push({ 
+          uid: row._uid, 
+          id: row.id, 
+          price: price, 
+          ralatInfo: ralatLog.join("<br>") || "-" 
+      });
     }
   });
 
   if (_avmRawData.length === 0) { toast('Tidak ada data valid untuk dianalisa.', 'error'); return; }
 
-  recalcAVM(); // Hitung IQR awal
-  switchAVMTab('sbm'); // Buka tab SBM sebagai default
+  recalcAVM(); 
+  switchAVMTab('sbm'); 
   document.getElementById('analyticsOverlay').classList.add('open');
 }
 
 function recalcAVM() {
-  // Hitung IQR secara otomatis pada awal (tanpa memperdulikan override)
   var allPrices = _avmRawData.map(d => d.price).sort((a, b) => a - b);
   var lowerBound = 0, upperBound = Infinity;
 
@@ -876,16 +934,13 @@ function recalcAVM() {
     upperBound = q3 + (1.5 * iqr);
   }
 
-  // Tentukan mana data yang dipakai berdasar (Override ATAU IQR)
   var finalPrices = [];
   var htmlAudit = '';
 
   _avmRawData.forEach(function(d) {
-      // Logika Sistem (IQR)
       var systemIncluded = (d.price >= lowerBound && d.price <= upperBound);
       var statusText = systemIncluded ? '<span style="color:#16a34a;font-weight:bold;">Sesuai Standar</span>' : '<span style="color:#dc2626;font-weight:bold;">Outlier (Di luar IQR)</span>';
       
-      // Logika Override Manual
       var isManuallyOverridden = _avmOverrideState.hasOwnProperty(d.uid);
       var finalIncluded = isManuallyOverridden ? _avmOverrideState[d.uid] : systemIncluded;
 
@@ -898,12 +953,12 @@ function recalcAVM() {
                    '<td style="text-align:center;"><input type="checkbox" onchange="toggleAVMOverride(\'' + d.uid + '\', this.checked)" ' + checkedAttr + '></td>' +
                    '<td><strong>' + d.id + '</strong></td>' +
                    '<td>' + formatRupiah(Math.round(d.price)) + '</td>' +
+                   '<td style="font-size:10px; color:#2d6be4;">' + d.ralatInfo + '</td>' +
                    '<td>' + statusText + '</td></tr>';
   });
 
   document.getElementById('auditTableBody').innerHTML = htmlAudit;
 
-  // Hitung Nilai Harapan / Base Case Median
   finalPrices.sort((a, b) => a - b);
   _avmCurrentMedian = getMed(finalPrices);
 
@@ -912,37 +967,33 @@ function recalcAVM() {
 
   var insightMsg = "Berdasarkan kendali mutu (Audit), Base Case senilai " + formatRupiah(Math.round(_avmCurrentMedian)) + " telah divalidasi. Masukkan asumsi skenario SBM untuk memproyeksikan Expected Value.";
   
-  // --- TAMBAHAN: LOGIKA AI AGENT EDGE NARRATIVE ---
+  // --- LOGIKA AI AGENT EDGE NARRATIVE ---
   if (_asetPOIData) {
       var edgeNarrative = "<br><br><span style='color:#2d6be4;'><strong>🤖 AI Agent Edge Insight:</strong></span> Berdasarkan analisis spasial otomatis, aset berada di kawasan strategis yang didukung oleh ";
       var facs = [];
       
-      // Jika mendeteksi Gerbang Tol dalam radius 3 KM
       if (_asetPOIData['Gerbang Tol'] && _asetPOIData['Gerbang Tol'].best && _asetPOIData['Gerbang Tol'].best.dist < 3000) {
           facs.push("akses transportasi (" + (_asetPOIData['Gerbang Tol'].best.dist/1000).toFixed(2) + " KM dari " + _asetPOIData['Gerbang Tol'].best.name + ")");
       }
-      // Jika mendeteksi Pusat Belanja dalam radius 3 KM
       if (_asetPOIData['Pusat Belanja'] && _asetPOIData['Pusat Belanja'].best && _asetPOIData['Pusat Belanja'].best.dist < 3000) {
           facs.push("pusat komersial (" + (_asetPOIData['Pusat Belanja'].best.dist/1000).toFixed(2) + " KM dari " + _asetPOIData['Pusat Belanja'].best.name + ")");
       }
       
-      // Jika ada fasilitas yang memenuhi syarat, gabungkan kalimatnya
       if(facs.length > 0) {
           edgeNarrative += facs.join(" dan ") + ". Hal ini sangat mendukung <em>Highest and Best Use (HBU)</em> dengan tingkat likuiditas pasar yang menjanjikan.";
-          insightMsg += edgeNarrative; // Gabungkan narasi AI ke dalam pesan utama
+          insightMsg += edgeNarrative;
       }
   }
-  // -----------------------------------------------
 
   document.getElementById('modalSmartInsight').innerHTML = insightMsg;
   document.getElementById('modalSmartInsight').style.borderLeftColor = "#16a34a";
 
-  calculateSBM(); // Trigger hitung ulang SBM
+  calculateSBM(); 
 }
 
 function toggleAVMOverride(uid, isChecked) {
   _avmOverrideState[uid] = isChecked;
-  recalcAVM(); // Hitung ulang median tiap ada centang berubah
+  recalcAVM(); 
 }
 
 function calculateSBM() {
@@ -950,7 +1001,7 @@ function calculateSBM() {
   var aPess = parseFloat(document.getElementById('sbmAdjPess').value) || 0;
 
   var pBase = parseFloat(document.getElementById('sbmProbBase').value) || 0;
-  var aBase = 0; // Base selalu 0% penyesuaian
+  var aBase = 0; 
 
   var pOpt = parseFloat(document.getElementById('sbmProbOpt').value) || 0;
   var aOpt = parseFloat(document.getElementById('sbmAdjOpt').value) || 0;
@@ -967,7 +1018,6 @@ function calculateSBM() {
       document.getElementById('sbmExpectedValue').style.color = "#fff";
   }
 
-  // Rumus OPM / SBM (Hybrid Value)
   var valPess = _avmCurrentMedian * (1 + (aPess/100)) * (pPess/100);
   var valBase = _avmCurrentMedian * (1 + (aBase/100)) * (pBase/100);
   var valOpt  = _avmCurrentMedian * (1 + (aOpt/100))  * (pOpt/100);
@@ -987,7 +1037,6 @@ function downloadAVMPDF() {
   var dataCount = document.getElementById('modalDataCount').textContent;
   var evRp = document.getElementById('sbmExpectedValue').textContent;
 
-  // Baca Input Skenario
   var pPess = document.getElementById('sbmProbPess').value;
   var aPess = document.getElementById('sbmAdjPess').value;
   var pBase = document.getElementById('sbmProbBase').value;
@@ -1033,15 +1082,15 @@ function downloadAVMPDF() {
       <tr><td style="padding:8px; border:1px solid #d1dbe8;">Optimis</td><td style="padding:8px; border:1px solid #d1dbe8;">${pOpt}%</td><td style="padding:8px; border:1px solid #d1dbe8;">+${aOpt}%</td></tr>
     </table>
 
-    <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Audit Trail Pembentuk Nilai Dasar</h3>
+    <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Audit Trail & Penyesuaian Spasial (RaLAT)</h3>
     <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
       <thead><tr>
         <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Digunakan</th>
         <th style="padding:6px; border-bottom:1px solid #d1dbe8;">ID Data</th>
-        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Harga</th>
-        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Status Sistem</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Harga Akhir</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Penyesuaian Ekometrika</th>
       </tr></thead>
-      <tbody>${auditHtml.replace(/<input type="checkbox"[^>]*checked[^>]*>/g, '✅').replace(/<input type="checkbox"[^>]*>/g, '❌')}</tbody>
+      <tbody>${auditHtml.replace(/<input type="checkbox"[^>]*checked[^>]*>/g, '✅').replace(/<input type="checkbox"[^>]*>/g, '❌').replace(/<td><span style="color:#(?:16a34a|dc2626);font-weight:bold;">.*?<\/span><\/td><\/tr>/g, '</tr>')}</tbody>
     </table>
 
     <div style="margin-top:40px; font-size:11px; color:#5a6a7e; text-align:right;">
@@ -1157,17 +1206,16 @@ function collectParams() {
   return { 
     jenisProprti: get('jenisProprti'), legalitas: get('legalitas'), jenisData: get('jenisData'), tahun: get('tahun'), 
     rowJalan: document.getElementById('rowJalan').value, statusData: statusVal, radiusKm: rad, centerLat: cLat, centerLng: cLng,
-    polygon: rad === 'polygon' ? polyPoints : null // Kirim koordinat poligon ke server jika dipilih
+    polygon: rad === 'polygon' ? polyPoints : null 
   };
 }
 
-// ── SISTEM PENCARIAN ──────────────────────────────────────────
+// ── SISTEM PENCARIAN & UPDATE MODEL REGRESI ──────────────────────────────────────────
 function doSearch() {
   var btn = document.getElementById('btnCari');
   btn.classList.add('loading'); btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
   var params = collectParams();
 
-  // Validasi jika pilih polygon tapi belum digambar
   if (params.radiusKm === 'polygon' && (!params.polygon || params.polygon.length < 3)) {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       toast('Area belum digambar atau tidak valid (butuh min 3 titik).', 'error'); return;
@@ -1177,6 +1225,12 @@ function doSearch() {
     .withSuccessHandler(function (res) {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
+        
+        // TAMBAHAN: Menyimpan Model Ekonometrika dari Server ke Memori Browser
+        if (res.models) {
+            window.regressionModels = res.models;
+        }
+
         currentData = res.data.map(function(row, index) {
           row._uid = 'prop_' + index;
           var indStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
@@ -1215,7 +1269,6 @@ function renderMarkers(data, params) {
   if (centerMarker) { gMap.removeLayer(centerMarker); centerMarker = null; }
   if (heatLayer)    { gMap.removeLayer(heatLayer);    heatLayer    = null; }
   
-  // Jika radius biasa, hilangkan polygon layer yang ada
   if (params && params.radiusKm !== 'polygon' && polyLayer) {
       gMap.removeLayer(polyLayer); polyLayer = null; polyPoints = [];
   }
@@ -1249,7 +1302,6 @@ function renderMarkers(data, params) {
     if (!gMap.hasLayer(markerGroup)) gMap.addLayer(markerGroup); 
   }
 
-  // Jika pencarian menggunakan lingkaran radius
   if (params && params.centerLat != null && params.centerLng != null && params.radiusKm !== 'polygon') {
     centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
     
@@ -1267,10 +1319,8 @@ function renderMarkers(data, params) {
     bounds.push([params.centerLat, params.centerLng]);
   }
   
-  // Jika pencarian menggunakan poligon, pastikan layer poligon terlihat
   if (params && params.radiusKm === 'polygon' && polyLayer) {
      if (!gMap.hasLayer(polyLayer)) polyLayer.addTo(gMap);
-     // Tambahkan titik poligon ke bounds agar kamera pas
      polyPoints.forEach(p => bounds.push([p.lat, p.lng]));
   }
 
@@ -1384,7 +1434,6 @@ function analyzePOI(lat, lng, uid) {
             }
         });
 
-        // TAMBAHAN: Jika yang dianalisis adalah "Lokasi Aset", simpan datanya ke memori AI
         if (uid === 'aset') {
             _asetPOIData = categories;
         }
