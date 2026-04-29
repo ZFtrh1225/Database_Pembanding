@@ -1112,7 +1112,18 @@ function renderMarkers(data, params) {
 
   if (params && params.centerLat != null && params.centerLng != null && params.radiusKm !== 'polygon') {
     centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
-    centerMarker.bindPopup('<div style="font-family:var(--font);padding:8px 12px;font-weight:700;color:#db4437;">📍 Lokasi Aset</div>');
+    
+    // PERBAIKAN: Menyuntikkan fitur Analisis POI ke popup Lokasi Aset
+    var asetPoiHtml = '<div id="poi_wrap_aset" class="poi-container" style="margin-top:8px; border-top:1px dashed #d1dbe8; padding-top:10px;">' +
+                      '<button class="poi-btn" id="btn_poi_aset" onclick="analyzePOI(' + params.centerLat + ', ' + params.centerLng + ', \'aset\')">📡 Analisis Jarak POI (Overpass)</button>' +
+                      '<div id="poi_res_aset"></div></div>';
+                      
+    var popupContent = '<div style="font-family:var(--font);padding:8px;min-width:220px;text-align:center;">' +
+                       '<div style="font-weight:800;color:#db4437;font-size:14px;">📍 Lokasi Aset</div>' +
+                       asetPoiHtml + '</div>';
+                       
+    centerMarker.bindPopup(popupContent);
+    
     if (params.radiusKm) { circleObj = L.circle([params.centerLat, params.centerLng], { radius: parseFloat(params.radiusKm) * 1000, color: '#db4437', weight: 3, opacity: 0.8, fillColor: '#db4437', fillOpacity: 0.06, interactive: false }).addTo(gMap); }
     bounds.push([params.centerLat, params.centerLng]);
   }
@@ -1261,7 +1272,6 @@ function analyzePOI(lat, lng, uid) {
                     weight: 3
                 }).addTo(poiLayerGroup);
                 
-                // PERBAIKAN: Label permanen melayang di atas marker
                 var tooltipText = '<div style="text-align:center; line-height:1.2;">' +
                                   '<span style="color:#ea4335; font-size:9px;">' + cat.toUpperCase() + '</span><br>' +
                                   '<span style="font-size:11px;">' + item.name + '</span><br>' +
@@ -1280,7 +1290,6 @@ function analyzePOI(lat, lng, uid) {
         if(!foundAny) { html += '<div style="color:var(--text-sub); text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
         resDiv.innerHTML = html;
 
-        // PERBAIKAN: Auto zoom-out diaktifkan kembali.
         if (foundAny) {
              setTimeout(function() { gMap.fitBounds(poiLayerGroup.getBounds(), {padding: [50, 50], maxZoom: 16}); }, 200);
         }
