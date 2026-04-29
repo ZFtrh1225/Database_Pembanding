@@ -230,6 +230,10 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .poi-btn:hover:not(:disabled) { background: #2d6be4; color: #fff; border-style: solid; box-shadow: 0 4px 10px rgba(45,107,228,.2); }
 .poi-btn:disabled { opacity: 0.6; cursor: not-wait; border-style: solid; }
 
+/* TAMBAHAN: CSS KHUSUS LABEL TOOLTIP PERMANEN POI */
+.poi-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #ea4335; border-radius: 6px; font-family: var(--font); font-size: 11px; color: var(--navy); box-shadow: 0 4px 8px rgba(0,0,0,0.25); padding: 5px 8px; }
+.poi-tooltip::before { border-top-color: #ea4335 !important; }
+
 /* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS
    ========================================================= */
@@ -603,7 +607,7 @@ var _pickingLocation = false;
 var heatLayer = null, isHeatmap = false;
 var myChart = null; 
 var histChart = null; 
-var poiLayerGroup = null; // TAMBAHAN: Global variabel untuk Layer POI (Garis Jarak)
+var poiLayerGroup = null; // Layer khusus POI
 
 var compareList = [];
 var compareTargetId = null;
@@ -620,7 +624,7 @@ var PIN_COLORS = { 'Tanah Kosong': '#4285f4', 'Tanah Bangunan': '#0f9d58', 'Ruko
 
 function getAgingFlag(yrStr) {
   var yr = parseInt(String(yrStr));
-  if (!isNaN(yr) && yr <= _currentYear - 2) return ' <span style="font-size:10.5px; color:#dc2626; cursor:help;" title="Data Lama (> 1 Tahun)">⏳</span>';
+  if (!isNaN(yr) && yr <= _currentYear - 2) return ' <span style="font-size:10.5px; color:#dc2626; cursor:help;" title="Data Lama (> 1 Tahun)">⏳</span>';
   return '';
 }
 
@@ -847,7 +851,6 @@ function downloadAVMPDF() {
   toast('Membangun Laporan PDF AVM...', 'loading');
   var template = document.getElementById('pdfAVMTemplate');
   
-  // Mengambil gambar grafik histogram
   var canvasImg = document.getElementById('chartHistogram').toDataURL('image/png');
   var medianRp = document.getElementById('modalMedianPrice').textContent;
   var scoreTxt = document.getElementById('modalScoreText').textContent;
@@ -937,17 +940,14 @@ function initMap() {
   // ✅ LOGIKA KLIK UNTUK MENGGAMBAR POLIGON & KLIK BEBAS DI PETA
   gMap.on('click', function(e) { 
     if (_pickingLocation) { 
-        // Kondisi 1: Sedang mengambil koordinat untuk form tambah/edit data
         _pickingLocation = false; document.getElementById('map').style.cursor = ''; 
         document.getElementById('f_koordinat').value = e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6); 
         document.getElementById('modalOverlay').classList.add('open'); 
     } else if (_drawingPolygon) {
-        // Kondisi 2: Sedang menggambar area kustom (Poligon)
         polyPoints.push(e.latlng);
         if (polyLayer) gMap.removeLayer(polyLayer);
         polyLayer = L.polygon(polyPoints, {color: '#f4b400', weight: 2, fillColor: '#f4b400', fillOpacity: 0.2}).addTo(gMap);
     } else {
-        // ✅ Kondisi 3 (BARU): Klik bebas di peta ala Google Maps
         var lat = e.latlng.lat.toFixed(6);
         var lng = e.latlng.lng.toFixed(6);
         var coordStr = lat + ',' + lng;
@@ -965,24 +965,24 @@ function initMap() {
     }
   });
 
-  // ✅ LOGIKA KLIK KANAN UNTUK SELESAI MENGGAMBAR POLIGON
+  // ✅ LOGIKA KLIK KANAN UNTUK SELESAI POLIGON ATAU MEMBERSIHKAN POI
   gMap.on('contextmenu', function(e) {
     if (_drawingPolygon) {
         _drawingPolygon = false;
         document.getElementById('map').style.cursor = '';
         if (polyPoints.length >= 3) toast('Area kustom selesai! Silakan klik Cari.', 'success');
         else { toast('Gagal: Area butuh minimal 3 titik.', 'error'); if(polyLayer) gMap.removeLayer(polyLayer); polyPoints = []; }
+    } else {
+        // PERBAIKAN: Fungsi menyapu bersih garis POI dipindah ke sini (Klik Kanan)
+        if (poiLayerGroup) {
+            gMap.removeLayer(poiLayerGroup);
+            poiLayerGroup = null;
+            toast('Analisis POI disembunyikan.', 'success');
+        }
     }
   });
 
-  // --- TAMBAHAN KODE UNTUK POI ---
-  // Hapus garis POI jika popup properti ditutup
-  gMap.on('popupclose', function() {
-      if(poiLayerGroup) {
-          gMap.removeLayer(poiLayerGroup);
-          poiLayerGroup = null;
-      }
-  });
+  // Catatan: gMap.on('popupclose') sudah dihapus dari sini agar garis tidak hilang otomatis
 
   document.getElementById('mapLoading').style.display = 'none'; setTimeout(function () { gMap.invalidateSize(); }, 300); doSearch();
 }
@@ -1077,7 +1077,6 @@ function renderMarkers(data, params) {
   if (centerMarker) { gMap.removeLayer(centerMarker); centerMarker = null; }
   if (heatLayer)    { gMap.removeLayer(heatLayer);    heatLayer    = null; }
   
-  // Jika radius biasa, hilangkan polygon layer yang ada
   if (params && params.radiusKm !== 'polygon' && polyLayer) {
       gMap.removeLayer(polyLayer); polyLayer = null; polyPoints = [];
   }
@@ -1111,7 +1110,6 @@ function renderMarkers(data, params) {
     if (!gMap.hasLayer(markerGroup)) gMap.addLayer(markerGroup); 
   }
 
-  // Jika pencarian menggunakan lingkaran radius
   if (params && params.centerLat != null && params.centerLng != null && params.radiusKm !== 'polygon') {
     centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
     centerMarker.bindPopup('<div style="font-family:var(--font);padding:8px 12px;font-weight:700;color:#db4437;">📍 Lokasi Aset</div>');
@@ -1119,10 +1117,8 @@ function renderMarkers(data, params) {
     bounds.push([params.centerLat, params.centerLng]);
   }
   
-  // Jika pencarian menggunakan poligon, pastikan layer poligon terlihat
   if (params && params.radiusKm === 'polygon' && polyLayer) {
      if (!gMap.hasLayer(polyLayer)) polyLayer.addTo(gMap);
-     // Tambahkan titik poligon ke bounds agar kamera pas
      polyPoints.forEach(p => bounds.push([p.lat, p.lng]));
   }
 
@@ -1140,7 +1136,6 @@ function buildPopup(row) {
   if (photos.length > 0) { var imgs = photos.map(function(url) { return '<img src="' + url + '" alt="Foto"/>'; }).join(''); var navHtml = photos.length > 1 ? '<button class="iw-foto-nav iw-foto-prev" onclick="moveFoto(this, -1, ' + photos.length + ')">❮</button><button class="iw-foto-nav iw-foto-next" onclick="moveFoto(this, 1, ' + photos.length + ')">❯</button><div class="iw-foto-count">1/' + photos.length + '</div>' : ''; fotoHtml = '<div class="iw-foto-container">' + navHtml + '<div class="iw-foto-slider" data-idx="0">' + imgs + '</div></div>'; }
   var coordJS = _parseCoordJS(row.koordinat); var gmapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(f(row.koordinat)); var svUrl = coordJS ? 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + coordJS.lat + ',' + coordJS.lng : '#';
 
-  // --- TAMBAHAN KODE UNTUK POI ---
   var poiHtml = '';
   if (coordJS) {
       poiHtml = '<div id="poi_wrap_' + row._uid + '" class="poi-container">' +
@@ -1173,9 +1168,8 @@ function analyzePOI(lat, lng, uid) {
     if(poiLayerGroup) { gMap.removeLayer(poiLayerGroup); }
     poiLayerGroup = L.featureGroup().addTo(gMap);
 
-    var radius = 2500; // Radius pencarian 2.5 KM
+    var radius = 2500; 
     
-    // Kueri Overpass QL: Mencari Gerbang Tol, RS, Sekolah, Mall, Stasiun
     var query = `[out:json][timeout:15];
     (
       node["highway"="motorway_junction"](around:${radius},${lat},${lng});
@@ -1198,14 +1192,13 @@ function analyzePOI(lat, lng, uid) {
     })
     .then(function(response) { return response.json(); })
     .then(function(data) {
-        btn.style.display = 'none'; // Sembunyikan tombol jika sukses
+        btn.style.display = 'none'; 
 
         if(!data.elements || data.elements.length === 0) {
             resDiv.innerHTML = '<div style="color:var(--text-sub); text-align:center; padding:10px 0;">Tidak ditemukan fasilitas utama dalam radius ' + (radius/1000) + ' KM.</div>';
             return;
         }
 
-        // Definisi Kategori dan Tag OSM-nya
         var categories = {
             'Gerbang Tol': { tags: ['highway', 'motorway_junction'], best: null },
             'Rumah Sakit': { tags: ['amenity', 'hospital'], best: null },
@@ -1216,7 +1209,6 @@ function analyzePOI(lat, lng, uid) {
 
         var propLatLng = L.latLng(lat, lng);
 
-        // Parsing hasil dan cari yang paling dekat untuk setiap kategori
         data.elements.forEach(function(el) {
             if (el.type === 'node' && el.tags) {
                 var elLatLng = L.latLng(el.lat, el.lon);
@@ -1242,7 +1234,6 @@ function analyzePOI(lat, lng, uid) {
             }
         });
 
-        // Render HTML dan Gambar Garis di Peta
         var html = '<div style="font-size:10px; color:var(--text-xs); margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">📍 Fasilitas Terdekat (Euclidean)</div>';
         var foundAny = false;
 
@@ -1255,7 +1246,6 @@ function analyzePOI(lat, lng, uid) {
                         '<span class="poi-name" title="' + item.name + '">' + cat + ': ' + item.name + '</span>' +
                         '<span class="poi-dist">' + distText + '</span></div>';
 
-                // PERBAIKAN 2: Garis Dipertebal, Kontras (Merah Terang), dan Opacity Solid
                 L.polyline([[lat, lng], [item.lat, item.lon]], {
                     color: '#ea4335', 
                     dashArray: '8, 8', 
@@ -1263,7 +1253,6 @@ function analyzePOI(lat, lng, uid) {
                     opacity: 1
                 }).addTo(poiLayerGroup);
                 
-                // PERBAIKAN 3: Titik POI Diperbesar
                 var marker = L.circleMarker([item.lat, item.lon], {
                     radius: 7, 
                     color: '#ea4335', 
@@ -1272,15 +1261,29 @@ function analyzePOI(lat, lng, uid) {
                     weight: 3
                 }).addTo(poiLayerGroup);
                 
-                marker.bindTooltip('<b>' + cat + '</b><br>' + item.name, {permanent: false, direction: 'top'});
+                // PERBAIKAN: Label permanen melayang di atas marker
+                var tooltipText = '<div style="text-align:center; line-height:1.2;">' +
+                                  '<span style="color:#ea4335; font-size:9px;">' + cat.toUpperCase() + '</span><br>' +
+                                  '<span style="font-size:11px;">' + item.name + '</span><br>' +
+                                  '<span style="background:#ea4335; color:#fff; padding:1px 4px; border-radius:3px; font-size:9px;">' + distText + '</span>' +
+                                  '</div>';
+                
+                marker.bindTooltip(tooltipText, {
+                    permanent: true, 
+                    direction: 'top', 
+                    className: 'poi-tooltip', 
+                    offset: [0, -5]
+                }).openTooltip();
             }
         }
 
         if(!foundAny) { html += '<div style="color:var(--text-sub); text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
         resDiv.innerHTML = html;
 
-        // PERBAIKAN 1: Auto zoom-out dihapus agar popup tidak tertutup oleh MarkerCluster
-        // Pengguna dapat melihat hasil di tabel popup dan zoom-out secara manual jika ingin melihat titik ujungnya.
+        // PERBAIKAN: Auto zoom-out diaktifkan kembali.
+        if (foundAny) {
+             setTimeout(function() { gMap.fitBounds(poiLayerGroup.getBounds(), {padding: [50, 50], maxZoom: 16}); }, 200);
+        }
 
     })
     .catch(function(err) {
