@@ -273,10 +273,188 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 }
 
 /* --- FITUR MEASUREMENT CSS --- */
-.mpt-coord-wrap { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
-.mpt-input { width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 11px; outline: none; }
-.mdist-label { background: rgba(10,20,50,.82); color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; font-weight: bold; white-space: nowrap; }
-.btn-mpt-clear { background: transparent; border: none; color: var(--red); cursor: pointer; font-size: 14px; }
+/* =========================================================
+   📐 MEASUREMENT FEATURE
+   ========================================================= */
+.btn-measurement {
+  background: #7c3aed; color: #fff; border: none; border-radius: 6px;
+  padding: 6px 14px; font-size: 12px; font-family: var(--font);
+  cursor: pointer; transition: background .2s;
+  display: flex; align-items: center; gap: 5px;
+}
+.btn-measurement:hover { background: #6d28d9; }
+
+.measure-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: #1a2332; flex-direction: row;
+}
+.measure-overlay.open { display: flex; }
+
+.measure-sidebar {
+  width: 290px; min-width: 290px;
+  background: linear-gradient(180deg,#1e3a5f 0%,#172d4a 100%);
+  display: flex; flex-direction: column; overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,.1);
+  transition: width .3s ease, min-width .3s ease, opacity .3s ease;
+  position: relative; z-index: 10; flex-shrink: 0;
+}
+.measure-sidebar.hidden {
+  width: 0 !important; min-width: 0 !important;
+  overflow: hidden; opacity: 0;
+}
+.measure-sidebar::-webkit-scrollbar { width: 4px; }
+.measure-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
+
+.msb-header {
+  background: rgba(255,217,102,.1); border-bottom: 1px solid rgba(255,217,102,.2);
+  padding: 13px 14px 10px; position: sticky; top: 0; z-index: 5;
+  backdrop-filter: blur(10px); flex-shrink: 0;
+}
+.msb-title { font-size: 13px; font-weight: 700; color: #FFD966; display: flex; align-items: center; gap: 7px; }
+.msb-sub { font-size: 10px; color: rgba(255,255,255,.45); margin-top: 2px; }
+
+.msb-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+
+.mpt-card {
+  background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09);
+  border-radius: 9px; padding: 10px 11px; transition: border-color .2s;
+}
+.mpt-card:hover { border-color: rgba(255,255,255,.2); }
+.mpt-card.has-val { border-color: rgba(74,210,149,.4); background: rgba(74,210,149,.055); }
+
+.mpt-head { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+.mpt-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 8px; font-weight: 800; color: #fff; flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,.25);
+}
+.mpt-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.88); flex: 1; }
+.mpt-dist {
+  background: rgba(74,210,149,.2); color: #4ad295;
+  border: 1px solid rgba(74,210,149,.3); border-radius: 10px;
+  padding: 1px 7px; font-size: 10px; font-weight: 700;
+  display: none; white-space: nowrap;
+}
+.mpt-card.has-val .mpt-dist { display: block; }
+.mpt-clear {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.28); font-size: 11px; padding: 0;
+  transition: color .18s; margin-left: 2px;
+}
+.mpt-clear:hover { color: rgba(220,38,38,.8); }
+
+.mpt-coord-wrap { position: relative; }
+.mpt-input {
+  width: 100%; background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.13); border-radius: 6px;
+  padding: 6px 32px 6px 9px; font-family: var(--mono); font-size: 11px;
+  color: rgba(255,255,255,.88); outline: none; transition: border .2s, background .2s;
+}
+.mpt-input::placeholder { color: rgba(255,255,255,.28); }
+.mpt-input:focus { border-color: rgba(74,210,149,.55); background: rgba(255,255,255,.11); }
+.mpt-input.valid { border-color: rgba(74,210,149,.45); }
+.mpt-input.invalid { border-color: rgba(220,38,38,.45); }
+.mpt-pick {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.35); font-size: 13px; padding: 2px; transition: color .18s; line-height: 1;
+}
+.mpt-pick:hover { color: #FFD966; }
+
+.msb-summary {
+  background: rgba(255,217,102,.07); border: 1px solid rgba(255,217,102,.18);
+  border-radius: 9px; padding: 10px 12px; margin: 0 12px 12px;
+}
+.msb-sum-title {
+  font-size: 9.5px; font-weight: 700; color: #FFD966;
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 7px; display: flex; align-items: center; gap: 5px;
+}
+.msb-sum-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05);
+  font-size: 11px;
+}
+.msb-sum-row:last-child { border: none; }
+.msb-sum-key { color: rgba(255,255,255,.48); display: flex; align-items: center; gap: 5px; }
+.msb-sum-val { color: #fff; font-weight: 700; font-family: var(--mono); }
+
+.msb-footer {
+  padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.07);
+  position: sticky; bottom: 0; flex-shrink: 0;
+  background: linear-gradient(0deg,#172d4a 60%,transparent);
+}
+.msb-reset {
+  width: 100%; background: rgba(220,38,38,.13); color: rgba(220,38,38,.75);
+  border: 1px solid rgba(220,38,38,.22); border-radius: 7px;
+  padding: 7px; font-family: var(--font); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.msb-reset:hover { background: rgba(220,38,38,.22); color: rgba(220,38,38,1); }
+
+.measure-map-wrap { flex: 1; position: relative; overflow: hidden; }
+#measureMap { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+.mmap-topbar {
+  position: absolute; top: 12px; left: 12px; z-index: 500;
+  display: flex; gap: 8px; align-items: center; pointer-events: none;
+}
+.mmap-topbar > * { pointer-events: all; }
+
+.mmap-btn {
+  background: rgba(20,40,72,.88); color: #FFD966;
+  border: 1px solid rgba(255,217,102,.28); border-radius: 8px;
+  padding: 7px 12px; font-size: 12px; font-family: var(--font);
+  font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  backdrop-filter: blur(8px); transition: all .2s; white-space: nowrap;
+}
+.mmap-btn:hover { background: rgba(20,40,72,1); border-color: rgba(255,217,102,.6); }
+.mmap-close {
+  background: rgba(185,28,28,.85); color: #fff; border: none;
+  border-radius: 8px; padding: 7px 14px; font-size: 12px;
+  font-family: var(--font); font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  backdrop-filter: blur(8px); transition: all .2s;
+}
+.mmap-close:hover { background: rgba(153,27,27,.95); }
+
+body.mmode-picking #measureMap { cursor: crosshair !important; }
+.mpick-hint {
+  display: none; position: absolute; bottom: 20px; left: 50%;
+  transform: translateX(-50%); z-index: 500;
+  background: rgba(109,40,217,.92); color: #fff;
+  padding: 9px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  font-family: var(--font); align-items: center; gap: 8px;
+  backdrop-filter: blur(8px); white-space: nowrap;
+  animation: pulseHint 1.5s infinite alternate;
+}
+body.mmode-picking .mpick-hint { display: flex; }
+@keyframes pulseHint {
+  from { box-shadow: 0 0 0 0 rgba(109,40,217,.5); }
+  to   { box-shadow: 0 0 0 10px rgba(109,40,217,0); }
+}
+.mpick-cancel {
+  background: rgba(255,255,255,.22); border: none; border-radius: 10px;
+  color: #fff; padding: 2px 8px; font-size: 10px; cursor: pointer; margin-left: 4px;
+}
+
+/* Label jarak di atas pin DP */
+.mdist-label {
+  background: rgba(10,20,50,.82);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5), 0 0 0 1.5px currentColor;
+  pointer-events: none;
+  line-height: 1.4;
+  text-align: center;
+}
 /* ----------------------------- */  
 </style>
 </head>
