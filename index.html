@@ -272,23 +272,12 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .sbm-grid { grid-template-columns: 1fr; }
 }
 
-/* --- KODE CSS MEASUREMENT --- */
-.measure-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: #f0f4f8; flex-direction: row; }
-.measure-overlay.open { display: flex; }
-.msb-sidebar { width: 340px; background: white; box-shadow: 2px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 10; }
-.msb-header { padding: 15px 20px; background: var(--navy); color: white; display: flex; justify-content: space-between; align-items: center; }
-.msb-header h3 { font-size: 15px; margin: 0; }
-.msb-content { padding: 15px; overflow-y: auto; flex: 1; }
-.msb-map-wrap { flex: 1; position: relative; }
-#mMap { width: 100%; height: 100%; z-index: 1; }
-.mpt-group { margin-bottom: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
-.mpt-group.obj { border-color: var(--red); background: #fff5f5; }
-.mpt-label { font-size: 11px; font-weight: 700; color: var(--text-sub); margin-bottom: 6px; display: flex; justify-content: space-between; }
-.mpt-group.obj .mpt-label { color: var(--red); }
-.mpt-coord-wrap { display: flex; gap: 5px; }
-.mpt-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 12px; font-family: var(--mono); }
-.mpt-input:focus { border-color: var(--blue); outline: none; }
-.mdist-label { background: rgba(255, 255, 255, 0.95); border: 1px solid var(--red); border-radius: 4px; padding: 3px 8px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 700; color: var(--red); text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }  
+/* --- FITUR MEASUREMENT CSS --- */
+.mpt-coord-wrap { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.mpt-input { width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 11px; outline: none; }
+.mdist-label { background: rgba(10,20,50,.82); color: white; border-radius: 8px; padding: 4px 8px; font-size: 11px; font-weight: bold; white-space: nowrap; }
+.btn-mpt-clear { background: transparent; border: none; color: var(--red); cursor: pointer; font-size: 14px; }
+/* ----------------------------- */  
 </style>
 </head>
 <body>
@@ -312,8 +301,6 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   <div class="topbar-brand"><div class="icon">🏠</div><span>Database Pembanding</span></div>
   <div class="topbar-actions">
     <button class="btn-top" onclick="toggleSidebar()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg> Filter</button>
-    <div class="topbar-actions">
-    <button class="btn-top primary" onclick="openMeasure()" title="Measurement">📏 Measurement</button>
     <button class="btn-top" id="btnAddTop" onclick="openModalNew()">+ Tambah Data</button>
     <button class="btn-top primary" id="btnExport" onclick="exportData()">⬇ Export</button>
   </div>
@@ -657,36 +644,6 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>  
 <script src="https://cdn.osmbuildings.org/classic/0.2.2b/OSMBuildings-Leaflet.js"></script>
-
-<div class="measure-overlay" id="measureOverlay">
-  <div class="msb-sidebar">
-    <div class="msb-header">
-      <h3>📏 Pengukuran Jarak</h3>
-      <button onclick="closeMeasure()" style="background:none; border:none; color:white; cursor:pointer; font-size:18px;">✖</button>
-    </div>
-    <div class="msb-content">
-      <div class="mpt-group obj">
-        <div class="mpt-label"><span>📍 Objek Penilaian</span></div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_Obj" placeholder="-6.2000, 106.8166" oninput="drawMeasure()">
-        </div>
-      </div>
-      <hr style="border:0; border-top:1px dashed #ccc; margin: 15px 0;">
-      
-      <div class="mpt-group"><div class="mpt-label"><span>🔵 DP 1</span></div><div class="mpt-coord-wrap"><input class="mpt-input" id="mCoord_1" placeholder="Lat, Lng" oninput="drawMeasure()"></div></div>
-      <div class="mpt-group"><div class="mpt-label"><span>🔵 DP 2</span></div><div class="mpt-coord-wrap"><input class="mpt-input" id="mCoord_2" placeholder="Lat, Lng" oninput="drawMeasure()"></div></div>
-      <div class="mpt-group"><div class="mpt-label"><span>🔵 DP 3</span></div><div class="mpt-coord-wrap"><input class="mpt-input" id="mCoord_3" placeholder="Lat, Lng" oninput="drawMeasure()"></div></div>
-      <div class="mpt-group"><div class="mpt-label"><span>🔵 DP 4</span></div><div class="mpt-coord-wrap"><input class="mpt-input" id="mCoord_4" placeholder="Lat, Lng" oninput="drawMeasure()"></div></div>
-      <div class="mpt-group"><div class="mpt-label"><span>🔵 DP 5</span></div><div class="mpt-coord-wrap"><input class="mpt-input" id="mCoord_5" placeholder="Lat, Lng" oninput="drawMeasure()"></div></div>
-      <div class="mpt-group"><div class="mpt-label"><span>🔵 DP 6</span></div><div class="mpt-coord-wrap"><input class="mpt-input" id="mCoord_6" placeholder="Lat, Lng" oninput="drawMeasure()"></div></div>
-      
-      <button class="btn-top" style="width:100%; margin-top:15px; justify-content:center; background:var(--red);" onclick="closeMeasure()">Keluar Measurement</button>
-    </div>
-  </div>
-  <div class="msb-map-wrap">
-    <div id="mMap"></div>
-  </div>
-</div>  
 
 <script>
 // --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
@@ -1813,79 +1770,35 @@ function toast(msg, type) {
   el.innerHTML = icon + ' <span>' + msg + '</span>'; document.getElementById('toastContainer').appendChild(el); setTimeout(function () { if(el.parentNode) el.remove(); }, type === 'loading' ? 10000 : 3500);
 }
 
+// =========================================================================
+// AWAL KODE FITUR MEASUREMENT (Diinjeksi secara aman tanpa menimpa variabel map)
+// =========================================================================
+var measurementPoints = [];
+var measurementLayers = L.layerGroup(); // Menampung layer garis dan label
+
+function mptClear(id) {
+    // Logic menghapus poin measurement
+    if (document.getElementById('mCoord_' + id)) {
+        document.getElementById('mCoord_' + id).value = '';
+    }
+    // Hapus layer dari peta jika map sudah terinisialisasi
+    if (typeof map !== 'undefined' && map.hasLayer(measurementLayers)) {
+        measurementLayers.clearLayers();
+        measurementPoints = [];
+    }
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    if (typeof L !== 'undefined' && _mapInited) {
+        return map.distance([lat1, lon1], [lat2, lon2]); // Menggunakan fungsi bawaan Leaflet
+    }
+    return 0;
+}  
 var _mapInited = false;
 function safeInitMap() {
   if (_mapInited) return; if (typeof L === 'undefined') { setTimeout(safeInitMap, 200); return; } if (!document.getElementById('map')) { setTimeout(safeInitMap, 200); return; } _mapInited = true;
   try { initMap(); } catch (err) { var el = document.getElementById('mapLoading'); if (el) el.innerHTML = '<div style="text-align:center;color:#dc2626;padding:30px"><div style="font-size:28px">⚠️</div><div style="margin-top:10px;font-size:12px">Error: ' + err.message + '</div></div>'; }
 }
-
-/* --- KODE JS MEASUREMENT --- */
-var _mMap = null;
-var _mLayer = null;
-
-function openMeasure() {
-  document.getElementById('measureOverlay').classList.add('open');
-  if (!_mMap) {
-    _mMap = L.map('mMap', { zoomControl: false }).setView([-1.269160, 116.825264], 5);
-    L.control.zoom({ position: 'bottomright' }).addTo(_mMap);
-    
-    var street = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], maxZoom:20 }).addTo(_mMap);
-    var sat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], maxZoom:20 });
-    L.control.layers({"Peta Jalan": street, "Satelit": sat}, null, {position: 'topright'}).addTo(_mMap);
-    
-    _mLayer = L.layerGroup().addTo(_mMap);
-  }
-  setTimeout(function() { _mMap.invalidateSize(); }, 300);
-}
-
-function closeMeasure() {
-  document.getElementById('measureOverlay').classList.remove('open');
-}
-
-function parseMCoord(val) {
-  if(!val) return null;
-  var p = val.split(',');
-  if(p.length < 2) return null;
-  var lat = parseFloat(p[0].trim());
-  var lng = parseFloat(p[1].trim());
-  if(isNaN(lat) || isNaN(lng)) return null;
-  return L.latLng(lat, lng);
-}
-
-function drawMeasure() {
-  if(!_mLayer) return;
-  _mLayer.clearLayers();
-  
-  var cObj = parseMCoord(document.getElementById('mCoord_Obj').value);
-  if(!cObj) return;
-
-  // Marker Objek (Merah)
-  L.circleMarker(cObj, { radius: 7, fillColor: "#dc2626", color: "#fff", weight: 2, fillOpacity: 1 }).bindTooltip("Objek", {permanent:true, direction:"top"}).addTo(_mLayer);
-  var bounds = L.latLngBounds([cObj]);
-
-  for(var i=1; i<=6; i++) {
-    var cDp = parseMCoord(document.getElementById('mCoord_'+i).value);
-    if(cDp) {
-      // Marker DP (Biru)
-      L.circleMarker(cDp, { radius: 6, fillColor: "#2d6be4", color: "#fff", weight: 2, fillOpacity: 1 }).bindTooltip("DP "+i, {direction:"bottom"}).addTo(_mLayer);
-      
-      // Garis
-      L.polyline([cObj, cDp], {color: '#dc2626', weight: 2, dashArray: '5, 5'}).addTo(_mLayer);
-      bounds.extend(cDp);
-      
-      // Hitung Jarak & Label
-      var dist = _mMap.distance(cObj, cDp);
-      var txt = dist >= 1000 ? (dist/1000).toFixed(2) + " km" : Math.round(dist) + " m";
-      var mid = [(cObj.lat + cDp.lat)/2, (cObj.lng + cDp.lng)/2];
-      
-      L.marker(mid, {
-        icon: L.divIcon({ className: 'mdist-label', html: txt, iconSize: [60, 20] }),
-        interactive: false
-      }).addTo(_mLayer);
-    }
-  }
-  if(bounds.isValid()) _mMap.fitBounds(bounds, {padding:[50,50], maxZoom:18});
-}  
 </script>
 </body>
 </html>
