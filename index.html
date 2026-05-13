@@ -208,6 +208,355 @@ button:disabled, .btn-disabled {
 .toast.error   { background: var(--red); }
 
 /* =========================================================
+   📐 MEASUREMENT OVERLAY
+   ========================================================= */
+.btn-measurement {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background .2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-measurement:hover { background: #6d28d9; }
+
+.measure-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #1a2332;
+  flex-direction: row;
+}
+.measure-overlay.open { display: flex; }
+
+/* Sidebar kiri measurement */
+.measure-sidebar {
+  width: 300px;
+  min-width: 300px;
+  background: linear-gradient(180deg, #1e3a5f 0%, #172d4a 100%);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,.1);
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+.measure-sidebar.hidden {
+  width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden;
+  opacity: 0;
+}
+.measure-sidebar::-webkit-scrollbar { width: 4px; }
+.measure-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
+
+.measure-sidebar-header {
+  background: rgba(255,217,102,.12);
+  border-bottom: 1px solid rgba(255,217,102,.25);
+  padding: 14px 16px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+}
+.measure-sidebar-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFD966;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.measure-sidebar-sub {
+  font-size: 10px;
+  color: rgba(255,255,255,.5);
+  margin-top: 2px;
+}
+
+.measure-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+.measure-point-card {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 11px 12px;
+  transition: border-color .2s;
+}
+.measure-point-card:hover { border-color: rgba(255,255,255,.25); }
+.measure-point-card.has-value { border-color: rgba(74,210,149,.4); background: rgba(74,210,149,.06); }
+
+.measure-point-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.measure-point-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.measure-point-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,.9);
+  flex: 1;
+}
+.measure-distance-badge {
+  background: rgba(74,210,149,.2);
+  color: #4ad295;
+  border: 1px solid rgba(74,210,149,.3);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  display: none;
+  white-space: nowrap;
+}
+.measure-point-card.has-value .measure-distance-badge { display: block; }
+
+.measure-coord-input {
+  width: 100%;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 7px;
+  padding: 7px 38px 7px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: rgba(255,255,255,.9);
+  outline: none;
+  transition: border .2s, background .2s;
+  placeholder-color: rgba(255,255,255,.3);
+}
+.measure-coord-input::placeholder { color: rgba(255,255,255,.3); }
+.measure-coord-input:focus {
+  border-color: rgba(74,210,149,.6);
+  background: rgba(255,255,255,.12);
+}
+.measure-coord-input.valid { border-color: rgba(74,210,149,.5); }
+.measure-coord-input.invalid { border-color: rgba(220,38,38,.5); }
+
+.measure-coord-wrap { position: relative; }
+.measure-pick-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,.4);
+  font-size: 14px;
+  padding: 2px;
+  transition: color .2s;
+  line-height: 1;
+}
+.measure-pick-btn:hover { color: #FFD966; }
+
+.measure-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,.3);
+  font-size: 11px;
+  padding: 0;
+  transition: color .2s;
+  margin-left: auto;
+}
+.measure-clear-btn:hover { color: rgba(220,38,38,.8); }
+
+.measure-summary {
+  background: rgba(255,217,102,.08);
+  border: 1px solid rgba(255,217,102,.2);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0 14px 14px;
+}
+.measure-summary-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #FFD966;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.measure-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  font-size: 11px;
+}
+.measure-summary-row:last-child { border: none; }
+.measure-summary-key { color: rgba(255,255,255,.5); }
+.measure-summary-val { color: #fff; font-weight: 700; font-family: var(--mono); }
+
+.measure-actions {
+  padding: 12px 14px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(0deg, #172d4a 70%, transparent);
+}
+.measure-btn-clear-all {
+  flex: 1;
+  background: rgba(220,38,38,.15);
+  color: rgba(220,38,38,.8);
+  border: 1px solid rgba(220,38,38,.25);
+  border-radius: 7px;
+  padding: 8px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+.measure-btn-clear-all:hover { background: rgba(220,38,38,.25); }
+
+/* Map container measurement */
+.measure-map-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#measureMap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Top bar measurement */
+.measure-topbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 500;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.measure-toggle-sidebar {
+  background: rgba(30,58,95,.9);
+  color: #FFD966;
+  border: 1px solid rgba(255,217,102,.3);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(8px);
+  transition: all .2s;
+  white-space: nowrap;
+}
+.measure-toggle-sidebar:hover { background: rgba(30,58,95,1); border-color: rgba(255,217,102,.6); }
+
+.measure-close-btn {
+  background: rgba(220,38,38,.85);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(8px);
+  transition: all .2s;
+}
+.measure-close-btn:hover { background: rgba(185,28,28,.9); }
+
+/* Measurement picking mode */
+body.measure-picking-mode #measureMap { cursor: crosshair !important; }
+body.measure-picking-mode .measure-picking-hint {
+  display: flex !important;
+}
+.measure-picking-hint {
+  display: none;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: rgba(124,58,237,.92);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  gap: 8px;
+  align-items: center;
+  backdrop-filter: blur(8px);
+  animation: pulseHint 1.5s infinite alternate;
+  white-space: nowrap;
+}
+@keyframes pulseHint {
+  from { box-shadow: 0 0 0 0 rgba(124,58,237,.5); }
+  to   { box-shadow: 0 0 0 10px rgba(124,58,237,0); }
+}
+.measure-picking-cancel {
+  background: rgba(255,255,255,.25);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+/* Distance line label on map */
+.measure-label {
+  background: rgba(30,58,95,.88);
+  color: #FFD966;
+  border: 1.5px solid rgba(255,217,102,.5);
+  border-radius: 10px;
+  padding: 3px 9px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+
+/* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS (MODE PONSEL)
    ========================================================= */
 @media (max-width: 768px) {
@@ -234,80 +583,6 @@ button:disabled, .btn-disabled {
   .modal-grid .span-2 { grid-column: span 1; }
   .iw-wrap { width: 240px; }
 }
-
- /* --- MEASUREMENT FEATURE CSS --- */
-/* Sidebar Pengukuran */
-.measurement-sidebar {
-  position: fixed;
-  top: 0; left: 0; bottom: 0;
-  width: 320px;
-  background: white;
-  z-index: 9999;
-  box-shadow: 4px 0 15px rgba(0,0,0,0.2);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-}
-.measurement-sidebar.hidden {
-  transform: translateX(-100%);
-}
-.ms-header {
-  padding: 15px 20px;
-  background: var(--navy);
-  color: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.ms-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
-.ms-content {
-  padding: 15px;
-  overflow-y: auto;
-  flex: 1;
-}
-.ms-input-group { margin-bottom: 12px; }
-.ms-input-group label {
-  display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--navy);
-}
-.ms-input-group input {
-  width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;
-  font-family: 'DM Mono', monospace;
-}
-.ms-input-group.objek-group label { color: var(--red); }
-.ms-input-group.objek-group input { border-color: var(--red); background: #fff5f5; }
-
-/* Floating Toggle Button (untuk menampilkan kembali sidebar) */
-.ms-toggle-show {
-  position: fixed; top: 15px; left: 15px; z-index: 9998;
-  background: var(--navy); color: white; border: none; padding: 10px 15px;
-  border-radius: 6px; cursor: pointer; display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-}
-
-/* Mode Fullscreen Active */
-body.measurement-active .app-header,
-body.measurement-active .data-panel {
-  display: none !important; /* Sembunyikan elemen lain */
-}
-body.measurement-active .map-panel {
-  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  z-index: 990; margin: 0; border-radius: 0;
-}
-
-/* Label Jarak pada Garis */
-.dist-label-icon {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid var(--red);
-  border-radius: 4px;
-  padding: 2px 6px;
-  color: var(--red);
-  font-weight: 700;
-  font-size: 11px;
-  white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  text-align: center;
-  margin-top: -10px; /* Offset to center on line */
-} 
-  
 </style>
 </head>
 <body>
@@ -338,10 +613,11 @@ body.measurement-active .map-panel {
     <button class="btn-top" onclick="toggleSidebar()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg> Filter
     </button>
-    <button class="btn btn-secondary" onclick="toggleMeasurementMode()" style="background-color: var(--navy-mid); color: white; border: none;">
-  📏 Measurement
-</button>
     <button class="btn-top" id="btnAddTop" onclick="openModalNew()">+ Tambah Data</button>
+    <button class="btn-measurement" onclick="openMeasurement()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17l4-8 4 4 4-6 4 10"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+      Measurement
+    </button>
     <button class="btn-top primary" id="btnExport" onclick="exportData()">⬇ Export</button>
   </div>
 </header>
@@ -578,35 +854,173 @@ body.measurement-active .map-panel {
   </div>
 </div>
 
+<!-- =====================================================
+     📐 MEASUREMENT OVERLAY
+     ===================================================== -->
+<div class="measure-overlay" id="measureOverlay">
+
+  <!-- ── SIDEBAR KIRI ── -->
+  <aside class="measure-sidebar" id="measureSidebar">
+    <div class="measure-sidebar-header">
+      <div>
+        <div class="measure-sidebar-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17l4-8 4 4 4-6 4 10"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+          Ukur Jarak
+        </div>
+        <div class="measure-sidebar-sub">Input koordinat (lat,lng) atau klik peta 📍</div>
+      </div>
+    </div>
+
+    <div class="measure-body">
+
+      <!-- OBJEK PENILAIAN -->
+      <div class="measure-point-card" id="mpCard_obj">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#db4437; border:2px solid rgba(255,255,255,.3);">OBJ</div>
+          <span class="measure-point-label">Objek Penilaian</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('obj')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_obj" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('obj')" onblur="onMeasureBlur('obj')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('obj')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+      <!-- DATA PEMBANDING 1–6 -->
+      <div class="measure-point-card" id="mpCard_1">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#2d6be4;">DP1</div>
+          <span class="measure-point-label">Data Pembanding 1</span>
+          <span class="measure-distance-badge" id="mDist_1">–</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('1')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_1" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('1')" onblur="onMeasureBlur('1')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('1')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+      <div class="measure-point-card" id="mpCard_2">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#0f9d58;">DP2</div>
+          <span class="measure-point-label">Data Pembanding 2</span>
+          <span class="measure-distance-badge" id="mDist_2">–</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('2')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_2" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('2')" onblur="onMeasureBlur('2')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('2')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+      <div class="measure-point-card" id="mpCard_3">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#f4b400;">DP3</div>
+          <span class="measure-point-label">Data Pembanding 3</span>
+          <span class="measure-distance-badge" id="mDist_3">–</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('3')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_3" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('3')" onblur="onMeasureBlur('3')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('3')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+      <div class="measure-point-card" id="mpCard_4">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#ab47bc;">DP4</div>
+          <span class="measure-point-label">Data Pembanding 4</span>
+          <span class="measure-distance-badge" id="mDist_4">–</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('4')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_4" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('4')" onblur="onMeasureBlur('4')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('4')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+      <div class="measure-point-card" id="mpCard_5">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#e67e22;">DP5</div>
+          <span class="measure-point-label">Data Pembanding 5</span>
+          <span class="measure-distance-badge" id="mDist_5">–</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('5')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_5" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('5')" onblur="onMeasureBlur('5')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('5')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+      <div class="measure-point-card" id="mpCard_6">
+        <div class="measure-point-header">
+          <div class="measure-point-dot" style="background:#16a34a;">DP6</div>
+          <span class="measure-point-label">Data Pembanding 6</span>
+          <span class="measure-distance-badge" id="mDist_6">–</span>
+          <button class="measure-clear-btn" onclick="clearMeasurePoint('6')" title="Hapus">✕</button>
+        </div>
+        <div class="measure-coord-wrap">
+          <input class="measure-coord-input" id="mCoord_6" placeholder="-6.1234, 106.8234"
+            oninput="onMeasureInput('6')" onblur="onMeasureBlur('6')" />
+          <button class="measure-pick-btn" onclick="startMeasurePick('6')" title="Klik di peta">📍</button>
+        </div>
+      </div>
+
+    </div><!-- end measure-body -->
+
+    <!-- Summary -->
+    <div class="measure-summary" id="measureSummary" style="display:none;">
+      <div class="measure-summary-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Ringkasan Jarak
+      </div>
+      <div id="measureSummaryRows"></div>
+    </div>
+
+    <div class="measure-actions">
+      <button class="measure-btn-clear-all" onclick="clearAllMeasure()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;vertical-align:middle;margin-right:4px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        Reset Semua
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── PETA MEASUREMENT ── -->
+  <div class="measure-map-container">
+    <div id="measureMap"></div>
+
+    <!-- Tombol di atas peta -->
+    <div class="measure-topbar">
+      <button class="measure-toggle-sidebar" onclick="toggleMeasureSidebar()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        <span id="measureSidebarToggleText">Sembunyikan Panel</span>
+      </button>
+      <button class="measure-close-btn" onclick="closeMeasurement()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Tutup
+      </button>
+    </div>
+
+    <!-- Hint saat picking -->
+    <div class="measure-picking-hint" id="measurePickingHint">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="measurePickingLabel">Klik pada peta untuk memilih titik</span>
+      <button class="measure-picking-cancel" onclick="cancelMeasurePick()">✕ Batal</button>
+    </div>
+  </div>
+
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-
-  <button class="ms-toggle-show" id="msShowBtn" onclick="toggleMeasurementSidebar(true)">☰ Tampilkan Input</button>
-
-<div id="measurementSidebar" class="measurement-sidebar hidden">
-  <div class="ms-header">
-    <h3>Pengukuran Jarak</h3>
-    <button onclick="toggleMeasurementSidebar(false)" style="background:none; border:none; color:white; cursor:pointer; font-size:18px;">✖</button>
-  </div>
-  <div class="ms-content">
-    <div class="ms-input-group objek-group">
-      <label>📍 Objek Penilaian (Lat, Lng)</label>
-      <input type="text" id="ms_objek" placeholder="-6.2000, 106.8166" oninput="calculateDistances()">
-    </div>
-    <hr style="border-top:1px dashed #ccc; margin: 15px 0;">
-    
-    <div class="ms-input-group"><label>🔵 Data Pembanding 1</label><input type="text" id="ms_dp1" placeholder="Lat, Lng" oninput="calculateDistances()"></div>
-    <div class="ms-input-group"><label>🔵 Data Pembanding 2</label><input type="text" id="ms_dp2" placeholder="Lat, Lng" oninput="calculateDistances()"></div>
-    <div class="ms-input-group"><label>🔵 Data Pembanding 3</label><input type="text" id="ms_dp3" placeholder="Lat, Lng" oninput="calculateDistances()"></div>
-    <div class="ms-input-group"><label>🔵 Data Pembanding 4</label><input type="text" id="ms_dp4" placeholder="Lat, Lng" oninput="calculateDistances()"></div>
-    <div class="ms-input-group"><label>🔵 Data Pembanding 5</label><input type="text" id="ms_dp5" placeholder="Lat, Lng" oninput="calculateDistances()"></div>
-    <div class="ms-input-group"><label>🔵 Data Pembanding 6</label><input type="text" id="ms_dp6" placeholder="Lat, Lng" oninput="calculateDistances()"></div>
-    
-    <button class="btn btn-danger" style="width:100%; margin-top:20px;" onclick="exitMeasurementMode()">Keluar Measurement</button>
-  </div>
-</div>
 
 <script>
 // --- KODE BARU: JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
@@ -1313,7 +1727,284 @@ function toast(msg, type) {
   setTimeout(function () { if(el.parentNode) el.remove(); }, type === 'loading' ? 10000 : 3500);
 }
 
-var _mapInited = false;
+// ══════════════════════════════════════════════════════════════
+// 📐 MEASUREMENT FEATURE — PURE FRONTEND, TIDAK KE DATABASE
+// ══════════════════════════════════════════════════════════════
+
+var _mMap = null;                   // Leaflet map untuk measurement
+var _mMapInited = false;
+var _mPickingTarget = null;         // ID titik yang sedang dipick ('obj','1'...'6')
+var _mMarkers   = {};               // Leaflet markers per titik
+var _mLines     = {};               // Leaflet polyline per DP
+var _mLabels    = {};               // Leaflet marker (label) per DP
+var _mSidebarVisible = true;
+
+// Warna per titik
+var _mColors = {
+  obj: '#db4437',
+  '1': '#2d6be4', '2': '#0f9d58', '3': '#f4b400',
+  '4': '#ab47bc', '5': '#e67e22', '6': '#16a34a'
+};
+var _mKeys = ['obj', '1', '2', '3', '4', '5', '6'];
+
+// ── BUKA / TUTUP OVERLAY ──────────────────────────────────────
+function openMeasurement() {
+  document.getElementById('measureOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(function () {
+    if (!_mMapInited) { _initMeasureMap(); _mMapInited = true; }
+    else if (_mMap) { _mMap.invalidateSize(); }
+  }, 120);
+}
+
+function closeMeasurement() {
+  cancelMeasurePick();
+  document.getElementById('measureOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ── TOGGLE SIDEBAR ────────────────────────────────────────────
+function toggleMeasureSidebar() {
+  _mSidebarVisible = !_mSidebarVisible;
+  var sb = document.getElementById('measureSidebar');
+  var txt = document.getElementById('measureSidebarToggleText');
+  if (_mSidebarVisible) {
+    sb.classList.remove('hidden');
+    txt.textContent = 'Sembunyikan Panel';
+  } else {
+    sb.classList.add('hidden');
+    txt.textContent = 'Tampilkan Panel';
+  }
+  setTimeout(function () { if (_mMap) _mMap.invalidateSize(); }, 320);
+}
+
+// ── INISIALISASI PETA MEASUREMENT ────────────────────────────
+function _initMeasureMap() {
+  var el = document.getElementById('measureMap');
+  if (!el || !window.L) return;
+
+  _mMap = L.map(el, { center: [-6.2, 106.816], zoom: 14, preferCanvas: true, tap: false, zoomControl: true });
+
+  var osmTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 20
+  });
+  var satTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri', maxZoom: 20
+  });
+  satTile.addTo(_mMap);  // default satelit
+  L.control.layers({ '🗺 Peta': osmTile, '🛰 Satelit': satTile }, {}, { position: 'topright', collapsed: false }).addTo(_mMap);
+
+  // Click handler untuk picking
+  _mMap.on('click', function (e) {
+    if (_mPickingTarget === null) return;
+    var lat = e.latlng.lat.toFixed(6);
+    var lng = e.latlng.lng.toFixed(6);
+    var id = _mPickingTarget;
+    document.getElementById('mCoord_' + id).value = lat + ', ' + lng;
+    cancelMeasurePick();
+    _processMeasurePoint(id);
+    _refreshMeasureMap();
+  });
+
+  setTimeout(function () { _mMap.invalidateSize(); }, 300);
+}
+
+// ── PICKING MODE ──────────────────────────────────────────────
+function startMeasurePick(id) {
+  _mPickingTarget = id;
+  document.body.classList.add('measure-picking-mode');
+  var label = id === 'obj' ? 'Objek Penilaian' : 'Data Pembanding ' + id;
+  document.getElementById('measurePickingLabel').textContent = 'Klik peta → ' + label;
+  document.getElementById('measurePickingHint').style.display = 'flex';
+}
+
+function cancelMeasurePick() {
+  _mPickingTarget = null;
+  document.body.classList.remove('measure-picking-mode');
+  document.getElementById('measurePickingHint').style.display = 'none';
+}
+
+// ── INPUT HANDLER ─────────────────────────────────────────────
+function onMeasureInput(id) {
+  var inp = document.getElementById('mCoord_' + id);
+  var coord = _parseMCoord(inp.value);
+  inp.classList.toggle('valid', !!coord);
+  inp.classList.toggle('invalid', inp.value.length > 3 && !coord);
+}
+
+function onMeasureBlur(id) {
+  _processMeasurePoint(id);
+  _refreshMeasureMap();
+}
+
+function _processMeasurePoint(id) {
+  var inp = document.getElementById('mCoord_' + id);
+  var coord = _parseMCoord(inp.value);
+  var card = document.getElementById('mpCard_' + id);
+  if (coord) {
+    inp.classList.add('valid'); inp.classList.remove('invalid');
+    card.classList.add('has-value');
+  } else {
+    inp.classList.remove('valid');
+    if (inp.value.length > 3) inp.classList.add('invalid');
+    card.classList.remove('has-value');
+  }
+}
+
+// ── CLEAR ─────────────────────────────────────────────────────
+function clearMeasurePoint(id) {
+  document.getElementById('mCoord_' + id).value = '';
+  document.getElementById('mCoord_' + id).classList.remove('valid', 'invalid');
+  document.getElementById('mpCard_' + id).classList.remove('has-value');
+  if (id !== 'obj' && document.getElementById('mDist_' + id)) {
+    document.getElementById('mDist_' + id).textContent = '–';
+  }
+  _refreshMeasureMap();
+}
+
+function clearAllMeasure() {
+  _mKeys.forEach(function (id) { clearMeasurePoint(id); });
+}
+
+// ── HAVERSINE DISTANCE ────────────────────────────────────────
+function _haversine(lat1, lng1, lat2, lng2) {
+  var R = 6371; // km
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLng = (lng2 - lng1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2)
+    + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180)
+    * Math.sin(dLng/2) * Math.sin(dLng/2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // km
+}
+
+function _fmtDist(km) {
+  if (km < 1) return (km * 1000).toFixed(0) + ' m';
+  return km.toFixed(2) + ' km';
+}
+
+// ── PARSE KOORDINAT ───────────────────────────────────────────
+function _parseMCoord(val) {
+  if (!val) return null;
+  var s = String(val).trim();
+  var sep = s.indexOf(',') !== -1 ? ',' : ' ';
+  var p = s.split(sep);
+  if (p.length < 2) return null;
+  var lat = parseFloat(p[0].trim()), lng = parseFloat(p[1].trim());
+  if (isNaN(lat) || isNaN(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat: lat, lng: lng };
+}
+
+// ── REFRESH PETA ──────────────────────────────────────────────
+function _refreshMeasureMap() {
+  if (!_mMap) return;
+
+  // Bersihkan semua layer measurement
+  Object.values(_mMarkers).forEach(function (m) { if (_mMap.hasLayer(m)) _mMap.removeLayer(m); });
+  Object.values(_mLines).forEach(function (l) { if (_mMap.hasLayer(l)) _mMap.removeLayer(l); });
+  Object.values(_mLabels).forEach(function (l) { if (_mMap.hasLayer(l)) _mMap.removeLayer(l); });
+  _mMarkers = {}; _mLines = {}; _mLabels = {};
+
+  var coordObj = _parseMCoord(document.getElementById('mCoord_obj').value);
+  var bounds = [];
+  var summaryRows = [];
+
+  // Taruh marker Objek Penilaian
+  if (coordObj) {
+    var objMarker = _makeMMarker(coordObj, '#db4437', 'OBJEK', true);
+    objMarker.addTo(_mMap);
+    _mMarkers['obj'] = objMarker;
+    bounds.push([coordObj.lat, coordObj.lng]);
+  }
+
+  // Taruh marker + garis untuk setiap DP
+  ['1','2','3','4','5','6'].forEach(function (id) {
+    var inp = document.getElementById('mCoord_' + id);
+    var coord = _parseMCoord(inp.value);
+    var distEl = document.getElementById('mDist_' + id);
+    if (!coord) { if (distEl) distEl.textContent = '–'; return; }
+
+    var color = _mColors[id];
+    var marker = _makeMMarker(coord, color, 'DP' + id, false);
+    marker.addTo(_mMap);
+    _mMarkers[id] = marker;
+    bounds.push([coord.lat, coord.lng]);
+
+    if (coordObj) {
+      var km = _haversine(coordObj.lat, coordObj.lng, coord.lat, coord.lng);
+      var distStr = _fmtDist(km);
+
+      // Update badge di sidebar
+      if (distEl) { distEl.textContent = distStr; }
+
+      // Garis putus-putus
+      var line = L.polyline([[coordObj.lat, coordObj.lng], [coord.lat, coord.lng]], {
+        color: color, weight: 2.5, opacity: 0.85, dashArray: '8,6', interactive: false
+      });
+      line.addTo(_mMap);
+      _mLines[id] = line;
+
+      // Label jarak di tengah garis
+      var midLat = (coordObj.lat + coord.lat) / 2;
+      var midLng = (coordObj.lng + coord.lng) / 2;
+      var labelMarker = L.marker([midLat, midLng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="measure-label" style="border-color:' + color + ';color:' + color + '">DP' + id + ' — ' + distStr + '</div>',
+          iconAnchor: [60, 14]
+        }),
+        interactive: false, zIndexOffset: 200
+      });
+      labelMarker.addTo(_mMap);
+      _mLabels[id] = labelMarker;
+
+      summaryRows.push({ id: id, color: color, dist: distStr, km: km });
+    }
+  });
+
+  // Update summary
+  var summaryEl = document.getElementById('measureSummary');
+  var rowsEl = document.getElementById('measureSummaryRows');
+  if (summaryRows.length > 0 && coordObj) {
+    summaryEl.style.display = 'block';
+    // Sort terdekat dulu
+    summaryRows.sort(function (a, b) { return a.km - b.km; });
+    rowsEl.innerHTML = summaryRows.map(function (r) {
+      return '<div class="measure-summary-row">'
+        + '<span class="measure-summary-key"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + r.color + ';margin-right:5px;vertical-align:middle;"></span>DP ' + r.id + '</span>'
+        + '<span class="measure-summary-val">' + r.dist + '</span>'
+        + '</div>';
+    }).join('');
+  } else {
+    summaryEl.style.display = 'none';
+  }
+
+  // Fit bounds
+  if (bounds.length === 1) {
+    _mMap.setView(bounds[0], 17);
+  } else if (bounds.length > 1) {
+    _mMap.fitBounds(bounds, { padding: [60, 60] });
+  }
+}
+
+// ── BUAT MARKER PIN MEASUREMENT ───────────────────────────────
+function _makeMMarker(coord, color, label, isObj) {
+  var size = isObj ? 44 : 38;
+  var uid = 'mm_' + Math.random().toString(36).slice(2, 7);
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + (size+8) + '" viewBox="0 0 ' + size + ' ' + (size+8) + '">'
+    + '<defs><filter id="' + uid + '"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,.45)"/></filter></defs>'
+    + '<path d="M' + (size/2) + ' 0C' + (size*0.25) + ' 0 0 ' + (size*0.25) + ' 0 ' + (size/2) + 'c0 ' + (size*0.375) + ' ' + (size/2) + ' ' + (size*0.625) + ' ' + (size/2) + ' ' + (size*0.625) + 'S' + size + ' ' + (size/2+size*0.375) + ' ' + size + ' ' + (size/2) + 'C' + size + ' ' + (size*0.25) + ' ' + (size*0.75) + ' 0 ' + (size/2) + ' 0z" fill="' + color + '" filter="url(#' + uid + ')" stroke="white" stroke-width="1.5"/>'
+    + '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/4) + '" fill="white" opacity="0.9"/>'
+    + '<text x="' + (size/2) + '" y="' + (size/2+3) + '" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="' + (isObj ? 7 : 7) + '" font-weight="800" fill="' + color + '">' + label + '</text>'
+    + '</svg>';
+  var anchor = size / 2;
+  return L.marker([coord.lat, coord.lng], {
+    icon: L.divIcon({ html: svg, className: '', iconSize: [size, size+8], iconAnchor: [anchor, size+8], popupAnchor: [0, -(size+8)] }),
+    title: label
+  });
+}
+
 function safeInitMap() {
   if (_mapInited) return;
   if (typeof L === 'undefined') { setTimeout(safeInitMap, 200); return; }
@@ -1324,142 +2015,6 @@ function safeInitMap() {
     if (el) el.innerHTML = '<div style="text-align:center;color:#dc2626;padding:30px"><div style="font-size:28px">⚠️</div><div style="margin-top:10px;font-size:12px">Error: ' + err.message + '</div></div>';
   }
 }
-
- /* --- MEASUREMENT FEATURE JAVASCRIPT --- */
-let measurementLayer = L.layerGroup(); // Layer khusus untuk garis dan marker ukur
-let mapControlLayers = null;
-
-// Pastikan Anda sudah mendefinisikan layer satelit dan street di awal script map Anda
-// Contoh (Sesuaikan jika Anda menggunakan tile provider lain):
-const gStreet = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']});
-const gSatellite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']});
-
-function toggleMeasurementMode() {
-  const isMeasurement = document.body.classList.toggle('measurement-active');
-  const sidebar = document.getElementById('measurementSidebar');
-  
-  if (isMeasurement) {
-    // Masuk Mode Measurement
-    sidebar.classList.remove('hidden');
-    measurementLayer.addTo(map);
-    
-    // Matikan layer marker utama agar tidak tumpang tindih (opsional)
-    if(window.markers) map.removeLayer(window.markers); 
-
-    // Tambahkan kontrol Layer (Satelit vs Peta) jika belum ada
-    if (!mapControlLayers) {
-      mapControlLayers = L.control.layers({"Peta Google": gStreet, "Satelit": gSatellite}).addTo(map);
-    }
-    
-    // Timeout untuk memperbaiki ukuran peta setelah animasi CSS full screen
-    setTimeout(() => { map.invalidateSize(); }, 300);
-  }
-}
-
-function exitMeasurementMode() {
-  document.body.classList.remove('measurement-active');
-  document.getElementById('measurementSidebar').classList.add('hidden');
-  document.getElementById('msShowBtn').style.display = 'none';
-  
-  // Bersihkan layer ukur
-  measurementLayer.clearLayers();
-  map.removeLayer(measurementLayer);
-  
-  // Tampilkan kembali marker utama jika ada
-  if(window.markers) map.addLayer(window.markers);
-  
-  // Hapus kontrol layer jika Anda tidak ingin tampil di mode biasa
-  if (mapControlLayers) {
-    map.removeControl(mapControlLayers);
-    mapControlLayers = null;
-  }
-  
-  setTimeout(() => { map.invalidateSize(); }, 300);
-}
-
-function toggleMeasurementSidebar(show) {
-  const sidebar = document.getElementById('measurementSidebar');
-  const btnShow = document.getElementById('msShowBtn');
-  if (show) {
-    sidebar.classList.remove('hidden');
-    btnShow.style.display = 'none';
-  } else {
-    sidebar.classList.add('hidden');
-    btnShow.style.display = 'block';
-  }
-}
-
-function parseInputLatLng(val) {
-  if(!val) return null;
-  let parts = val.split(',');
-  if(parts.length < 2) return null;
-  let lat = parseFloat(parts[0].trim());
-  let lng = parseFloat(parts[1].trim());
-  if(isNaN(lat) || isNaN(lng)) return null;
-  return L.latLng(lat, lng);
-}
-
-function calculateDistances() {
-  measurementLayer.clearLayers(); // Bersihkan garis dan marker sebelumnya
-  
-  const objekVal = document.getElementById('ms_objek').value;
-  const objekLatLng = parseInputLatLng(objekVal);
-  
-  if (!objekLatLng) return; // Tunggu sampai objek utama valid
-
-  // Gambar Marker Objek Penilaian (Merah)
-  L.circleMarker(objekLatLng, {
-    radius: 8, fillColor: "#dc2626", color: "#fff", weight: 2, fillOpacity: 1
-  }).bindTooltip("Objek Penilaian", {permanent: true, direction: "top"}).addTo(measurementLayer);
-  
-  // Kumpulkan boundary untuk auto-zoom
-  let bounds = L.latLngBounds([objekLatLng]);
-
-  // Loop Data Pembanding 1 s/d 6
-  for(let i = 1; i <= 6; i++) {
-    let dpVal = document.getElementById(`ms_dp${i}`).value;
-    let dpLatLng = parseInputLatLng(dpVal);
-    
-    if (dpLatLng) {
-      // Gambar Marker Pembanding (Biru)
-      L.circleMarker(dpLatLng, {
-        radius: 6, fillColor: "#2d6be4", color: "#fff", weight: 2, fillOpacity: 1
-      }).bindTooltip(`DP ${i}`, {direction: "bottom"}).addTo(measurementLayer);
-      
-      // Gambar Garis (Merah putus-putus atau solid)
-      L.polyline([objekLatLng, dpLatLng], {color: '#dc2626', weight: 2, dashArray: '5, 5'}).addTo(measurementLayer);
-      
-      // Hitung Jarak
-      let distanceMeters = map.distance(objekLatLng, dpLatLng);
-      let distanceText = distanceMeters >= 1000 
-                         ? (distanceMeters / 1000).toFixed(2) + " km" 
-                         : Math.round(distanceMeters) + " m";
-                         
-      // Titik Tengah untuk Label
-      let midPoint = [
-        (objekLatLng.lat + dpLatLng.lat) / 2,
-        (objekLatLng.lng + dpLatLng.lng) / 2
-      ];
-      
-      // Tambahkan Label Angka Jarak
-      L.marker(midPoint, {
-        icon: L.divIcon({
-          className: 'dist-label-icon',
-          html: distanceText,
-          iconSize: [60, 20]
-        }),
-        interactive: false
-      }).addTo(measurementLayer);
-      
-      bounds.extend(dpLatLng);
-    }
-  }
-  
-  // Auto Zoom agar semua titik terlihat
-  if (bounds.isValid()) {
-    map.fitBounds(bounds, {padding: [50, 50], maxZoom: 18});
-  }
-} 
 </script>
 </body>
 </html>
