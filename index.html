@@ -378,7 +378,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 }
 .msb-sum-row:last-child { border: none; }
 .msb-sum-key { color: rgba(255,255,255,.48); display: flex; align-items: center; gap: 5px; }
-.msb-sum-val { color: #fff; font-weight: 700; font-family: var(--mono); }
+.msb-sum-val { color: #fff; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; letter-spacing: .2px; }
 
 .msb-footer {
   padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.07);
@@ -440,20 +440,38 @@ body.mmode-picking .mpick-hint { display: flex; }
   color: #fff; padding: 2px 8px; font-size: 10px; cursor: pointer; margin-left: 4px;
 }
 
-/* Label jarak di atas pin DP */
+/* Label jarak di atas pin DP — gaya kartu Google Maps */
 .mdist-label {
-  background: rgba(10,20,50,.82);
-  border-radius: 8px;
-  padding: 3px 8px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 5px 10px 7px;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 10.5px;
-  font-weight: 700;
   white-space: nowrap;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 2px 8px rgba(0,0,0,.5), 0 0 0 1.5px currentColor;
+  box-shadow: 0 4px 14px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.05);
   pointer-events: none;
-  line-height: 1.4;
   text-align: center;
+  display: inline-block;
+}
+.mdist-label .mdl-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a6a7e;
+  letter-spacing: .3px;
+  text-transform: none;
+  line-height: 1.2;
+  margin-bottom: 3px;
+}
+.mdist-label .mdl-pill {
+  display: inline-block;
+  background: #FFD966;
+  color: #1a2332;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  line-height: 1.3;
+  letter-spacing: .2px;
 }
 /* ----------------------------- */  
 </style>
@@ -1538,13 +1556,15 @@ function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; document.getE
 function collectParams() {
   function get(group) { return Array.from(document.querySelectorAll('.cb-item[data-group="' + group + '"].checked')).map(function (el) { return el.dataset.val; }); }
   var statusEl = document.querySelector('input[name="statusData"]:checked'); var statusVal = statusEl ? statusEl.value : 'Lengkap';
+  // Saat "Lengkap" dipilih, jangan filter di server agar semua data (termasuk yang inputannya belum lengkap) tetap ditampilkan.
+  var statusToSend = (statusVal === 'Lengkap') ? '' : statusVal;
   var ci = document.getElementById('mapSearch').value.trim(), cLat = null, cLng = null, coord = _parseCoordJS(ci);
   if (coord) { cLat = coord.lat; cLng = coord.lng; }
   
   var rad = document.getElementById('radius').value;
   return { 
     jenisProprti: get('jenisProprti'), legalitas: get('legalitas'), jenisData: get('jenisData'), tahun: get('tahun'), 
-    rowJalan: document.getElementById('rowJalan').value, statusData: statusVal, radiusKm: rad, centerLat: cLat, centerLng: cLng,
+    rowJalan: document.getElementById('rowJalan').value, statusData: statusToSend, radiusKm: rad, centerLat: cLat, centerLng: cLng,
     polygon: rad === 'polygon' ? polyPoints : null 
   };
 }
@@ -2258,17 +2278,17 @@ function _mRedraw() {
       _mLines[id+'_a'] = lineOuter;
       _mLines[id+'_b'] = lineInner;
 
-      // Label jarak di ATAS pin DP (bukan tengah garis)
-      var labelHtml = '<div class="mdist-label" style="color:'+color+';border-color:'+color+';">'
-        + '<span style="font-size:9px;opacity:.75;">DP'+id+'</span><br>'
-        + '<span style="font-size:11px;">'+ds+'</span>'
+      // Label jarak di ATAS pin DP (gaya kartu Google Maps)
+      var labelHtml = '<div class="mdist-label">'
+        + '<div class="mdl-title">Data '+id+'</div>'
+        + '<div class="mdl-pill">'+ds+'</div>'
         + '</div>';
       var labelMarker = L.marker([coord.lat, coord.lng], {
         icon: L.divIcon({
           className: '',
           html: labelHtml,
-          iconSize:  [80, 40],
-          iconAnchor:[40, 70]   // tepat di atas icon pin (pin height ~50px + 20px margin)
+          iconSize:  [90, 50],
+          iconAnchor:[45, 80]   // tepat di atas icon pin (pin height ~50px + 30px margin)
         }),
         interactive: false, zIndexOffset: 300
       }).addTo(_mMap);
