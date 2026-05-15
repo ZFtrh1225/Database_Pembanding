@@ -6,12 +6,11 @@
 <title>Database Pembanding & Hybrid AVM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<!-- Google Maps loaded via script tag below -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBSJYYcFB2DHu4VNTWWQl3y5dp0bp4phbA&libraries=geometry,visualization,marker&loading=async"></script>
 
 <style>
 :root {
@@ -137,11 +136,9 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .harga-cell { font-family: var(--font); font-size: 11px; color: var(--green); font-weight: 600; }
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-sub); }
 
-.leaflet-container { font-family: var(--font) !important; cursor: crosshair; }
-.leaflet-popup-content-wrapper { border-radius: 10px !important; padding: 0 !important; overflow: hidden; box-shadow: var(--shadow-lg) !important; }
-.leaflet-popup-content { margin: 0 !important; width: auto !important; }
-.leaflet-popup-tip-container { margin-top: -1px; }
-.leaflet-control-layers { border-radius: 8px !important; border: 1px solid var(--border) !important; box-shadow: var(--shadow) !important; font-family: var(--font) !important; font-size: 12px !important; }
+/* Google Maps InfoWindow styling */
+.gm-style-iw { max-width: 340px !important; }
+.gm-style-iw-d { overflow: auto !important; max-height: 400px !important; }
 
 /* CSS MULTI FOTO & POPUP */
 .iw-wrap { font-family: 'Plus Jakarta Sans', sans-serif; min-width: 240px; max-width: 320px; font-size: 12px; }
@@ -971,12 +968,8 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div class="mroute-loading" id="mRouteLoading"><div class="dotspin"></div><span id="mRouteLoadingTxt">Menghitung rute…</span></div>
 
     <div class="mmap-keywarn" id="mKeyWarn" style="display:none;">
-      <h4 id="mKeyWarnTitle">⚠️ Google Maps API Key belum diatur</h4>
-      <p id="mKeyWarnBody">Buka <code>index.html</code>, cari konstanta <code>GOOGLE_MAPS_API_KEY</code>, lalu isi dengan API key dari Google Cloud Console.</p>
-      <p>Aktifkan <strong>Maps JavaScript API</strong> &amp; <strong>Directions API</strong>. Jangan lupa batasi key dengan <em>HTTP referrer</em> agar aman.</p>
-      <button id="mUseOsmBtn" onclick="_mFallbackToLeaflet('Beralih ke OpenStreetMap.')" style="margin-top:8px;background:#2d6be4;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;display:none;">
-        🗺️ Pakai OpenStreetMap (gratis, tanpa key)
-      </button>
+      <h4 id="mKeyWarnTitle">⚠️ Google Maps API Key Error</h4>
+      <p id="mKeyWarnBody">Terjadi masalah saat memuat Google Maps. Pastikan API key valid dan billing aktif di Google Cloud Console.</p>
     </div>
 
     <div class="mmap-topbar">
@@ -1022,16 +1015,12 @@ body.mmode-picking .mpick-hint { display: flex; }
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>  
-<script src="https://cdn.osmbuildings.org/classic/0.2.2b/OSMBuildings-Leaflet.js"></script>
-
 <script>
 // --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2qboXhulMHhHRVntqDGdGdVUnrUqA97EqfIMtJ40BpzF8p6E8tEevfMVhCnQBM-Jx/exec";
 
-const google = { script: { get run() { return new GasRunner(); } } };
+// PERBAIKAN UTAMA: Gunakan nama 'GAS' agar tidak tabrakan dengan google.maps
+const GAS = { script: { get run() { return new GasRunner(); } } };
 
 class GasRunner {
   constructor() { this._success = function(){}; this._failure = function(){}; }
@@ -1052,7 +1041,7 @@ class GasRunner {
 
 var ENABLE_GPS = true; 
 var _originalKoordinat = null;
-var gMap = null, markerGroup = null, centerMarker = null, circleObj = null;
+var gMap = null, gMarkers = [], centerMarker = null, circleObj = null;
 var currentData = [], currentView = 'map', _iconCounter = 0;
 var _fotoDataUrl = null, _fotoFilename = null;
 var _editingId = null, _editingFoto = '';
@@ -1060,7 +1049,7 @@ var _pickingLocation = false;
 
 var heatLayer = null, isHeatmap = false;
 var myChart = null; 
-var poiLayerGroup = null; 
+var poiLayerGroup = []; 
 
 var compareList = [];
 var compareTargetId = null;
@@ -1073,13 +1062,10 @@ var _avmCurrentMedian = 0;
 var _asetPOIData = null; 
 window.regressionModels = {}; // Global var untuk menyimpan koefisien Ekonometrika
 
-// Variabel Virtual Twin 3D
-var osmb = null; 
-var is3D = false;
-
 var _drawingPolygon = false;
 var polyPoints = [];
 var polyLayer = null;
+var _gInfoWindow = null; // Shared InfoWindow for dashboard map
 
 var activeRole = sessionStorage.getItem('userRole');
 var activeUsername = sessionStorage.getItem('userName');
@@ -1121,7 +1107,7 @@ function doLogin() {
   if (!u || !p) { toast('Harap isi username & password', 'error'); return; }
   var btn = document.getElementById('btnLoginAction'); btn.textContent = 'Memverifikasi...'; btn.disabled = true;
 
-  google.script.run
+  GAS.script.run
     .withSuccessHandler(function(res) {
       btn.textContent = 'Login'; btn.disabled = false;
       if (res.success) {
@@ -1143,9 +1129,16 @@ function applyPermissions(role) {
 
 function locateMe() {
   if (!gMap) return; toast('Mencari sinyal GPS...', 'loading');
-  gMap.locate({setView: false, enableHighAccuracy: true});
-  gMap.once('locationfound', function(e) { toast('Lokasi ditemukan! Menarik radius data...', 'success'); document.getElementById('mapSearch').value = e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6); doSearch(); });
-  gMap.once('locationerror', function(e) { toast('Gagal akses GPS. Pastikan izin lokasi aktif.', 'error'); });
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude, lng = pos.coords.longitude;
+      toast('Lokasi ditemukan! Menarik radius data...', 'success');
+      document.getElementById('mapSearch').value = lat.toFixed(6) + ',' + lng.toFixed(6);
+      doSearch();
+    }, function(err) {
+      toast('Gagal akses GPS. Pastikan izin lokasi aktif.', 'error');
+    }, { enableHighAccuracy: true });
+  } else { toast('Browser tidak mendukung GPS.', 'error'); }
 }
 
 function pickLocation() {
@@ -1159,25 +1152,13 @@ function startDrawingPolygon() {
   polyPoints = []; if (polyLayer) { gMap.removeLayer(polyLayer); polyLayer = null; }
   toast('Klik titik-titik pembatas di peta. Klik Kanan pada mouse untuk selesai.', 'success');
   document.getElementById('map').style.cursor = 'crosshair';
-  if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
+  if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
 }
 
-function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
+function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
 
 function toggle3D() {
-  if(!osmb) { 
-      osmb = new OSMBuildings(gMap).load('https://{s}.data.osmbuildings.org/0.2/anonymous/tile/{z}/{x}/{y}.json'); 
-  }
-  is3D = !is3D;
-  document.getElementById('btn3D').classList.toggle('active', is3D);
-  if(is3D) {
-    osmb.addTo(gMap);
-    gMap.setZoom(17); 
-    toast('Virtual Twin 3D diaktifkan!', 'success');
-  } else {
-    gMap.removeLayer(osmb);
-    toast('Kembali ke mode 2D', 'success');
-  }
+  toast('Fitur 3D hanya tersedia pada Google Earth. Gunakan tombol Satelit pada peta.', 'error');
 }
 
 function calculateSidebarStats(data) {
@@ -1246,7 +1227,7 @@ function initAVMAnalysis() {
   var centerLatLng = null;
   var inputSearch = document.getElementById('mapSearch').value.split(',');
   if(inputSearch.length === 2 && !isNaN(parseFloat(inputSearch[0]))) {
-      centerLatLng = L.latLng(parseFloat(inputSearch[0]), parseFloat(inputSearch[1]));
+      centerLatLng = new google.maps.LatLng(parseFloat(inputSearch[0]), parseFloat(inputSearch[1]));
   }
 
   currentData.forEach(function(row) {
@@ -1270,10 +1251,10 @@ function initAVMAnalysis() {
               
               if (activeModel[varName] && _asetPOIData[poiName] && _asetPOIData[poiName].best) {
                   var koef = activeModel[varName].koefisien;
-                  var targetLatLng = L.latLng(_asetPOIData[poiName].best.lat, _asetPOIData[poiName].best.lon);
+                  var targetLatLng = new google.maps.LatLng(_asetPOIData[poiName].best.lat, _asetPOIData[poiName].best.lon);
 
-                  var distAset = gMap.distance(coordAset, targetLatLng);
-                  var distComp = gMap.distance(L.latLng(coordComp.lat, coordComp.lng), targetLatLng);
+                  var distAset = google.maps.geometry.spherical.computeDistanceBetween(coordAset, targetLatLng);
+                  var distComp = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(coordComp.lat, coordComp.lng), targetLatLng);
 
                   // Hindari ln(0)
                   distAset = distAset <= 0 ? 1 : distAset;
@@ -1498,69 +1479,82 @@ function _getPinLabel(id) { var s = String(id || '').toUpperCase().trim(); retur
 function _parseCoordJS(val) { if (!val) return null; var s = String(val).trim(); if (s.indexOf(',') !== -1) { var p = s.split(','); var lat = parseFloat(p[0].trim()), lng = parseFloat(p[1].trim()); if (!isNaN(lat) && !isNaN(lng)) return { lat: lat, lng: lng }; } var sp = s.split(/\s+/); if (sp.length >= 2) { var lat = parseFloat(sp[0]), lng = parseFloat(sp[1]); if (!isNaN(lat) && !isNaN(lng)) return { lat: lat, lng: lng }; } return null; }
 
 function makePinIcon(color, label) {
-  var uid = 'sh_' + (++_iconCounter);
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><defs><filter id="' + uid + '" x="-30%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,.35)"/></filter></defs><path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26S36 31.5 36 18C36 8.06 27.94 0 18 0z" fill="' + color + '" filter="url(#' + uid + ')" stroke="white" stroke-width="1.5"/><circle cx="18" cy="18" r="9" fill="white" opacity="0.9"/><text x="18" y="22" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="700" fill="' + color + '">' + label + '</text></svg>';
-  return L.divIcon({ html: svg, className: '', iconSize: [36,44], iconAnchor: [18,44], popupAnchor: [0,-44] });
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26S36 31.5 36 18C36 8.06 27.94 0 18 0z" fill="' + color + '" stroke="white" stroke-width="1.5"/><circle cx="18" cy="18" r="9" fill="white" opacity="0.9"/><text x="18" y="22" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="700" fill="' + color + '">' + label + '</text></svg>';
+  return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new google.maps.Size(36, 44), anchor: new google.maps.Point(18, 44) };
 }
 
 function makeAssetIcon() {
-  var uid = 'sh_' + (++_iconCounter);
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><defs><filter id="' + uid + '"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,.4)"/></filter></defs><path d="M20 0C9.0 0 0 9.0 0 20c0 15 20 28 20 28S40 35 40 20C40 9.0 31.0 0 20 0z" fill="#db4437" filter="url(#' + uid + ')" stroke="white" stroke-width="2"/><circle cx="20" cy="20" r="8" fill="white"/><text x="20" y="24" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="800" fill="#db4437">ASET</text></svg>';
-  return L.divIcon({ html: svg, className: '', iconSize: [40,48], iconAnchor: [20,48], popupAnchor: [0,-48] });
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><path d="M20 0C9.0 0 0 9.0 0 20c0 15 20 28 20 28S40 35 40 20C40 9.0 31.0 0 20 0z" fill="#db4437" stroke="white" stroke-width="2"/><circle cx="20" cy="20" r="8" fill="white"/><text x="20" y="24" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="800" fill="#db4437">ASET</text></svg>';
+  return { url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize: new google.maps.Size(40, 48), anchor: new google.maps.Point(20, 48) };
 }
 
 function initMap() {
   if (gMap) return; var mapEl = document.getElementById('map'); if (!mapEl) return;
   if (ENABLE_GPS) document.getElementById('btnGPS').style.display = 'flex';
-  gMap = L.map(mapEl, { center: [-6.175, 106.827], zoom: 14, preferCanvas: true, tap: false });
-  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxZoom: 20 }), sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 20 });
-  sat.addTo(gMap); L.control.layers({ '🗺 Peta (OSM)': osm, '🛰 Satelit (Esri)': sat }, {}, { position: 'topright', collapsed: false }).addTo(gMap);
-  markerGroup = typeof L.markerClusterGroup === 'function' ? L.markerClusterGroup({ maxClusterRadius: 50, spiderfyOnMaxZoom: true, showCoverageOnHover: false }) : L.layerGroup();
-  gMap.addLayer(markerGroup);
   
-  gMap.on('click', function(e) { 
+  gMap = new google.maps.Map(mapEl, {
+    center: { lat: -6.175, lng: 106.827 },
+    zoom: 14,
+    mapTypeId: 'hybrid',
+    mapTypeControl: true,
+    streetViewControl: true,
+    fullscreenControl: false,
+    mapTypeControlOptions: {
+      style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+      position: google.maps.ControlPosition.TOP_RIGHT,
+      mapTypeIds: ['roadmap', 'satellite', 'hybrid']
+    },
+    gestureHandling: 'greedy'
+  });
+
+  _gInfoWindow = new google.maps.InfoWindow();
+
+  gMap.addListener('click', function(e) { 
     if (_pickingLocation) { 
         _pickingLocation = false; document.getElementById('map').style.cursor = ''; 
-        document.getElementById('f_koordinat').value = e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6); 
+        document.getElementById('f_koordinat').value = e.latLng.lat().toFixed(6) + ',' + e.latLng.lng().toFixed(6); 
         document.getElementById('modalOverlay').classList.add('open'); 
     } else if (_drawingPolygon) {
-        polyPoints.push(e.latlng);
-        if (polyLayer) gMap.removeLayer(polyLayer);
-        polyLayer = L.polygon(polyPoints, {color: '#f4b400', weight: 2, fillColor: '#f4b400', fillOpacity: 0.2}).addTo(gMap);
+        polyPoints.push({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        if (polyLayer) polyLayer.setMap(null);
+        polyLayer = new google.maps.Polygon({
+          paths: polyPoints,
+          strokeColor: '#f4b400', strokeWeight: 2,
+          fillColor: '#f4b400', fillOpacity: 0.2,
+          map: gMap
+        });
     } else {
-        var lat = e.latlng.lat.toFixed(6);
-        var lng = e.latlng.lng.toFixed(6);
+        var lat = e.latLng.lat().toFixed(6);
+        var lng = e.latLng.lng().toFixed(6);
         var coordStr = lat + ',' + lng;
 
-        var popupContent = `
-            <div style="font-family:var(--font); text-align:center; padding:5px;">
-                <div style="font-size:11px; color:var(--text-sub); margin-bottom:5px;">📍 Koordinat Terpilih:</div>
-                <div style="font-size:13px; color:var(--navy); font-weight:800; user-select:all; margin-bottom:10px;">${coordStr}</div>
-                <button onclick="document.getElementById('mapSearch').value='${coordStr}'; doSearch(); gMap.closePopup();" style="background:var(--blue); color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:11px; font-weight:bold; width:100%; transition:0.2s;">
-                    🔍 Gunakan sbg Pusat Radius
-                </button>
-            </div>
-        `;
-        L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(gMap);
+        var popupContent = '<div style="font-family:Plus Jakarta Sans,sans-serif; text-align:center; padding:5px;">' +
+            '<div style="font-size:11px; color:#5a6a7e; margin-bottom:5px;">📍 Koordinat Terpilih:</div>' +
+            '<div style="font-size:13px; color:#1e3a5f; font-weight:800; user-select:all; margin-bottom:10px;">' + coordStr + '</div>' +
+            '<button onclick="document.getElementById(\'mapSearch\').value=\'' + coordStr + '\'; doSearch(); _gInfoWindow.close();" style="background:#2d6be4; color:#fff; border:none; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:11px; font-weight:bold; width:100%; transition:0.2s;">' +
+            '🔍 Gunakan sbg Pusat Radius</button></div>';
+        _gInfoWindow.setContent(popupContent);
+        _gInfoWindow.setPosition(e.latLng);
+        _gInfoWindow.open(gMap);
     }
   });
 
-  gMap.on('contextmenu', function(e) {
+  gMap.addListener('rightclick', function(e) {
     if (_drawingPolygon) {
         _drawingPolygon = false;
         document.getElementById('map').style.cursor = '';
         if (polyPoints.length >= 3) toast('Area kustom selesai! Silakan klik Cari.', 'success');
-        else { toast('Gagal: Area butuh minimal 3 titik.', 'error'); if(polyLayer) gMap.removeLayer(polyLayer); polyPoints = []; }
+        else { toast('Gagal: Area butuh minimal 3 titik.', 'error'); if(polyLayer){ polyLayer.setMap(null); polyLayer=null; } polyPoints = []; }
     } else {
-        if (poiLayerGroup) {
-            gMap.removeLayer(poiLayerGroup);
-            poiLayerGroup = null;
+        if (poiLayerGroup.length > 0) {
+            poiLayerGroup.forEach(function(item){ item.setMap(null); });
+            poiLayerGroup = [];
             toast('Analisis POI disembunyikan.', 'success');
         }
     }
   });
 
-  document.getElementById('mapLoading').style.display = 'none'; setTimeout(function () { gMap.invalidateSize(); }, 300); doSearch();
+  document.getElementById('mapLoading').style.display = 'none'; doSearch();
 }
 
 document.addEventListener('click', function (e) {
@@ -1612,7 +1606,7 @@ function doSearch() {
       toast('Area belum digambar atau tidak valid (butuh min 3 titik).', 'error'); return;
   }
 
-  google.script.run
+  GAS.script.run
     .withSuccessHandler(function (res) {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
@@ -1640,7 +1634,7 @@ function doSearch() {
         renderMarkers(currentData, params); 
         renderTable(currentData); 
         toast(res.total + ' data ditemukan', 'success');
-        if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) gMap.invalidateSize(); }, 350); }
+        if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
       } else { toast('Error: ' + res.error, 'error'); }
     })
     .withFailureHandler(function (err) { btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari'; toast('Gagal memuat data dari server: ' + err.message, 'error'); })
@@ -1654,17 +1648,20 @@ function toggleHeatmap() {
 }
 
 function renderMarkers(data, params) {
-  if (!gMap || !markerGroup) return;
-  markerGroup.clearLayers();
-  if (circleObj)    { gMap.removeLayer(circleObj);    circleObj    = null; }
-  if (centerMarker) { gMap.removeLayer(centerMarker); centerMarker = null; }
-  if (heatLayer)    { gMap.removeLayer(heatLayer);    heatLayer    = null; }
+  if (!gMap) return;
+  // Clear existing markers
+  gMarkers.forEach(function(m){ m.setMap(null); });
+  gMarkers = [];
+  if (circleObj)    { circleObj.setMap(null);    circleObj    = null; }
+  if (centerMarker) { centerMarker.setMap(null); centerMarker = null; }
+  if (heatLayer)    { heatLayer.setMap(null);    heatLayer    = null; }
   
   if (params && params.radiusKm !== 'polygon' && polyLayer) {
-      gMap.removeLayer(polyLayer); polyLayer = null; polyPoints = [];
+      polyLayer.setMap(null); polyLayer = null; polyPoints = [];
   }
 
-  var bounds = [];
+  var bounds = new google.maps.LatLngBounds();
+  var hasBounds = false;
   var heatData = [];
 
   data.forEach(function (row) {
@@ -1673,49 +1670,90 @@ function renderMarkers(data, params) {
 
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr) || 0;
-    if(price > 0) { heatData.push([coord.lat, coord.lng, price]); }
+    if(price > 0) { heatData.push({ location: new google.maps.LatLng(coord.lat, coord.lng), weight: price }); }
 
     var color  = PIN_COLORS[row.objek] || '#9e9e9e';
     var label  = _getPinLabel(row.id);
-    var marker = L.marker([coord.lat, coord.lng], { icon: makePinIcon(color, label), title: row.alamat });
-    marker.bindPopup(buildPopup(row), { maxWidth: row.foto ? 310 : 290 });
-    markerGroup.addLayer(marker);
-    bounds.push([coord.lat, coord.lng]);
+    var marker = new google.maps.Marker({
+      position: { lat: coord.lat, lng: coord.lng },
+      map: isHeatmap ? null : gMap,
+      icon: makePinIcon(color, label),
+      title: row.alamat
+    });
+    
+    (function(mk, r) {
+      mk.addListener('click', function() {
+        _gInfoWindow.setContent(buildPopup(r));
+        _gInfoWindow.open(gMap, mk);
+      });
+    })(marker, row);
+    
+    gMarkers.push(marker);
+    bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+    hasBounds = true;
   });
 
   if (isHeatmap && heatData.length > 0) {
-    if (gMap.hasLayer(markerGroup)) gMap.removeLayer(markerGroup);
-    var maxPrice = 0;
-    heatData.forEach(function(d) { if (d[2] > maxPrice) maxPrice = d[2]; });
-    var normalizedHeat = heatData.map(function(d) { return [d[0], d[1], maxPrice > 0 ? d[2]/maxPrice : 0.5]; });
-    heatLayer = L.heatLayer(normalizedHeat, {radius: 25, blur: 15, maxZoom: 15, gradient: {0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}}).addTo(gMap);
-  } else {
-    if (!gMap.hasLayer(markerGroup)) gMap.addLayer(markerGroup); 
+    heatLayer = new google.maps.visualization.HeatmapLayer({
+      data: heatData,
+      map: gMap,
+      radius: 30,
+      opacity: 0.7
+    });
+    // Hide markers during heatmap
+    gMarkers.forEach(function(m){ m.setMap(null); });
   }
 
   if (params && params.centerLat != null && params.centerLng != null && params.radiusKm !== 'polygon') {
-    centerMarker = L.marker([params.centerLat, params.centerLng], { icon: makeAssetIcon(), zIndexOffset: 1000, title: 'Lokasi Aset' }).addTo(gMap);
+    centerMarker = new google.maps.Marker({
+      position: { lat: params.centerLat, lng: params.centerLng },
+      map: gMap,
+      icon: makeAssetIcon(),
+      zIndex: 1000,
+      title: 'Lokasi Aset'
+    });
     
     var asetPoiHtml = '<div id="poi_wrap_aset" class="poi-container" style="margin-top:8px; border-top:1px dashed #d1dbe8; padding-top:10px;">' +
                       '<button class="poi-btn" id="btn_poi_aset" onclick="analyzePOI(' + params.centerLat + ', ' + params.centerLng + ', \'aset\')">📡 Analisis Jarak POI (Overpass)</button>' +
                       '<div id="poi_res_aset"></div></div>';
                       
-    var popupContent = '<div style="font-family:var(--font);padding:8px;min-width:220px;text-align:center;">' +
+    var popupContent = '<div style="font-family:Plus Jakarta Sans,sans-serif;padding:8px;min-width:220px;text-align:center;">' +
                        '<div style="font-weight:800;color:#db4437;font-size:14px;">📍 Lokasi Aset</div>' +
                        asetPoiHtml + '</div>';
-                       
-    centerMarker.bindPopup(popupContent);
     
-    if (params.radiusKm) { circleObj = L.circle([params.centerLat, params.centerLng], { radius: parseFloat(params.radiusKm) * 1000, color: '#db4437', weight: 3, opacity: 0.8, fillColor: '#db4437', fillOpacity: 0.06, interactive: false }).addTo(gMap); }
-    bounds.push([params.centerLat, params.centerLng]);
+    centerMarker.addListener('click', function() {
+      _gInfoWindow.setContent(popupContent);
+      _gInfoWindow.open(gMap, centerMarker);
+    });
+    
+    if (params.radiusKm) { 
+      circleObj = new google.maps.Circle({
+        center: { lat: params.centerLat, lng: params.centerLng },
+        radius: parseFloat(params.radiusKm) * 1000,
+        strokeColor: '#db4437', strokeWeight: 3, strokeOpacity: 0.8,
+        fillColor: '#db4437', fillOpacity: 0.06,
+        clickable: false,
+        map: gMap
+      });
+    }
+    bounds.extend(new google.maps.LatLng(params.centerLat, params.centerLng));
+    hasBounds = true;
   }
   
   if (params && params.radiusKm === 'polygon' && polyLayer) {
-     if (!gMap.hasLayer(polyLayer)) polyLayer.addTo(gMap);
-     polyPoints.forEach(p => bounds.push([p.lat, p.lng]));
+     if (!polyLayer.getMap()) polyLayer.setMap(gMap);
+     polyPoints.forEach(function(p){ bounds.extend(new google.maps.LatLng(p.lat, p.lng)); });
+     hasBounds = true;
   }
 
-  if (bounds.length > 0) { bounds.length === 1 ? gMap.setView(bounds[0], 16) : gMap.fitBounds(bounds, { padding: [50, 50] }); }
+  if (hasBounds) { 
+    if (data.length <= 1 && params && params.centerLat) {
+      gMap.setCenter({ lat: params.centerLat, lng: params.centerLng }); 
+      gMap.setZoom(16);
+    } else {
+      gMap.fitBounds(bounds, 50); 
+    }
+  }
 }
 
 function moveFoto(btn, dir, max) { var container = btn.parentElement, slider = container.querySelector('.iw-foto-slider'), countBadge = container.querySelector('.iw-foto-count'); var currentIdx = parseInt(slider.getAttribute('data-idx') || '0'); var newIdx = currentIdx + dir; if (newIdx < 0) newIdx = max - 1; if (newIdx >= max) newIdx = 0; slider.setAttribute('data-idx', newIdx); slider.style.transform = 'translateX(-' + (newIdx * 100) + '%)'; countBadge.textContent = (newIdx + 1) + '/' + max; }
@@ -1756,23 +1794,13 @@ function analyzePOI(lat, lng, uid) {
     btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px;margin:0;border-color:rgba(45,107,228,0.3);border-top-color:#2d6be4;"></div> Menarik Data Satelit...';
     resDiv.innerHTML = '';
 
-    if(poiLayerGroup) { gMap.removeLayer(poiLayerGroup); }
-    poiLayerGroup = L.featureGroup().addTo(gMap);
+    // Clear old POI layers
+    poiLayerGroup.forEach(function(item){ item.setMap(null); });
+    poiLayerGroup = [];
 
     var radius = 2500; 
     
-    var query = `[out:json][timeout:15];
-    (
-      node["highway"="motorway_junction"](around:${radius},${lat},${lng});
-      node["amenity"="hospital"](around:${radius},${lat},${lng});
-      node["amenity"="school"](around:${radius},${lat},${lng});
-      node["shop"="mall"](around:${radius},${lat},${lng});
-      node["shop"="supermarket"](around:${radius},${lat},${lng});
-      node["railway"="station"](around:${radius},${lat},${lng});
-    );
-    out body;
-    >;
-    out skel qt;`;
+    var query = '[out:json][timeout:15];(node["highway"="motorway_junction"](around:' + radius + ',' + lat + ',' + lng + ');node["amenity"="hospital"](around:' + radius + ',' + lat + ',' + lng + ');node["amenity"="school"](around:' + radius + ',' + lat + ',' + lng + ');node["shop"="mall"](around:' + radius + ',' + lat + ',' + lng + ');node["shop"="supermarket"](around:' + radius + ',' + lat + ',' + lng + ');node["railway"="station"](around:' + radius + ',' + lat + ',' + lng + '););out body;>;out skel qt;';
 
     var url = 'https://overpass-api.de/api/interpreter';
 
@@ -1786,7 +1814,7 @@ function analyzePOI(lat, lng, uid) {
         btn.style.display = 'none'; 
 
         if(!data.elements || data.elements.length === 0) {
-            resDiv.innerHTML = '<div style="color:var(--text-sub); text-align:center; padding:10px 0;">Tidak ditemukan fasilitas utama dalam radius ' + (radius/1000) + ' KM.</div>';
+            resDiv.innerHTML = '<div style="color:#5a6a7e; text-align:center; padding:10px 0;">Tidak ditemukan fasilitas utama dalam radius ' + (radius/1000) + ' KM.</div>';
             return;
         }
 
@@ -1798,12 +1826,12 @@ function analyzePOI(lat, lng, uid) {
             'Sekolah': { tags: ['amenity', 'school'], best: null }
         };
 
-        var propLatLng = L.latLng(lat, lng);
+        var propLatLng = new google.maps.LatLng(lat, lng);
 
         data.elements.forEach(function(el) {
             if (el.type === 'node' && el.tags) {
-                var elLatLng = L.latLng(el.lat, el.lon);
-                var dist = gMap.distance(propLatLng, elLatLng); 
+                var elLatLng = new google.maps.LatLng(el.lat, el.lon);
+                var dist = google.maps.geometry.spherical.computeDistanceBetween(propLatLng, elLatLng);
                 var name = el.tags.name || el.tags.description || 'Tidak Bernama';
 
                 for (var cat in categories) {
@@ -1829,8 +1857,10 @@ function analyzePOI(lat, lng, uid) {
             _asetPOIData = categories;
         }
 
-        var html = '<div style="font-size:10px; color:var(--text-xs); margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">📍 Fasilitas Terdekat (Euclidean)</div>';
+        var html = '<div style="font-size:10px; color:#8a9ab0; margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">📍 Fasilitas Terdekat</div>';
         var foundAny = false;
+        var poiBounds = new google.maps.LatLngBounds();
+        poiBounds.extend(propLatLng);
 
         for (var cat in categories) {
             var item = categories[cat].best;
@@ -1841,41 +1871,41 @@ function analyzePOI(lat, lng, uid) {
                         '<span class="poi-name" title="' + item.name + '">' + cat + ': ' + item.name + '</span>' +
                         '<span class="poi-dist">' + distText + '</span></div>';
 
-                L.polyline([[lat, lng], [item.lat, item.lon]], {
-                    color: '#2d6be4', 
-                    dashArray: '8, 8', 
-                    weight: 4, 
-                    opacity: 1
-                }).addTo(poiLayerGroup);
+                var line = new google.maps.Polyline({
+                    path: [{lat: lat, lng: lng}, {lat: item.lat, lng: item.lon}],
+                    strokeColor: '#2d6be4',
+                    strokeOpacity: 1,
+                    strokeWeight: 4,
+                    geodesic: true,
+                    icons: [{icon: {path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3}, offset: '0', repeat: '16px'}],
+                    strokeOpacity: 0,
+                    map: gMap
+                });
+                poiLayerGroup.push(line);
                 
-                var marker = L.circleMarker([item.lat, item.lon], {
-                    radius: 7, 
-                    color: '#2d6be4', 
-                    fillColor: '#FFD966', 
-                    fillOpacity: 1, 
-                    weight: 3
-                }).addTo(poiLayerGroup);
-                
-                var tooltipText = '<div style="text-align:center; line-height:1.2;">' +
-                                  '<span style="color:#2d6be4; font-size:9px;">' + cat.toUpperCase() + '</span><br>' +
-                                  '<span style="font-size:11px;">' + item.name + '</span><br>' +
-                                  '<span style="background:#2d6be4; color:#fff; padding:1px 4px; border-radius:3px; font-size:9px;">' + distText + '</span>' +
-                                  '</div>';
-                
-                marker.bindTooltip(tooltipText, {
-                    permanent: true, 
-                    direction: 'top', 
-                    className: 'poi-tooltip', 
-                    offset: [0, -5]
-                }).openTooltip();
+                var poiMarker = new google.maps.Marker({
+                    position: {lat: item.lat, lng: item.lon},
+                    map: gMap,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#FFD966',
+                        fillOpacity: 1,
+                        strokeColor: '#2d6be4',
+                        strokeWeight: 3
+                    },
+                    title: cat + ': ' + item.name + ' (' + distText + ')'
+                });
+                poiLayerGroup.push(poiMarker);
+                poiBounds.extend(new google.maps.LatLng(item.lat, item.lon));
             }
         }
 
-        if(!foundAny) { html += '<div style="color:var(--text-sub); text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
+        if(!foundAny) { html += '<div style="color:#5a6a7e; text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
         resDiv.innerHTML = html;
 
         if (foundAny) {
-             setTimeout(function() { gMap.fitBounds(poiLayerGroup.getBounds(), {padding: [50, 50], maxZoom: 16}); }, 200);
+             setTimeout(function() { gMap.fitBounds(poiBounds, 50); }, 200);
         }
 
     })
@@ -1905,8 +1935,8 @@ function geocodeLocation() {
     .catch(function (e) { toast('Gagal geocode: ' + e.message, 'error'); });
 }
 
-function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), tableEl = document.getElementById('tableView'); if (v === 'map') { mapEl.style.display = 'block'; tableEl.classList.remove('active'); if (gMap) setTimeout(function () { gMap.invalidateSize(); }, 50); } else { mapEl.style.display = 'none'; tableEl.classList.add('active'); } }
-function resetFilter() { document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){gMap.removeLayer(polyLayer); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; toast('Filter direset', ''); }
+function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), tableEl = document.getElementById('tableView'); if (v === 'map') { mapEl.style.display = 'block'; tableEl.classList.remove('active'); if (gMap) setTimeout(function () { google.maps.event.trigger(gMap, 'resize'); }, 50); } else { mapEl.style.display = 'none'; tableEl.classList.add('active'); } }
+function resetFilter() { document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; toast('Filter direset', ''); }
 
 function openModalNew() { _editingId = null; _editingFoto = ''; _originalKoordinat = null; document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding'; document.getElementById('f_id').disabled = false; document.getElementById('btnSubmit').textContent = '💾 Simpan Data'; document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; document.querySelectorAll('.modal .form-input, .modal .form-select').forEach(function(i) { i.value = ''; }); removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
 function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; document.getElementById('f_objek').value = row.objek; document.getElementById('f_tipe').value = row.tipeBangunan; document.getElementById('f_legalitas').value = row.legalitas; document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; document.getElementById('f_statusHarga').value = row.statusHarga; document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
@@ -1923,7 +1953,7 @@ function submitData() {
   if (_fotoDataUrl) {
     document.getElementById('fotoStatus').textContent = '⏳ Mengupload foto…';
     var cleanSumber = g('f_sumber') ? g('f_sumber').replace(/[\/\\]/g, '-') : 'Foto'; var newFilename = cleanSumber + ' - ' + (g('f_id') || 'Baru') + '.jpg';
-    google.script.run.withSuccessHandler(function (res) { 
+    GAS.script.run.withSuccessHandler(function (res) { 
       if (res.success) { 
         document.getElementById('fotoStatus').textContent = '✅ Foto diupload.'; 
         _doSubmitRow(res.url, g, num, btn); 
@@ -1941,7 +1971,7 @@ function submitData() {
 function _doSubmitRow(fotoUrl, g, num, btn) {
   var finalFoto = fotoUrl; if (_editingId && !fotoUrl) finalFoto = _editingFoto; 
   var row = [ g('f_id'), g('f_sumber'), g('f_hp'), g('f_koordinat'), g('f_alamat'), g('f_kota'), g('f_provinsi'), g('f_objek'), g('f_tipe'), g('f_legalitas'), num('f_lt'), num('f_lb'), num('f_tahunBangun'), g('f_harga'), num('f_frontage'), g('f_lokasi'), g('f_posisi'), g('f_bentuk'), g('f_kontur'), num('f_row'), num('f_elevasi'), g('f_statusHarga'), g('f_waktuData'), g('f_tujuan'), g('f_peruntukan'), g('f_indikasi'), finalFoto ];
-  google.script.run.withSuccessHandler(function (res) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; if (res.success) { closeModal(); toast('Data berhasil disimpan!', 'success'); doSearch(); } else { toast(res.error, 'error'); } }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal: ' + err.message, 'error'); })[_editingId ? 'editData' : 'addData'](row, activeUsername, _originalKoordinat);
+  GAS.script.run.withSuccessHandler(function (res) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; if (res.success) { closeModal(); toast('Data berhasil disimpan!', 'success'); doSearch(); } else { toast(res.error, 'error'); } }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal: ' + err.message, 'error'); })[_editingId ? 'editData' : 'addData'](row, activeUsername, _originalKoordinat);
 }
 
 function exportData() {
@@ -1963,7 +1993,7 @@ function triggerFotoUpdate(rowId, koordinat, sumber) {
         var canvas = document.createElement('canvas'), MAX = 1200, w = img.width, h = img.height; if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
         canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         var dataUrl = canvas.toDataURL('image/jpeg', 0.82); var cleanSumber = (sumber && sumber !== '–') ? sumber.replace(/[\/\\]/g, '-') : 'Foto_Update'; var newFilename = cleanSumber + ' - ' + rowId + '.jpg'; 
-        google.script.run.withSuccessHandler(function (res) { if (res.success) { google.script.run.withSuccessHandler(function (r) { if (r.success) { toast('Foto berhasil disimpan!', 'success'); doSearch(); } else { toast('Gagal update database: ' + r.error, 'error'); } }).withFailureHandler(function (e) { toast('Gagal: ' + e.message, 'error'); }).updateFoto(koordinat, res.url); } else { toast('Gagal upload ke Drive: ' + res.error, 'error'); } }).withFailureHandler(function (e) { toast('Gagal: ' + e.message, 'error'); }).uploadFoto(dataUrl, newFilename); 
+        GAS.script.run.withSuccessHandler(function (res) { if (res.success) { GAS.script.run.withSuccessHandler(function (r) { if (r.success) { toast('Foto berhasil disimpan!', 'success'); doSearch(); } else { toast('Gagal update database: ' + r.error, 'error'); } }).withFailureHandler(function (e) { toast('Gagal: ' + e.message, 'error'); }).updateFoto(koordinat, res.url); } else { toast('Gagal upload ke Drive: ' + res.error, 'error'); } }).withFailureHandler(function (e) { toast('Gagal: ' + e.message, 'error'); }).uploadFoto(dataUrl, newFilename); 
       }; img.src = ev.target.result;
     }; reader.readAsDataURL(file);
   }; inp.click();
@@ -2156,35 +2186,25 @@ function toast(msg, type) {
 
 // ══════════════════════════════════════════════════════════
 // 📐 MEASUREMENT — PURE FRONTEND, TIDAK KE DATABASE
-//    (Google Maps + Directions API)
+//    (Google Maps + Directions API — API sudah dimuat di <head>)
 // ══════════════════════════════════════════════════════════
-
-// 🔑 ISI DENGAN API KEY GOOGLE MAPS ANDA
-//    1. Buka https://console.cloud.google.com/google/maps-apis
-//    2. Aktifkan: Maps JavaScript API + Directions API + Geometry library
-//    3. Buat API key, lalu BATASI dengan HTTP referrer (domain Anda)
-//    4. Tempel key-nya menggantikan string di bawah:
-var GOOGLE_MAPS_API_KEY = "AIzaSyBSJYYcFB2DHu4VNTWWQl3y5dp0bp4phbA";
 
 var _mMap = null, _mMapInited = false, _mPickTarget = null;
 var _mSbVisible = true;
 var _mMks = {}, _mLbls = {};            // markers, labels
 var _mRoutes = {};                       // DirectionsRenderer per DP id
 var _mDirSvc = null;                     // DirectionsService instance
-var _mGmapsLoading = false, _mGmapsReady = false;
 var _mDpIds  = ['1','2','3','4','5','6'];
 
-// Warna pin & rute per ID — Objek pakai merah Google Maps, DP juga merah agar konsisten dengan permintaan
+// Warna pin & rute per ID
 var _mColors = { obj:'#db4437','1':'#db4437','2':'#db4437','3':'#db4437','4':'#db4437','5':'#db4437','6':'#db4437' };
-// Warna garis rute per DP (boleh beda biar tetap mudah dibedakan saat banyak DP aktif)
 var _mRouteColors = { '1':'#1a73e8','2':'#0f9d58','3':'#f4b400','4':'#9334e6','5':'#ea4335','6':'#00897b' };
 
 function openMeasurement() {
   document.getElementById('measureOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(function(){
-    if (_mUseLeaflet && _mLMap) { _mLMap.invalidateSize(); return; }
-    if (!_mMapInited) { _mLoadGmaps(); _mMapInited = true; }
+    if (!_mMapInited) { _mInitMap(); _mMapInited = true; }
     else if (_mMap) { google.maps.event.trigger(_mMap, 'resize'); }
   }, 150);
 }
@@ -2198,95 +2218,11 @@ function toggleMSidebar() {
   document.getElementById('measureSidebar').classList.toggle('hidden', !_mSbVisible);
   document.getElementById('mSidebarBtnTxt').textContent = _mSbVisible ? 'Sembunyikan Panel' : 'Tampilkan Panel';
   setTimeout(function(){
-    if (_mUseLeaflet && _mLMap) _mLMap.invalidateSize();
-    else if (_mMap) google.maps.event.trigger(_mMap, 'resize');
+    if (_mMap) google.maps.event.trigger(_mMap, 'resize');
   }, 320);
 }
 
-// ── LOAD GOOGLE MAPS API DINAMIS ─────────────────────────
-function _mLoadGmaps() {
-  // Bila belum diisi, tampilkan banner peringatan dan jangan load
-  if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.indexOf('MASUKKAN_') === 0) {
-    var w = document.getElementById('mKeyWarn'); if (w) w.style.display = 'block';
-    var btn = document.getElementById('mUseOsmBtn'); if (btn) btn.style.display = 'inline-block';
-    return;
-  }
-  if (window.google && window.google.maps) { _mInitMap(); return; }
-  if (_mGmapsLoading) return;
-  _mGmapsLoading = true;
-
-  // Handler global untuk gagal autentikasi (referrer ditolak / key invalid / billing off)
-  window.gm_authFailure = function() {
-    _mShowGmapsError(
-      '⚠️ Google Maps gagal autentikasi',
-      'API key ditolak. Penyebab umum: domain belum di-whitelist (HTTP referrer), billing belum aktif, atau Maps JavaScript API belum di-enable di Google Cloud Console.'
-    );
-  };
-
-  // Timeout deteksi: kalau 8 detik peta belum terinisialisasi, anggap gagal
-  var initTimer = setTimeout(function(){
-    if (!_mMap) {
-      _mShowGmapsError(
-        '⚠️ Google Maps tidak merespons',
-        'Skrip dimuat tapi peta tidak terinisialisasi. Kemungkinan API key dibatasi domain atau billing belum aktif.'
-      );
-    }
-  }, 8000);
-
-  window.__mGmapsCb = function() { _mGmapsReady = true; clearTimeout(initTimer); _mInitMap(); };
-  var s = document.createElement('script');
-  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(GOOGLE_MAPS_API_KEY)
-        + '&libraries=geometry&loading=async&callback=__mGmapsCb';
-  s.async = true; s.defer = true;
-  s.onerror = function() {
-    clearTimeout(initTimer);
-    _mShowGmapsError(
-      '⚠️ Gagal memuat Google Maps',
-      'Periksa koneksi internet & validitas API key.'
-    );
-  };
-  document.head.appendChild(s);
-}
-
-// Helper: tampilkan banner error + tombol fallback OSM
-function _mShowGmapsError(title, msg) {
-  var w = document.getElementById('mKeyWarn');
-  if (!w) return;
-  var t = document.getElementById('mKeyWarnTitle'); if (t) t.textContent = title;
-  var b = document.getElementById('mKeyWarnBody');  if (b) b.textContent = msg;
-  w.style.display = 'block';
-  var btn = document.getElementById('mUseOsmBtn'); if (btn) btn.style.display = 'inline-block';
-}
-
-// Fallback: pakai Leaflet + OSM (gratis, tanpa API key)
-var _mUseLeaflet = false, _mLMap = null, _mLMarkers = {}, _mLLines = {}, _mLLabels = {};
-function _mFallbackToLeaflet(reason) {
-  if (typeof L === 'undefined') { alert('Leaflet belum termuat.'); return; }
-  _mUseLeaflet = true;
-  var w = document.getElementById('mKeyWarn'); if (w) w.style.display = 'none';
-  var el = document.getElementById('measureMap');
-  if (!el) return;
-  el.innerHTML = ''; // bersihkan sisa elemen Google Maps
-  el.style.background = '#e8ecf0';
-
-  _mLMap = L.map(el, { center: [-6.2, 106.816], zoom: 14, preferCanvas: true });
-  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
-  var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 });
-  osm.addTo(_mLMap);
-  L.control.layers({ '🗺 OSM': osm, '🛰 Satelit': sat }, {}, { position: 'topright', collapsed: false }).addTo(_mLMap);
-
-  _mLMap.on('click', function(e){
-    if (_mPickTarget === null) return;
-    var id = _mPickTarget;
-    document.getElementById('mCoord_'+id).value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
-    mCancelPick(); _mProcess(id); _mRedraw();
-  });
-
-  setTimeout(function(){ _mLMap.invalidateSize(); }, 200);
-  showToast(reason || 'Beralih ke OpenStreetMap.', 'success');
-}
-
-// ── INIT PETA ─────────────────────────────────────────────
+// ── INIT PETA MEASUREMENT (Google Maps sudah dimuat di <head>) ────
 function _mInitMap() {
   var el = document.getElementById('measureMap');
   if (!el || !window.google || !google.maps) return;
@@ -2446,9 +2382,6 @@ function _mMakeLabel(coord, dpId, ds) {
 
 // ── REDRAW PETA ───────────────────────────────────────────
 function _mRedraw() {
-  // Mode fallback Leaflet
-  if (_mUseLeaflet) { _mRedrawLeaflet(); return; }
-
   if (!_mMap || !window.google || !google.maps) return;
 
   _mClearLayers();
@@ -2568,90 +2501,12 @@ function _mRedraw() {
   }
 }
 
-// ── REDRAW PETA — MODE LEAFLET (FALLBACK) ────────────────
-function _mRedrawLeaflet() {
-  if (!_mLMap) return;
-
-  // Bersihkan layer lama
-  Object.keys(_mLMarkers).forEach(function(k){ if(_mLMarkers[k]) _mLMap.removeLayer(_mLMarkers[k]); });
-  Object.keys(_mLLines).forEach(function(k){ if(_mLLines[k]) _mLMap.removeLayer(_mLLines[k]); });
-  Object.keys(_mLLabels).forEach(function(k){ if(_mLLabels[k]) _mLMap.removeLayer(_mLLabels[k]); });
-  _mLMarkers = {}; _mLLines = {}; _mLLabels = {};
-
-  var sumEl = document.getElementById('mSummary');
-  var sumRows = document.getElementById('mSummaryRows');
-  if (sumRows) sumRows.innerHTML = '';
-
-  var cObj = _mParse(document.getElementById('mCoord_obj').value);
-  var pts = [];
-  var summaryData = [];
-
-  function makeIcon(label, color, isObj) {
-    var s = isObj ? 46 : 40;
-    var html = '<div style="position:relative;width:'+s+'px;height:'+(s+8)+'px;">'
-      +'<div style="position:absolute;left:0;top:0;width:'+s+'px;height:'+s+'px;background:'+color+';border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>'
-      +'<div style="position:absolute;left:0;top:0;width:'+s+'px;height:'+s+'px;display:grid;place-items:center;font:800 9px Plus Jakarta Sans,sans-serif;color:'+color+';">'
-      +'<span style="background:#fff;border-radius:50%;width:'+(s*0.55)+'px;height:'+(s*0.55)+'px;display:grid;place-items:center;">'+label+'</span>'
-      +'</div></div>';
-    return L.divIcon({ html: html, className: '', iconSize: [s, s+8], iconAnchor: [s/2, s+4] });
-  }
-
-  if (cObj) {
-    _mLMarkers['obj'] = L.marker([cObj.lat, cObj.lng], { icon: makeIcon('OBJ', '#db4437', true), zIndexOffset: 1000 }).addTo(_mLMap);
-    pts.push([cObj.lat, cObj.lng]);
-  }
-
-  _mDpIds.forEach(function(id){
-    var inp = document.getElementById('mCoord_'+id);
-    var coord = _mParse(inp.value);
-    var distEl = document.getElementById('mDist_'+id);
-    if (!coord) { if(distEl) distEl.textContent='–'; return; }
-
-    var color = _mRouteColors[id] || '#1a73e8';
-    _mLMarkers[id] = L.marker([coord.lat, coord.lng], { icon: makeIcon('DP'+id, '#db4437', false) }).addTo(_mLMap);
-    pts.push([coord.lat, coord.lng]);
-
-    if (cObj) {
-      var km = _mHaversine(cObj.lat, cObj.lng, coord.lat, coord.lng);
-      var ds = _mFmtDist(km) + ' (lurus)';
-      _mLLines[id] = L.polyline([[cObj.lat,cObj.lng],[coord.lat,coord.lng]], { color: color, weight: 5, opacity: 0.9 }).addTo(_mLMap);
-
-      // Label di atas pin DP
-      var lbl = L.marker([coord.lat, coord.lng], {
-        icon: L.divIcon({
-          className: '',
-          html: '<div class="mdist-label" style="transform:translate(-50%,-180%);"><div class="mdl-title">Data '+id+'</div><div class="mdl-pill">'+ds+'</div></div>',
-          iconSize: [0,0]
-        }),
-        interactive: false
-      }).addTo(_mLMap);
-      _mLLabels[id] = lbl;
-
-      if (distEl) distEl.textContent = ds;
-      summaryData.push({ id: id, dist: ds, meters: km*1000, color: color });
-    }
-  });
-
-  if (summaryData.length > 0) {
-    sumEl.style.display = 'block';
-    summaryData.sort(function(a,b){ return a.meters - b.meters; });
-    sumRows.innerHTML = summaryData.map(function(r){
-      return '<div class="msb-sum-row">'
-        +'<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+r.color+';"></span> DP '+r.id+'</span>'
-        +'<span class="msb-sum-val">'+r.dist+'</span>'
-        +'</div>';
-    }).join('');
-  } else { sumEl.style.display = 'none'; }
-
-  if (pts.length === 1) { _mLMap.setView(pts[0], 17); }
-  else if (pts.length > 1) { _mLMap.fitBounds(pts, { padding: [60,60] }); }
-}
 // ═══════════════════════════════════════════════════════════
 
 var _mapInited = false;
 function safeInitMap() {
   if (_mapInited) return;
-  if (typeof L === 'undefined') { setTimeout(safeInitMap, 200); return; }
+  if (!window.google || !google.maps) { setTimeout(safeInitMap, 200); return; }
   if (!document.getElementById('map')) { setTimeout(safeInitMap, 200); return; }
   _mapInited = true;
   try { initMap(); } catch (err) {
@@ -2660,10 +2515,6 @@ function safeInitMap() {
   }
 }
   
-// =========================================================================
-// (Catatan: blok measurement lama berbasis Leaflet sudah dihapus.
-//  Logika measurement utama ada di blok `_mInitMap` / `_mRedraw` di atas
-//  yang memakai Google Maps + Directions API.)
 // =========================================================================
 </script>
 </body>
