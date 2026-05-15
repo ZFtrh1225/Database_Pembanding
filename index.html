@@ -971,9 +971,12 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div class="mroute-loading" id="mRouteLoading"><div class="dotspin"></div><span id="mRouteLoadingTxt">Menghitung rute…</span></div>
 
     <div class="mmap-keywarn" id="mKeyWarn" style="display:none;">
-      <h4>⚠️ Google Maps API Key belum diatur</h4>
-      <p>Buka <code>index.html</code>, cari konstanta <code>GOOGLE_MAPS_API_KEY</code>, lalu isi dengan API key dari Google Cloud Console.</p>
+      <h4 id="mKeyWarnTitle">⚠️ Google Maps API Key belum diatur</h4>
+      <p id="mKeyWarnBody">Buka <code>index.html</code>, cari konstanta <code>GOOGLE_MAPS_API_KEY</code>, lalu isi dengan API key dari Google Cloud Console.</p>
       <p>Aktifkan <strong>Maps JavaScript API</strong> &amp; <strong>Directions API</strong>. Jangan lupa batasi key dengan <em>HTTP referrer</em> agar aman.</p>
+      <button id="mUseOsmBtn" onclick="_mFallbackToLeaflet('Beralih ke OpenStreetMap.')" style="margin-top:8px;background:#2d6be4;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;display:none;">
+        🗺️ Pakai OpenStreetMap (gratis, tanpa key)
+      </button>
     </div>
 
     <div class="mmap-topbar">
@@ -2180,6 +2183,7 @@ function openMeasurement() {
   document.getElementById('measureOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(function(){
+    if (_mUseLeaflet && _mLMap) { _mLMap.invalidateSize(); return; }
     if (!_mMapInited) { _mLoadGmaps(); _mMapInited = true; }
     else if (_mMap) { google.maps.event.trigger(_mMap, 'resize'); }
   }, 150);
@@ -2193,7 +2197,10 @@ function toggleMSidebar() {
   _mSbVisible = !_mSbVisible;
   document.getElementById('measureSidebar').classList.toggle('hidden', !_mSbVisible);
   document.getElementById('mSidebarBtnTxt').textContent = _mSbVisible ? 'Sembunyikan Panel' : 'Tampilkan Panel';
-  setTimeout(function(){ if(_mMap) google.maps.event.trigger(_mMap, 'resize'); }, 320);
+  setTimeout(function(){
+    if (_mUseLeaflet && _mLMap) _mLMap.invalidateSize();
+    else if (_mMap) google.maps.event.trigger(_mMap, 'resize');
+  }, 320);
 }
 
 // ── LOAD GOOGLE MAPS API DINAMIS ─────────────────────────
@@ -2201,26 +2208,82 @@ function _mLoadGmaps() {
   // Bila belum diisi, tampilkan banner peringatan dan jangan load
   if (!GOOGLE_MAPS_API_KEY || GOOGLE_MAPS_API_KEY.indexOf('MASUKKAN_') === 0) {
     var w = document.getElementById('mKeyWarn'); if (w) w.style.display = 'block';
+    var btn = document.getElementById('mUseOsmBtn'); if (btn) btn.style.display = 'inline-block';
     return;
   }
   if (window.google && window.google.maps) { _mInitMap(); return; }
   if (_mGmapsLoading) return;
   _mGmapsLoading = true;
 
-  window.__mGmapsCb = function() { _mGmapsReady = true; _mInitMap(); };
+  // Handler global untuk gagal autentikasi (referrer ditolak / key invalid / billing off)
+  window.gm_authFailure = function() {
+    _mShowGmapsError(
+      '⚠️ Google Maps gagal autentikasi',
+      'API key ditolak. Penyebab umum: domain belum di-whitelist (HTTP referrer), billing belum aktif, atau Maps JavaScript API belum di-enable di Google Cloud Console.'
+    );
+  };
+
+  // Timeout deteksi: kalau 8 detik peta belum terinisialisasi, anggap gagal
+  var initTimer = setTimeout(function(){
+    if (!_mMap) {
+      _mShowGmapsError(
+        '⚠️ Google Maps tidak merespons',
+        'Skrip dimuat tapi peta tidak terinisialisasi. Kemungkinan API key dibatasi domain atau billing belum aktif.'
+      );
+    }
+  }, 8000);
+
+  window.__mGmapsCb = function() { _mGmapsReady = true; clearTimeout(initTimer); _mInitMap(); };
   var s = document.createElement('script');
   s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(GOOGLE_MAPS_API_KEY)
         + '&libraries=geometry&loading=async&callback=__mGmapsCb';
   s.async = true; s.defer = true;
   s.onerror = function() {
-    var w = document.getElementById('mKeyWarn');
-    if (w) {
-      w.querySelector('h4').textContent = '⚠️ Gagal memuat Google Maps';
-      w.querySelector('p').textContent = 'Periksa koneksi internet & validitas API key.';
-      w.style.display = 'block';
-    }
+    clearTimeout(initTimer);
+    _mShowGmapsError(
+      '⚠️ Gagal memuat Google Maps',
+      'Periksa koneksi internet & validitas API key.'
+    );
   };
   document.head.appendChild(s);
+}
+
+// Helper: tampilkan banner error + tombol fallback OSM
+function _mShowGmapsError(title, msg) {
+  var w = document.getElementById('mKeyWarn');
+  if (!w) return;
+  var t = document.getElementById('mKeyWarnTitle'); if (t) t.textContent = title;
+  var b = document.getElementById('mKeyWarnBody');  if (b) b.textContent = msg;
+  w.style.display = 'block';
+  var btn = document.getElementById('mUseOsmBtn'); if (btn) btn.style.display = 'inline-block';
+}
+
+// Fallback: pakai Leaflet + OSM (gratis, tanpa API key)
+var _mUseLeaflet = false, _mLMap = null, _mLMarkers = {}, _mLLines = {}, _mLLabels = {};
+function _mFallbackToLeaflet(reason) {
+  if (typeof L === 'undefined') { alert('Leaflet belum termuat.'); return; }
+  _mUseLeaflet = true;
+  var w = document.getElementById('mKeyWarn'); if (w) w.style.display = 'none';
+  var el = document.getElementById('measureMap');
+  if (!el) return;
+  el.innerHTML = ''; // bersihkan sisa elemen Google Maps
+  el.style.background = '#e8ecf0';
+
+  _mLMap = L.map(el, { center: [-6.2, 106.816], zoom: 14, preferCanvas: true });
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
+  var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 });
+  osm.addTo(_mLMap);
+  L.control.layers({ '🗺 OSM': osm, '🛰 Satelit': sat }, {}, { position: 'topright', collapsed: false }).addTo(_mLMap);
+
+  _mLMap.on('click', function(e){
+    if (_mPickTarget === null) return;
+    var id = _mPickTarget;
+    document.getElementById('mCoord_'+id).value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+    mCancelPick(); _mProcess(id); _mRedraw();
+  });
+
+  setTimeout(function(){ _mLMap.invalidateSize(); }, 200);
+  showToast(reason || 'Beralih ke OpenStreetMap.', 'success');
 }
 
 // ── INIT PETA ─────────────────────────────────────────────
@@ -2383,6 +2446,9 @@ function _mMakeLabel(coord, dpId, ds) {
 
 // ── REDRAW PETA ───────────────────────────────────────────
 function _mRedraw() {
+  // Mode fallback Leaflet
+  if (_mUseLeaflet) { _mRedrawLeaflet(); return; }
+
   if (!_mMap || !window.google || !google.maps) return;
 
   _mClearLayers();
@@ -2500,6 +2566,85 @@ function _mRedraw() {
       else _mMap.fitBounds(bounds, 80);
     }
   }
+}
+
+// ── REDRAW PETA — MODE LEAFLET (FALLBACK) ────────────────
+function _mRedrawLeaflet() {
+  if (!_mLMap) return;
+
+  // Bersihkan layer lama
+  Object.keys(_mLMarkers).forEach(function(k){ if(_mLMarkers[k]) _mLMap.removeLayer(_mLMarkers[k]); });
+  Object.keys(_mLLines).forEach(function(k){ if(_mLLines[k]) _mLMap.removeLayer(_mLLines[k]); });
+  Object.keys(_mLLabels).forEach(function(k){ if(_mLLabels[k]) _mLMap.removeLayer(_mLLabels[k]); });
+  _mLMarkers = {}; _mLLines = {}; _mLLabels = {};
+
+  var sumEl = document.getElementById('mSummary');
+  var sumRows = document.getElementById('mSummaryRows');
+  if (sumRows) sumRows.innerHTML = '';
+
+  var cObj = _mParse(document.getElementById('mCoord_obj').value);
+  var pts = [];
+  var summaryData = [];
+
+  function makeIcon(label, color, isObj) {
+    var s = isObj ? 46 : 40;
+    var html = '<div style="position:relative;width:'+s+'px;height:'+(s+8)+'px;">'
+      +'<div style="position:absolute;left:0;top:0;width:'+s+'px;height:'+s+'px;background:'+color+';border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>'
+      +'<div style="position:absolute;left:0;top:0;width:'+s+'px;height:'+s+'px;display:grid;place-items:center;font:800 9px Plus Jakarta Sans,sans-serif;color:'+color+';">'
+      +'<span style="background:#fff;border-radius:50%;width:'+(s*0.55)+'px;height:'+(s*0.55)+'px;display:grid;place-items:center;">'+label+'</span>'
+      +'</div></div>';
+    return L.divIcon({ html: html, className: '', iconSize: [s, s+8], iconAnchor: [s/2, s+4] });
+  }
+
+  if (cObj) {
+    _mLMarkers['obj'] = L.marker([cObj.lat, cObj.lng], { icon: makeIcon('OBJ', '#db4437', true), zIndexOffset: 1000 }).addTo(_mLMap);
+    pts.push([cObj.lat, cObj.lng]);
+  }
+
+  _mDpIds.forEach(function(id){
+    var inp = document.getElementById('mCoord_'+id);
+    var coord = _mParse(inp.value);
+    var distEl = document.getElementById('mDist_'+id);
+    if (!coord) { if(distEl) distEl.textContent='–'; return; }
+
+    var color = _mRouteColors[id] || '#1a73e8';
+    _mLMarkers[id] = L.marker([coord.lat, coord.lng], { icon: makeIcon('DP'+id, '#db4437', false) }).addTo(_mLMap);
+    pts.push([coord.lat, coord.lng]);
+
+    if (cObj) {
+      var km = _mHaversine(cObj.lat, cObj.lng, coord.lat, coord.lng);
+      var ds = _mFmtDist(km) + ' (lurus)';
+      _mLLines[id] = L.polyline([[cObj.lat,cObj.lng],[coord.lat,coord.lng]], { color: color, weight: 5, opacity: 0.9 }).addTo(_mLMap);
+
+      // Label di atas pin DP
+      var lbl = L.marker([coord.lat, coord.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="mdist-label" style="transform:translate(-50%,-180%);"><div class="mdl-title">Data '+id+'</div><div class="mdl-pill">'+ds+'</div></div>',
+          iconSize: [0,0]
+        }),
+        interactive: false
+      }).addTo(_mLMap);
+      _mLLabels[id] = lbl;
+
+      if (distEl) distEl.textContent = ds;
+      summaryData.push({ id: id, dist: ds, meters: km*1000, color: color });
+    }
+  });
+
+  if (summaryData.length > 0) {
+    sumEl.style.display = 'block';
+    summaryData.sort(function(a,b){ return a.meters - b.meters; });
+    sumRows.innerHTML = summaryData.map(function(r){
+      return '<div class="msb-sum-row">'
+        +'<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+r.color+';"></span> DP '+r.id+'</span>'
+        +'<span class="msb-sum-val">'+r.dist+'</span>'
+        +'</div>';
+    }).join('');
+  } else { sumEl.style.display = 'none'; }
+
+  if (pts.length === 1) { _mLMap.setView(pts[0], 17); }
+  else if (pts.length > 1) { _mLMap.fitBounds(pts, { padding: [60,60] }); }
 }
 // ═══════════════════════════════════════════════════════════
 
