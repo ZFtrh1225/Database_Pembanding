@@ -120,7 +120,15 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 #map.map-hidden { display: none; }
 #osmMap { z-index: 1; }
 #osmMap .leaflet-control-attribution { font-size: 9px; }
+/* Samakan tampilan popup OSM dengan InfoWindow Google Maps */
+#osmMap .leaflet-popup-content-wrapper { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+#osmMap .leaflet-popup-content { margin: 0; padding: 0; width: auto !important; }
+#osmMap .leaflet-popup-content .iw-osm-wrap { padding: 0; }
+#osmMap .leaflet-popup-content .iw-wrap { min-width: 240px; max-width: 320px; font-size: 12px; }
+#osmMap .leaflet-popup-tip { box-shadow: 0 2px 6px rgba(0,0,0,.2); }
 .mode-active { background: var(--navy) !important; color: #fff !important; border-color: var(--navy) !important; }
+.mode-menu-item:hover { background: var(--sky) !important; }
+.mode-dropdown-wrap .btn-view.active { background: #4285f4; color: #fff; }
 .map-loading { position: absolute; inset: 0; background: #e8ecf0; display: flex; flex-direction:column; align-items: center; justify-content:center; z-index: 5; }
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; margin-bottom:10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -264,6 +272,9 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .legend-wrap { display: none; } 
   .view-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; width: 100%; }
   .view-toggle .btn-view { justify-content: center; padding: 8px 5px; font-size: 11px; width: 100%; }
+  .view-toggle .mode-dropdown-wrap { width: 100%; }
+  .view-toggle .mode-dropdown-wrap .btn-view { width: 100%; }
+  .view-toggle .mode-dropdown-menu { left: 0; right: 0; min-width: 100% !important; }
   .btn-add { width: 100%; justify-content: center; padding: 9px; font-size: 12px; margin-top: 2px;}
   .modal { width: 95%; padding: 15px; margin: 10px; }
   .modal-grid { grid-template-columns: 1fr; }
@@ -653,8 +664,20 @@ body.mmode-picking .mpick-hint { display: flex; }
       <div class="view-toggle">
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
         <button class="btn-view" id="btnHeatmap" onclick="toggleHeatmap()" style="color:#ea4335; border-color:#ea4335;">🔥 Heatmap</button>
-        <button class="btn-view active" id="btnModeGmaps" onclick="switchMapMode('gmaps')" style="color:#4285f4; border-color:#4285f4; font-weight:bold;">🌐 Google Maps</button>
-        <button class="btn-view" id="btnModeOSM" onclick="switchMapMode('osm')" style="color:#2d6be4; border-color:#2d6be4; font-weight:bold;">🗺️ OpenStreetMap</button>
+        <div class="mode-dropdown-wrap" style="position:relative;">
+          <button class="btn-view active" id="btnModeToggle" type="button" onclick="toggleModeMenu(event)" style="color:#4285f4; border-color:#4285f4; font-weight:bold;">
+            <span id="btnModeLabel">🌐 Mode: Google Maps</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="mode-dropdown-menu" id="modeMenu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(30,58,95,.18); z-index:200; min-width:180px; overflow:hidden;">
+            <button type="button" class="mode-menu-item" data-mode="gmaps" onclick="selectMapMode('gmaps')" style="width:100%; text-align:left; background:#fff; border:none; padding:8px 12px; font-family:var(--font); font-size:12px; color:#4285f4; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+              <span>🌐</span><span>Google Maps</span>
+            </button>
+            <button type="button" class="mode-menu-item" data-mode="osm" onclick="selectMapMode('osm')" style="width:100%; text-align:left; background:#fff; border:none; padding:8px 12px; font-family:var(--font); font-size:12px; color:#2d6be4; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; border-top:1px solid var(--border);">
+              <span>🗺️</span><span>OpenStreetMap</span>
+            </button>
+          </div>
+        </div>
         <button class="btn-view active" id="btnViewMap" onclick="setView('map')">🗺 Peta</button>
         <button class="btn-view" id="btnViewTable" onclick="setView('table')">☰ Tabel</button>
       </div>
@@ -1172,21 +1195,55 @@ var _currentMapMode = 'gmaps'; // 'gmaps' or 'osm'
 var _osmMap = null;
 var _osmMarkers = [];
 
+function toggleModeMenu(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  var menu = document.getElementById('modeMenu');
+  if (!menu) return;
+  menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+}
+
+function _closeModeMenu() {
+  var menu = document.getElementById('modeMenu');
+  if (menu) menu.style.display = 'none';
+}
+
+// Tutup dropdown jika klik di luar
+document.addEventListener('click', function(e) {
+  var wrap = e.target.closest && e.target.closest('.mode-dropdown-wrap');
+  if (!wrap) _closeModeMenu();
+});
+
+function selectMapMode(mode) {
+  _closeModeMenu();
+  switchMapMode(mode);
+}
+
+function _updateModeButtonLabel(mode) {
+  var btn = document.getElementById('btnModeToggle');
+  var label = document.getElementById('btnModeLabel');
+  if (!btn || !label) return;
+  if (mode === 'osm') {
+    label.textContent = '🗺️ Mode: OpenStreetMap';
+    btn.style.color = '#2d6be4';
+    btn.style.borderColor = '#2d6be4';
+  } else {
+    label.textContent = '🌐 Mode: Google Maps';
+    btn.style.color = '#4285f4';
+    btn.style.borderColor = '#4285f4';
+  }
+}
+
 function switchMapMode(mode) {
-  if (mode === _currentMapMode) return;
+  if (mode === _currentMapMode) { _updateModeButtonLabel(mode); return; }
   _currentMapMode = mode;
 
   var gmapEl = document.getElementById('map');
   var osmEl = document.getElementById('osmMap');
-  var btnGmaps = document.getElementById('btnModeGmaps');
-  var btnOSM = document.getElementById('btnModeOSM');
 
   if (mode === 'osm') {
     // Switch to OpenStreetMap
     gmapEl.style.display = 'none';
     osmEl.style.display = 'block';
-    btnGmaps.classList.remove('active');
-    btnOSM.classList.add('active');
 
     if (!_osmMap) {
       _osmMap = L.map('osmMap', { zoomControl: true }).setView([-6.175, 106.827], 14);
@@ -1207,14 +1264,13 @@ function switchMapMode(mode) {
     _syncMarkersToOSM();
 
     setTimeout(function() { _osmMap.invalidateSize(); }, 100);
+    _updateModeButtonLabel('osm');
     toast('Mode: OpenStreetMap aktif', 'success');
 
   } else {
     // Switch to Google Maps
     osmEl.style.display = 'none';
     gmapEl.style.display = 'block';
-    btnOSM.classList.remove('active');
-    btnGmaps.classList.add('active');
 
     // Sync center from OSM
     if (_osmMap && gMap) {
@@ -1225,6 +1281,7 @@ function switchMapMode(mode) {
     }
 
     if (gMap) setTimeout(function() { google.maps.event.trigger(gMap, 'resize'); }, 100);
+    _updateModeButtonLabel('gmaps');
     toast('Mode: Google Maps aktif', 'success');
   }
 }
@@ -1249,25 +1306,25 @@ function _syncMarkersToOSM() {
     if (!coord) return;
 
     var color = colorMap[row.objek] || '#1e3a5f';
+    var pinLabel = (typeof _getPinLabel === 'function') ? _getPinLabel(row.id) : 'DP';
     var icon = L.divIcon({
       className: 'osm-custom-marker',
-      html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>',
-      iconSize: [14, 14],
-      iconAnchor: [7, 7]
+      html: '<div style="position:relative;width:28px;height:36px;">' +
+              '<div style="width:28px;height:28px;border-radius:50% 50% 50% 0;background:' + color + ';border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);transform:rotate(-45deg);position:absolute;top:0;left:0;"></div>' +
+              '<div style="position:absolute;top:4px;left:0;width:28px;height:20px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:9px;font-family:Plus Jakarta Sans,sans-serif;letter-spacing:.3px;">' + pinLabel + '</div>' +
+            '</div>',
+      iconSize: [28, 36],
+      iconAnchor: [14, 32],
+      popupAnchor: [0, -28]
     });
 
     var marker = L.marker([coord.lat, coord.lng], { icon: icon });
-    
-    var popupContent = '<div style="font-family:Plus Jakarta Sans,sans-serif;font-size:12px;min-width:200px;">' +
-      '<div style="background:#1e3a5f;color:#fff;padding:6px 10px;border-radius:6px 6px 0 0;font-weight:700;font-size:11px;">' + (row.id || '-') + ' — ' + (row.objek || '-') + '</div>' +
-      '<div style="padding:8px 10px;">' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#5a6a7e;">Alamat:</span><span style="font-weight:600;text-align:right;max-width:140px;overflow:hidden;text-overflow:ellipsis;">' + (row.alamat || '-') + '</span></div>' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#5a6a7e;">LT/LB:</span><span style="font-weight:600;">' + (row.luasTanah || '-') + ' / ' + (row.luasBangunan || '-') + ' m²</span></div>' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#5a6a7e;">Harga:</span><span style="font-weight:600;color:#16a34a;">' + (row.harga || '-') + '</span></div>' +
-      '<div style="display:flex;justify-content:space-between;"><span style="color:#5a6a7e;">Ind. Nilai/m²:</span><span style="font-weight:600;color:#2d6be4;">' + (row.indikasiNilai || '-') + '</span></div>' +
-      '</div></div>';
 
-    marker.bindPopup(popupContent, { maxWidth: 280 });
+    // Gunakan buildPopup yang sama seperti Google Maps agar informasi konsisten.
+    // Kita bungkus dengan container lebar tetap supaya popup Leaflet
+    // mengakomodasi konten yang panjang (foto, tombol aksi, POI, dsb).
+    var popupHtml = '<div class="iw-osm-wrap" style="width:300px;">' + buildPopup(row) + '</div>';
+    marker.bindPopup(popupHtml, { maxWidth: 340, minWidth: 280, autoPan: true });
     marker.addTo(_osmMap);
     _osmMarkers.push(marker);
   });
@@ -2101,8 +2158,85 @@ function submitData() {
 
 function _doSubmitRow(fotoUrl, g, num, btn) {
   var finalFoto = fotoUrl; if (_editingId && !fotoUrl) finalFoto = _editingFoto; 
-  var row = [ g('f_id'), g('f_sumber'), g('f_hp'), g('f_koordinat'), g('f_alamat'), g('f_kota'), g('f_provinsi'), g('f_objek'), g('f_tipe'), g('f_legalitas'), num('f_lt'), num('f_lb'), num('f_tahunBangun'), g('f_harga'), num('f_frontage'), g('f_lokasi'), g('f_posisi'), g('f_bentuk'), g('f_kontur'), num('f_row'), num('f_elevasi'), g('f_statusHarga'), g('f_waktuData'), g('f_tujuan'), g('f_peruntukan'), g('f_indikasi'), finalFoto ];
-  GAS.script.run.withSuccessHandler(function (res) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; if (res.success) { closeModal(); toast('Data berhasil disimpan!', 'success'); doSearch(); } else { toast(res.error, 'error'); } }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data'; toast('Gagal: ' + err.message, 'error'); })[_editingId ? 'editData' : 'addData'](row, activeUsername, _originalKoordinat);
+
+  // PERBAIKAN BUG EDIT: Saat mode edit dan user tidak mengubah koordinat,
+  // gunakan koordinat asli persis sebagaimana tersimpan di database (tanpa
+  // normalisasi/trim) agar backend dapat menemukan baris yang dimaksud.
+  var koordValue = g('f_koordinat');
+  if (_editingId && _originalKoordinat) {
+    var origTrim = String(_originalKoordinat).trim();
+    if (koordValue === origTrim) {
+      koordValue = _originalKoordinat; // pakai format asli persis
+    }
+  }
+
+  var row = [ g('f_id'), g('f_sumber'), g('f_hp'), koordValue, g('f_alamat'), g('f_kota'), g('f_provinsi'), g('f_objek'), g('f_tipe'), g('f_legalitas'), num('f_lt'), num('f_lb'), num('f_tahunBangun'), g('f_harga'), num('f_frontage'), g('f_lokasi'), g('f_posisi'), g('f_bentuk'), g('f_kontur'), num('f_row'), num('f_elevasi'), g('f_statusHarga'), g('f_waktuData'), g('f_tujuan'), g('f_peruntukan'), g('f_indikasi'), finalFoto ];
+
+  function _resetBtn() {
+    btn.disabled = false;
+    btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data';
+  }
+
+  // Daftar variasi koordinat asli yang akan dicoba secara berurutan
+  // untuk menangani perbedaan format penyimpanan (spasi/format desimal).
+  function _coordVariants(coord) {
+    var variants = [];
+    if (!coord) return variants;
+    var raw = String(coord);
+    var trimmed = raw.trim();
+    var noSpace = trimmed.replace(/\s+/g, '');
+    var withSpace = noSpace.replace(/,/, ', ');
+    [raw, trimmed, noSpace, withSpace].forEach(function(v){
+      if (v && variants.indexOf(v) === -1) variants.push(v);
+    });
+    return variants;
+  }
+
+  if (_editingId) {
+    var variants = _coordVariants(_originalKoordinat);
+    if (variants.length === 0) variants.push(_originalKoordinat || '');
+
+    function tryEdit(idx) {
+      if (idx >= variants.length) {
+        _resetBtn();
+        toast('Data tidak ditemukan di server. Coba muat ulang lalu edit kembali.', 'error');
+        return;
+      }
+      GAS.script.run.withSuccessHandler(function (res) {
+        if (res && res.success) {
+          _resetBtn();
+          closeModal();
+          toast('Data berhasil disimpan!', 'success');
+          doSearch();
+        } else if (res && res.error && /tidak ditemukan/i.test(res.error) && idx + 1 < variants.length) {
+          // Coba format koordinat berikutnya
+          tryEdit(idx + 1);
+        } else {
+          _resetBtn();
+          toast((res && res.error) || 'Gagal menyimpan data.', 'error');
+        }
+      }).withFailureHandler(function (err) {
+        _resetBtn();
+        toast('Gagal: ' + err.message, 'error');
+      }).editData(row, activeUsername, variants[idx]);
+    }
+
+    tryEdit(0);
+  } else {
+    GAS.script.run.withSuccessHandler(function (res) {
+      _resetBtn();
+      if (res && res.success) {
+        closeModal();
+        toast('Data berhasil disimpan!', 'success');
+        doSearch();
+      } else {
+        toast((res && res.error) || 'Gagal menyimpan data.', 'error');
+      }
+    }).withFailureHandler(function (err) {
+      _resetBtn();
+      toast('Gagal: ' + err.message, 'error');
+    }).addData(row, activeUsername);
+  }
 }
 
 function exportData() {
