@@ -507,7 +507,31 @@ body.mmode-picking .mpick-hint { display: flex; }
   line-height: 1.3;
   letter-spacing: .2px;
 }
-/* ----------------------------- */  
+/* ----------------------------- */
+
+/* Tombol OSM Toggle di Measurement */
+.mmap-osm-toggle {
+  background: rgba(22,163,74,.85); color: #fff; border: none;
+  border-radius: 8px; padding: 7px 14px; font-size: 12px;
+  font-family: var(--font); font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  backdrop-filter: blur(8px); transition: all .2s;
+}
+.mmap-osm-toggle:hover { background: rgba(22,163,74,1); }
+.mmap-osm-toggle.active { background: rgba(37,99,235,.9); }
+.mmap-osm-toggle.active:hover { background: rgba(37,99,235,1); }
+
+#measureOsmMap {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; display: none;
+}
+#measureOsmMap.active { display: block; }
+
+/* Leaflet popup di measurement OSM */
+#measureOsmMap .leaflet-popup-content-wrapper { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+#measureOsmMap .leaflet-popup-content { margin: 0; padding: 0; width: auto !important; }
+
+/* Garis lurus OSM measurement */
+.measure-osm-line { stroke: #1a73e8; stroke-width: 3; stroke-dasharray: 8 6; }
 </style>
 </head>
 <body>
@@ -994,6 +1018,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   <!-- Peta Measurement -->
   <div class="measure-map-wrap">
     <div id="measureMap"></div>
+    <div id="measureOsmMap"></div>
 
     <div class="mroute-loading" id="mRouteLoading"><div class="dotspin"></div><span id="mRouteLoadingTxt">Menghitung rute…</span></div>
 
@@ -1010,6 +1035,10 @@ body.mmode-picking .mpick-hint { display: flex; }
       <button class="mmap-close" onclick="closeMeasurement()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Tutup
+      </button>
+      <button class="mmap-osm-toggle" id="btnMeasureOsm" onclick="toggleMeasureOSM()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        OpenStreetMap
       </button>
     </div>
 
@@ -2765,6 +2794,243 @@ function _mRedraw() {
     }
   }
 }
+
+// ═══════════════════════════ MEASUREMENT OSM TOGGLE ═══════════════════════════
+var _mOsmActive = false;       // Status: apakah sedang mode OSM
+var _mOsmMap = null;           // Instance Leaflet map
+var _mOsmInited = false;       // Sudah init?
+var _mOsmMarkers = [];         // Leaflet markers
+var _mOsmLines = [];           // Leaflet polylines (garis lurus)
+var _mOsmLabels = [];          // Leaflet label popups
+
+function toggleMeasureOSM() {
+  _mOsmActive = !_mOsmActive;
+  var btn = document.getElementById('btnMeasureOsm');
+  var gMap = document.getElementById('measureMap');
+  var oMap = document.getElementById('measureOsmMap');
+
+  if (_mOsmActive) {
+    // Switch ke OSM
+    btn.classList.add('active');
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Google Maps';
+    gMap.style.display = 'none';
+    oMap.classList.add('active');
+
+    if (!_mOsmInited) {
+      _mInitMeasureOsm();
+      _mOsmInited = true;
+    } else {
+      _mOsmMap.invalidateSize();
+    }
+    _mOsmRedraw();
+  } else {
+    // Switch kembali ke Google Maps
+    btn.classList.remove('active');
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> OpenStreetMap';
+    oMap.classList.remove('active');
+    gMap.style.display = '';
+
+    if (_mMap) {
+      google.maps.event.trigger(_mMap, 'resize');
+    }
+    _mRedraw(); // redraw Google Maps measurement
+  }
+}
+
+function _mInitMeasureOsm() {
+  var el = document.getElementById('measureOsmMap');
+  if (!el || !window.L) return;
+
+  _mOsmMap = L.map(el, {
+    center: [-6.2, 106.816],
+    zoom: 14,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(_mOsmMap);
+
+  // Klik pada peta OSM untuk pick koordinat
+  _mOsmMap.on('click', function(e) {
+    if (_mPickTarget === null) return;
+    var id = _mPickTarget;
+    document.getElementById('mCoord_' + id).value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+    mCancelPick();
+    _mProcess(id);
+    _mOsmRedraw();
+  });
+
+  setTimeout(function() { _mOsmMap.invalidateSize(); }, 200);
+}
+
+// Bersihkan semua layer OSM measurement
+function _mOsmClearLayers() {
+  _mOsmMarkers.forEach(function(m) { if (_mOsmMap) _mOsmMap.removeLayer(m); });
+  _mOsmLines.forEach(function(l) { if (_mOsmMap) _mOsmMap.removeLayer(l); });
+  _mOsmLabels.forEach(function(l) { if (_mOsmMap) _mOsmMap.removeLayer(l); });
+  _mOsmMarkers = [];
+  _mOsmLines = [];
+  _mOsmLabels = [];
+}
+
+// Buat marker icon SVG untuk OSM
+function _mOsmMakeIcon(color, label, isObj) {
+  var s = isObj ? 42 : 36;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+s+'" height="'+(s+8)+'" viewBox="0 0 '+s+' '+(s+8)+'">'
+    +'<ellipse cx="'+(s/2)+'" cy="'+(s+5)+'" rx="'+(s*0.18)+'" ry="3" fill="rgba(0,0,0,.3)"/>'
+    +'<path d="M'+(s/2)+' 0 C'+(s*.22)+' 0 0 '+(s*.22)+' 0 '+(s/2)+' C0 '+(s*.78)+' '+(s/2)+' '+s+' '+(s/2)+' '+s+' C'+(s/2)+' '+s+' '+s+' '+(s*.78)+' '+s+' '+(s/2)+' C'+s+' '+(s*.22)+' '+(s*.78)+' 0 '+(s/2)+' 0z" fill="'+color+'" stroke="white" stroke-width="2"/>'
+    +'<circle cx="'+(s/2)+'" cy="'+(s/2)+'" r="'+(s/2*.45)+'" fill="white" opacity=".95"/>'
+    +'<text x="'+(s/2)+'" y="'+(s/2+3)+'" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="800" fill="'+color+'">'+label+'</text>'
+    +'</svg>';
+
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [s, s + 8],
+    iconAnchor: [s / 2, s + 8],
+    popupAnchor: [0, -(s + 8)]
+  });
+}
+
+// Redraw semua titik dan garis lurus di OSM measurement
+function _mOsmRedraw() {
+  if (!_mOsmMap || !_mOsmActive) return;
+  _mOsmClearLayers();
+
+  var sumEl = document.getElementById('mSummary');
+  var sumRows = document.getElementById('mSummaryRows');
+  if (sumRows) sumRows.innerHTML = '';
+
+  var cObj = _mParse(document.getElementById('mCoord_obj').value);
+  var bounds = [];
+  var summaryData = [];
+
+  // Marker OBJ
+  if (cObj) {
+    var mObj = L.marker([cObj.lat, cObj.lng], { icon: _mOsmMakeIcon('#db4437', 'OBJ', true), zIndexOffset: 1000 }).addTo(_mOsmMap);
+    _mOsmMarkers.push(mObj);
+    bounds.push([cObj.lat, cObj.lng]);
+  }
+
+  // Marker DP + garis lurus
+  _mDpIds.forEach(function(id) {
+    var inp = document.getElementById('mCoord_' + id);
+    var coord = _mParse(inp.value);
+    var distEl = document.getElementById('mDist_' + id);
+    if (!coord) { if (distEl) distEl.textContent = '–'; return; }
+
+    var color = _mRouteColors[id] || '#1a73e8';
+    var mDp = L.marker([coord.lat, coord.lng], { icon: _mOsmMakeIcon('#db4437', 'DP' + id, false), zIndexOffset: 500 }).addTo(_mOsmMap);
+    _mOsmMarkers.push(mDp);
+    bounds.push([coord.lat, coord.lng]);
+
+    // Hitung jarak garis lurus (haversine)
+    if (cObj) {
+      var km = _mHaversine(cObj.lat, cObj.lng, coord.lat, coord.lng);
+      var meters = km * 1000;
+      var ds = _mFmtDist(km);
+      if (distEl) distEl.textContent = ds + ' (lurus)';
+
+      // Gambar garis lurus (polyline dashed)
+      var line = L.polyline([[cObj.lat, cObj.lng], [coord.lat, coord.lng]], {
+        color: color,
+        weight: 4,
+        opacity: 0.85,
+        dashArray: '10 6'
+      }).addTo(_mOsmMap);
+      _mOsmLines.push(line);
+
+      // Label jarak di tengah garis
+      var midLat = (cObj.lat + coord.lat) / 2;
+      var midLng = (cObj.lng + coord.lng) / 2;
+      var labelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
+        + '<div class="mdl-title">DP ' + id + '</div>'
+        + '<div class="mdl-pill">' + ds + '</div></div>';
+      var labelIcon = L.divIcon({
+        html: labelHtml,
+        className: '',
+        iconSize: [100, 40],
+        iconAnchor: [50, 20]
+      });
+      var labelMarker = L.marker([midLat, midLng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
+      _mOsmLabels.push(labelMarker);
+
+      summaryData.push({ id: id, dist: ds + ' (lurus)', meters: meters, color: color });
+    }
+  });
+
+  // Ringkasan
+  if (summaryData.length > 0) {
+    sumEl.style.display = 'block';
+    summaryData.sort(function(a, b) { return a.meters - b.meters; });
+    sumRows.innerHTML = summaryData.map(function(r) {
+      return '<div class="msb-sum-row">'
+        + '<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + r.color + ';"></span> DP ' + r.id + '</span>'
+        + '<span class="msb-sum-val">' + r.dist + '</span>'
+        + '</div>';
+    }).join('');
+  } else {
+    sumEl.style.display = 'none';
+  }
+
+  // Fit bounds
+  if (bounds.length > 1) {
+    _mOsmMap.fitBounds(bounds, { padding: [60, 60] });
+  } else if (bounds.length === 1) {
+    _mOsmMap.setView(bounds[0], 17);
+  }
+}
+
+// Override _mRedraw asli agar juga redraw OSM ketika input berubah
+var _mRedrawOriginal = _mRedraw;
+// Patch mptBlur & mptClear agar juga redraw OSM
+var _origMptBlur = mptBlur;
+mptBlur = function(id) {
+  _mProcess(id);
+  if (_mOsmActive) { _mOsmRedraw(); }
+  else { _mRedraw(); }
+};
+var _origMptClear = mptClear;
+mptClear = function(id) {
+  var inp = document.getElementById('mCoord_' + id);
+  if (inp) { inp.value = ''; inp.className = 'mpt-input'; }
+  var card = document.getElementById('mpCard_' + id);
+  if (card) card.classList.remove('has-val');
+  if (id !== 'obj') { var d = document.getElementById('mDist_' + id); if (d) d.textContent = '–'; }
+  if (_mOsmActive) { _mOsmRedraw(); }
+  else { _mRedraw(); }
+};
+var _origMResetAll = mResetAll;
+mResetAll = function() {
+  ['obj'].concat(_mDpIds).forEach(function(id) {
+    var inp = document.getElementById('mCoord_' + id);
+    if (inp) { inp.value = ''; inp.className = 'mpt-input'; }
+    var card = document.getElementById('mpCard_' + id);
+    if (card) card.classList.remove('has-val');
+    if (id !== 'obj') { var d = document.getElementById('mDist_' + id); if (d) d.textContent = '–'; }
+  });
+  if (_mOsmActive) { _mOsmRedraw(); }
+  else { _mRedraw(); }
+};
+
+// Patch map click saat OSM mode aktif - cancel pick juga di OSM
+var _origOpenMeasurement = openMeasurement;
+openMeasurement = function() {
+  document.getElementById('measureOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(function() {
+    if (_mOsmActive) {
+      if (!_mOsmInited) { _mInitMeasureOsm(); _mOsmInited = true; }
+      else { _mOsmMap.invalidateSize(); }
+      _mOsmRedraw();
+    } else {
+      if (!_mMapInited) { _mInitMap(); _mMapInited = true; }
+      else if (_mMap) { google.maps.event.trigger(_mMap, 'resize'); }
+    }
+  }, 150);
+};
 
 // ═══════════════════════════════════════════════════════════
 
