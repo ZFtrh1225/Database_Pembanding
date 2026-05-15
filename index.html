@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <!-- Google Maps loaded via script tag below -->
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBSJYYcFB2DHu4VNTWWQl3y5dp0bp4phbA&libraries=geometry,visualization,marker&loading=async"></script>
@@ -116,6 +118,9 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .content-area { flex: 1; position: relative; overflow: hidden; background: #e8ecf0; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
 #map.map-hidden { display: none; }
+#osmMap { z-index: 1; }
+#osmMap .leaflet-control-attribution { font-size: 9px; }
+.mode-active { background: var(--navy) !important; color: #fff !important; border-color: var(--navy) !important; }
 .map-loading { position: absolute; inset: 0; background: #e8ecf0; display: flex; flex-direction:column; align-items: center; justify-content:center; z-index: 5; }
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; margin-bottom:10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -648,7 +653,8 @@ body.mmode-picking .mpick-hint { display: flex; }
       <div class="view-toggle">
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
         <button class="btn-view" id="btnHeatmap" onclick="toggleHeatmap()" style="color:#ea4335; border-color:#ea4335;">🔥 Heatmap</button>
-        <button class="btn-view" id="btn3D" onclick="toggle3D()" style="color:#2d6be4; border-color:#2d6be4; font-weight:bold;">🏙️ 3D Twin</button>
+        <button class="btn-view active" id="btnModeGmaps" onclick="switchMapMode('gmaps')" style="color:#4285f4; border-color:#4285f4; font-weight:bold;">🌐 Google Maps</button>
+        <button class="btn-view" id="btnModeOSM" onclick="switchMapMode('osm')" style="color:#2d6be4; border-color:#2d6be4; font-weight:bold;">🗺️ OpenStreetMap</button>
         <button class="btn-view active" id="btnViewMap" onclick="setView('map')">🗺 Peta</button>
         <button class="btn-view" id="btnViewTable" onclick="setView('table')">☰ Tabel</button>
       </div>
@@ -658,6 +664,7 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div class="content-area">
       <div class="map-loading" id="mapLoading"><div class="spinner"></div><div style="color:#5a6a7e;font-size:12px;">Memuat peta…</div></div>
       <div id="map"></div>
+      <div id="osmMap" style="position:absolute; inset:0; width:100%; height:100%; z-index:1; display:none;"></div>
       <div class="table-view" id="tableView">
         <table class="data-table">
           <thead>
@@ -1158,7 +1165,128 @@ function startDrawingPolygon() {
 function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
 
 function toggle3D() {
-  toast('Fitur 3D hanya tersedia pada Google Earth. Gunakan tombol Satelit pada peta.', 'error');
+  // Legacy — replaced by switchMapMode
+}
+
+var _currentMapMode = 'gmaps'; // 'gmaps' or 'osm'
+var _osmMap = null;
+var _osmMarkers = [];
+
+function switchMapMode(mode) {
+  if (mode === _currentMapMode) return;
+  _currentMapMode = mode;
+
+  var gmapEl = document.getElementById('map');
+  var osmEl = document.getElementById('osmMap');
+  var btnGmaps = document.getElementById('btnModeGmaps');
+  var btnOSM = document.getElementById('btnModeOSM');
+
+  if (mode === 'osm') {
+    // Switch to OpenStreetMap
+    gmapEl.style.display = 'none';
+    osmEl.style.display = 'block';
+    btnGmaps.classList.remove('active');
+    btnOSM.classList.add('active');
+
+    if (!_osmMap) {
+      _osmMap = L.map('osmMap', { zoomControl: true }).setView([-6.175, 106.827], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(_osmMap);
+    }
+
+    // Sync center from Google Maps
+    if (gMap) {
+      var center = gMap.getCenter();
+      var zoom = gMap.getZoom();
+      _osmMap.setView([center.lat(), center.lng()], zoom);
+    }
+
+    // Sync markers
+    _syncMarkersToOSM();
+
+    setTimeout(function() { _osmMap.invalidateSize(); }, 100);
+    toast('Mode: OpenStreetMap aktif', 'success');
+
+  } else {
+    // Switch to Google Maps
+    osmEl.style.display = 'none';
+    gmapEl.style.display = 'block';
+    btnOSM.classList.remove('active');
+    btnGmaps.classList.add('active');
+
+    // Sync center from OSM
+    if (_osmMap && gMap) {
+      var osmCenter = _osmMap.getCenter();
+      var osmZoom = _osmMap.getZoom();
+      gMap.setCenter({ lat: osmCenter.lat, lng: osmCenter.lng });
+      gMap.setZoom(osmZoom);
+    }
+
+    if (gMap) setTimeout(function() { google.maps.event.trigger(gMap, 'resize'); }, 100);
+    toast('Mode: Google Maps aktif', 'success');
+  }
+}
+
+function _syncMarkersToOSM() {
+  if (!_osmMap) return;
+  // Clear existing OSM markers
+  _osmMarkers.forEach(function(m) { _osmMap.removeLayer(m); });
+  _osmMarkers = [];
+
+  if (!currentData || currentData.length === 0) return;
+
+  var colorMap = {
+    'Tanah Kosong': '#4285f4',
+    'Tanah Bangunan': '#0f9d58',
+    'Ruko': '#ab47bc',
+    'Office/Retail/Unit Apartemen': '#f4b400'
+  };
+
+  currentData.forEach(function(row) {
+    var coord = _parseCoordJS(row.koordinat);
+    if (!coord) return;
+
+    var color = colorMap[row.objek] || '#1e3a5f';
+    var icon = L.divIcon({
+      className: 'osm-custom-marker',
+      html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
+    var marker = L.marker([coord.lat, coord.lng], { icon: icon });
+    
+    var popupContent = '<div style="font-family:Plus Jakarta Sans,sans-serif;font-size:12px;min-width:200px;">' +
+      '<div style="background:#1e3a5f;color:#fff;padding:6px 10px;border-radius:6px 6px 0 0;font-weight:700;font-size:11px;">' + (row.id || '-') + ' — ' + (row.objek || '-') + '</div>' +
+      '<div style="padding:8px 10px;">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#5a6a7e;">Alamat:</span><span style="font-weight:600;text-align:right;max-width:140px;overflow:hidden;text-overflow:ellipsis;">' + (row.alamat || '-') + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#5a6a7e;">LT/LB:</span><span style="font-weight:600;">' + (row.luasTanah || '-') + ' / ' + (row.luasBangunan || '-') + ' m²</span></div>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#5a6a7e;">Harga:</span><span style="font-weight:600;color:#16a34a;">' + (row.harga || '-') + '</span></div>' +
+      '<div style="display:flex;justify-content:space-between;"><span style="color:#5a6a7e;">Ind. Nilai/m²:</span><span style="font-weight:600;color:#2d6be4;">' + (row.indikasiNilai || '-') + '</span></div>' +
+      '</div></div>';
+
+    marker.bindPopup(popupContent, { maxWidth: 280 });
+    marker.addTo(_osmMap);
+    _osmMarkers.push(marker);
+  });
+
+  // Also add center marker if search was done
+  var inputSearch = document.getElementById('mapSearch').value.split(',');
+  if (inputSearch.length === 2 && !isNaN(parseFloat(inputSearch[0])) && !isNaN(parseFloat(inputSearch[1]))) {
+    var cLat = parseFloat(inputSearch[0]);
+    var cLng = parseFloat(inputSearch[1]);
+    var centerIcon = L.divIcon({
+      className: 'osm-center-marker',
+      html: '<div style="width:18px;height:18px;border-radius:50%;background:#db4437;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+    var cm = L.marker([cLat, cLng], { icon: centerIcon }).addTo(_osmMap);
+    cm.bindPopup('<div style="font-family:Plus Jakarta Sans,sans-serif;font-size:12px;font-weight:700;color:#db4437;">📍 Lokasi Aset / Pusat Pencarian</div>');
+    _osmMarkers.push(cm);
+  }
 }
 
 function calculateSidebarStats(data) {
@@ -1754,6 +1882,9 @@ function renderMarkers(data, params) {
       gMap.fitBounds(bounds, 50); 
     }
   }
+
+  // Sync to OSM if in OSM mode
+  if (_currentMapMode === 'osm') { _syncMarkersToOSM(); }
 }
 
 function moveFoto(btn, dir, max) { var container = btn.parentElement, slider = container.querySelector('.iw-foto-slider'), countBadge = container.querySelector('.iw-foto-count'); var currentIdx = parseInt(slider.getAttribute('data-idx') || '0'); var newIdx = currentIdx + dir; if (newIdx < 0) newIdx = max - 1; if (newIdx >= max) newIdx = 0; slider.setAttribute('data-idx', newIdx); slider.style.transform = 'translateX(-' + (newIdx * 100) + '%)'; countBadge.textContent = (newIdx + 1) + '/' + max; }
@@ -1935,7 +2066,7 @@ function geocodeLocation() {
     .catch(function (e) { toast('Gagal geocode: ' + e.message, 'error'); });
 }
 
-function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), tableEl = document.getElementById('tableView'); if (v === 'map') { mapEl.style.display = 'block'; tableEl.classList.remove('active'); if (gMap) setTimeout(function () { google.maps.event.trigger(gMap, 'resize'); }, 50); } else { mapEl.style.display = 'none'; tableEl.classList.add('active'); } }
+function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), osmEl = document.getElementById('osmMap'), tableEl = document.getElementById('tableView'); if (v === 'map') { if (_currentMapMode === 'gmaps') { mapEl.style.display = 'block'; osmEl.style.display = 'none'; } else { mapEl.style.display = 'none'; osmEl.style.display = 'block'; } tableEl.classList.remove('active'); if (_currentMapMode === 'gmaps' && gMap) setTimeout(function () { google.maps.event.trigger(gMap, 'resize'); }, 50); if (_currentMapMode === 'osm' && _osmMap) setTimeout(function () { _osmMap.invalidateSize(); }, 50); } else { mapEl.style.display = 'none'; osmEl.style.display = 'none'; tableEl.classList.add('active'); } }
 function resetFilter() { document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; toast('Filter direset', ''); }
 
 function openModalNew() { _editingId = null; _editingFoto = ''; _originalKoordinat = null; document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding'; document.getElementById('f_id').disabled = false; document.getElementById('btnSubmit').textContent = '💾 Simpan Data'; document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; document.querySelectorAll('.modal .form-input, .modal .form-select').forEach(function(i) { i.value = ''; }); removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
