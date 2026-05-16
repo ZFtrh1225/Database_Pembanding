@@ -2907,11 +2907,24 @@ function _mOsmRedraw() {
   var bounds = [];
   var summaryData = [];
 
-  // Marker OBJ
+  // Marker OBJ + label "Objek Penilaian"
   if (cObj) {
     var mObj = L.marker([cObj.lat, cObj.lng], { icon: _mOsmMakeIcon('#db4437', 'OBJ', true), zIndexOffset: 1000 }).addTo(_mOsmMap);
     _mOsmMarkers.push(mObj);
     bounds.push([cObj.lat, cObj.lng]);
+
+    // Label "Objek Penilaian" di atas pin OBJ
+    var objLabelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
+      + '<div class="mdl-title">Objek Penilaian</div>'
+      + '<div class="mdl-pill" style="background:#db4437;color:#fff;">OBJ</div></div>';
+    var objLabelIcon = L.divIcon({
+      html: objLabelHtml,
+      className: '',
+      iconSize: [120, 44],
+      iconAnchor: [60, 88]
+    });
+    var objLabel = L.marker([cObj.lat, cObj.lng], { icon: objLabelIcon, interactive: false, zIndexOffset: 3000 }).addTo(_mOsmMap);
+    _mOsmLabels.push(objLabel);
   }
 
   // Marker DP + garis lurus
@@ -2942,19 +2955,17 @@ function _mOsmRedraw() {
       }).addTo(_mOsmMap);
       _mOsmLines.push(line);
 
-      // Label jarak di tengah garis
-      var midLat = (cObj.lat + coord.lat) / 2;
-      var midLng = (cObj.lng + coord.lng) / 2;
+      // Label jarak di atas pin DP (bukan di tengah garis)
       var labelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
-        + '<div class="mdl-title">DP ' + id + '</div>'
+        + '<div class="mdl-title">Data ' + id + '</div>'
         + '<div class="mdl-pill">' + ds + '</div></div>';
       var labelIcon = L.divIcon({
         html: labelHtml,
         className: '',
-        iconSize: [100, 40],
-        iconAnchor: [50, 20]
+        iconSize: [100, 44],
+        iconAnchor: [50, 88]
       });
-      var labelMarker = L.marker([midLat, midLng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
+      var labelMarker = L.marker([coord.lat, coord.lng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
       _mOsmLabels.push(labelMarker);
 
       summaryData.push({ id: id, dist: ds + ' (lurus)', meters: meters, color: color });
@@ -2967,7 +2978,7 @@ function _mOsmRedraw() {
     summaryData.sort(function(a, b) { return a.meters - b.meters; });
     sumRows.innerHTML = summaryData.map(function(r) {
       return '<div class="msb-sum-row">'
-        + '<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + r.color + ';"></span> DP ' + r.id + '</span>'
+        + '<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + r.color + ';"></span> Data ' + r.id + '</span>'
         + '<span class="msb-sum-val">' + r.dist + '</span>'
         + '</div>';
     }).join('');
