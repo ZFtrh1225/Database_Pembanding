@@ -149,6 +149,15 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .harga-cell { font-family: var(--font); font-size: 11px; color: var(--green); font-weight: 600; }
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-sub); }
 
+/* TABEL DETAIL DATA (modal Lihat Data) */
+.detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.detail-table tr { border-bottom: 1px solid var(--border); }
+.detail-table tr:last-child { border-bottom: none; }
+.detail-table tr:nth-child(even) { background: #f8fafc; }
+.detail-table th { width: 42%; text-align: left; padding: 9px 12px; color: var(--text-sub); font-weight: 600; font-size: 11.5px; vertical-align: top; }
+.detail-table td { padding: 9px 12px; color: var(--text); font-weight: 600; word-break: break-word; vertical-align: top; }
+.detail-table td.harga-cell { color: var(--green); font-family: var(--font); }
+
 /* Google Maps InfoWindow styling */
 .gm-style-iw { max-width: 340px !important; }
 .gm-style-iw-d { overflow: auto !important; max-height: 400px !important; }
@@ -829,6 +838,22 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div class="modal-footer" style="justify-content: flex-end; align-items: center; background: #fafafa;">
         <button class="btn-submit" onclick="closeAnalyticsModal()" style="width: auto; background:transparent; color:var(--text-sub); border:1px solid var(--border); margin-right:5px;">Tutup</button>
         <button class="btn-submit" onclick="downloadAVMPDF()" style="width: auto; background:#f4b400; color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Unduh Laporan SBM</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LIHAT DATA (DETAIL) -->
+<div class="modal-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetailModal()">
+  <div class="modal" style="max-width: 580px;">
+    <div class="modal-header">
+      <div class="modal-title">👁 Detail Data Pembanding</div>
+      <button class="btn-close" onclick="closeDetailModal()">×</button>
+    </div>
+    <div class="modal-body" id="detailBody" style="padding: 0;">
+      <!-- Tabel vertikal di-render oleh openDetailModal() -->
+    </div>
+    <div class="modal-footer" style="background: #fafafa;">
+      <button class="btn-submit" onclick="closeDetailModal()" style="width: auto; background:transparent; color:var(--text-sub); border:1px solid var(--border);">Tutup</button>
     </div>
   </div>
 </div>
@@ -2139,7 +2164,7 @@ function renderTable(data) {
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state"><p>Tidak ada data sesuai filter</p></td></tr>'; return; }
   function bc(obj) { if (obj === 'Tanah Bangunan') return 'badge-tanah-bangunan'; if (obj === 'Tanah Kosong') return 'badge-tanah-kosong'; if (obj === 'Ruko') return 'badge-ruko'; return 'badge-office'; }
   function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
-  tbody.innerHTML = data.map(function (row) { return '<tr><td>' + f(row.id) + '</td><td><button onclick="toggleCompare(\'' + row._uid + '\')" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;">⚖️</button></td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>'; }).join('');
+  tbody.innerHTML = data.map(function (row) { return '<tr><td>' + f(row.id) + '</td><td style="white-space:nowrap;"><button onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;margin-right:4px;">⚖️</button><button onclick="openDetailModal(\'' + row._uid + '\')" title="Lihat Data" style="cursor:pointer;background:#1e3a5f;color:white;border:none;border-radius:4px;padding:4px 8px;">👁</button></td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>'; }).join('');
 }
 
 function geocodeLocation() {
@@ -2158,6 +2183,63 @@ function resetFilter() { document.querySelectorAll('.cb-item').forEach(function 
 function openModalNew() { _editingId = null; _editingFoto = ''; _originalKoordinat = null; document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding'; document.getElementById('f_id').disabled = false; document.getElementById('btnSubmit').textContent = '💾 Simpan Data'; document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; document.querySelectorAll('.modal .form-input, .modal .form-select').forEach(function(i) { i.value = ''; }); removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
 function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; document.getElementById('f_objek').value = row.objek; document.getElementById('f_tipe').value = row.tipeBangunan; document.getElementById('f_legalitas').value = row.legalitas; document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; document.getElementById('f_statusHarga').value = row.statusHarga; document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); removeFoto(); }
+
+/* ============== FITUR LIHAT DATA (DETAIL MODAL) ============== */
+function openDetailModal(uid) {
+  var row = (currentData || []).find(function (r) { return r._uid === uid; });
+  if (!row) { toast('Data tidak ditemukan', 'error'); return; }
+
+  function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '–') ? String(v).trim() : '–'; }
+  function unit(v, u) { var t = f(v); return t === '–' ? '–' : (t + ' ' + u); }
+  function rp(v) { return formatRupiah(v); }
+
+  // Urutan field sesuai permintaan user
+  var fields = [
+    { label: 'ID',                  val: f(row.id) },
+    { label: 'Sumber',              val: f(row.sumber) },
+    { label: 'HP',                  val: f(row.hp) },
+    { label: 'Koordinat',           val: f(row.koordinat) },
+    { label: 'Alamat',              val: f(row.alamat) },
+    { label: 'Kota',                val: f(row.kota) },
+    { label: 'Provinsi',            val: f(row.provinsi) },
+    { label: 'Objek',               val: f(row.objek) },
+    { label: 'Tipe Bangunan',       val: f(row.tipeBangunan) },
+    { label: 'Legalitas',           val: f(row.legalitas) },
+    { label: 'Luas Tanah',          val: unit(row.luasTanah, 'm²') },
+    { label: 'Luas Bangunan',       val: unit(row.luasBangunan, 'm²') },
+    { label: 'Tahun Bangun',        val: f(row.tahunBangun) },
+    { label: 'Harga',               val: rp(row.harga),         harga: true },
+    { label: 'Frontage',            val: unit(row.frontage, 'm') },
+    { label: 'Lokasi',              val: f(row.lokasi) },
+    { label: 'Posisi',              val: f(row.posisi) },
+    { label: 'Bentuk',              val: f(row.bentuk) },
+    { label: 'Kontur',              val: f(row.kontur) },
+    { label: 'Lebar Jalan (ROW)',   val: unit(row.lebarJalanROW, 'm') },
+    { label: 'Elevasi',             val: unit(row.elevasi, 'm') },
+    { label: 'Status Harga',        val: f(row.statusHarga) },
+    { label: 'Waktu Data',          val: f(row.waktuData) },
+    { label: 'Tujuan Penilaian',    val: f(row.tujuanPenilaian) },
+    { label: 'Peruntukan',          val: f(row.peruntukan) },
+    { label: 'Indikasi Nilai /m²',  val: rp(row.indikasiNilai), harga: true }
+  ];
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  var rowsHtml = fields.map(function (it) {
+    var tdClass = it.harga ? ' class="harga-cell"' : '';
+    return '<tr><th>' + esc(it.label) + '</th><td' + tdClass + '>' + esc(it.val) + '</td></tr>';
+  }).join('');
+
+  document.getElementById('detailBody').innerHTML =
+    '<table class="detail-table"><tbody>' + rowsHtml + '</tbody></table>';
+
+  document.getElementById('detailOverlay').classList.add('open');
+}
+
+function closeDetailModal() {
+  document.getElementById('detailOverlay').classList.remove('open');
+}
+/* ============================================================ */
 
 function submitData() {
   function g(id) { return document.getElementById(id).value.trim(); } function num(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
