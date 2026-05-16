@@ -530,8 +530,8 @@ body.mmode-picking .mpick-hint { display: flex; }
 #measureOsmMap .leaflet-popup-content-wrapper { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
 #measureOsmMap .leaflet-popup-content { margin: 0; padding: 0; width: auto !important; }
 
-/* Garis lurus OSM measurement — lebih kontras */
-.measure-osm-line { stroke: #0033ff; stroke-width: 5; stroke-dasharray: 12 8; }
+/* Garis lurus OSM measurement — fallback warna kontras (jika tanpa inline) */
+.measure-osm-line { stroke: #e60023; stroke-width: 6; stroke-dasharray: 14 8; }
 </style>
 </head>
 <body>
@@ -2492,7 +2492,8 @@ var _mDpIds  = ['1','2','3','4','5','6'];
 
 // Warna pin & rute per ID — warna lebih kontras & tebal agar terlihat jelas
 var _mColors = { obj:'#db4437','1':'#db4437','2':'#db4437','3':'#db4437','4':'#db4437','5':'#db4437','6':'#db4437' };
-var _mRouteColors = { '1':'#0033ff','2':'#e6005c','3':'#ff8c00','4':'#8b00ff','5':'#00b341','6':'#cc0000' };
+// Warna garis rute (Google Maps) & garis putus-putus (OSM) — saturasi tinggi & kontras tinggi
+var _mRouteColors = { '1':'#e60023','2':'#0066ff','3':'#ff6600','4':'#9c00ff','5':'#00a020','6':'#ff0088' };
 
 function openMeasurement() {
   document.getElementById('measureOverlay').classList.add('open');
@@ -2648,21 +2649,20 @@ function _mMakePin(coord, color, label, isObj) {
   return marker;
 }
 
-// ── LABEL JARAK DI TENGAH GARIS (antara OBJ dan DP) ───────────────────────────
+// ── LABEL JARAK DI ATAS PIN DP (Google Maps) ─────────────────────────────
 function _mMakeLabel(coord, dpId, ds, objCoord) {
   if (!_mMap) return null;
-  // Hitung titik tengah antara OBJ dan DP untuk menempatkan label di tengah garis
+  // Label ditempatkan tepat di atas pin DP (bukan di tengah garis)
   var labelCoord = coord;
-  if (objCoord) {
-    labelCoord = { lat: (objCoord.lat + coord.lat) / 2, lng: (objCoord.lng + coord.lng) / 2 };
-  }
   // Pakai OverlayView agar HTML kustom bisa ditempatkan di koordinat
   var overlay = new google.maps.OverlayView();
   overlay.onAdd = function() {
     var div = document.createElement('div');
     div.className = 'mdist-label';
     div.style.position = 'absolute';
-    div.style.transform = 'translate(-50%, -50%)';
+    // Geser ke atas pin: anchor di bawah-tengah label, lalu naik dari titik pin
+    div.style.transform = 'translate(-50%, -100%)';
+    div.style.marginTop = '-52px';
     div.innerHTML = '<div class="mdl-title">Data '+dpId+'</div>'
                   + '<div class="mdl-pill">'+ds+'</div>';
     overlay._div = div;
@@ -2948,8 +2948,9 @@ function _mOsmRedraw() {
     var objLabelIcon = L.divIcon({
       html: objLabelHtml,
       className: '',
-      iconSize: [120, 30],
-      iconAnchor: [60, 60]
+      iconSize: [140, 30],
+      // anchor di tengah-bawah label dengan offset, sehingga label muncul di atas pin OBJ
+      iconAnchor: [70, 88]
     });
     var objLabelMarker = L.marker([cObj.lat, cObj.lng], { icon: objLabelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
     _mOsmLabels.push(objLabelMarker);
@@ -2977,15 +2978,13 @@ function _mOsmRedraw() {
       // Gambar garis lurus (polyline dashed) — warna lebih kontras & tebal
       var line = L.polyline([[cObj.lat, cObj.lng], [coord.lat, coord.lng]], {
         color: color,
-        weight: 5,
+        weight: 6,
         opacity: 1,
-        dashArray: '12 8'
+        dashArray: '14 8'
       }).addTo(_mOsmMap);
       _mOsmLines.push(line);
 
-      // Label jarak di tengah garis dengan keterangan "Data X"
-      var midLat = (cObj.lat + coord.lat) / 2;
-      var midLng = (cObj.lng + coord.lng) / 2;
+      // Label jarak di ATAS pin DP (bukan tengah garis) dengan keterangan "Data X"
       var labelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
         + '<div class="mdl-title">Data ' + id + '</div>'
         + '<div class="mdl-pill">' + ds + ' (lurus)</div></div>';
@@ -2993,9 +2992,10 @@ function _mOsmRedraw() {
         html: labelHtml,
         className: '',
         iconSize: [140, 44],
-        iconAnchor: [70, 22]
+        // anchor di tengah-bawah label, sehingga label muncul di atas pin DP
+        iconAnchor: [70, 96]
       });
-      var labelMarker = L.marker([midLat, midLng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
+      var labelMarker = L.marker([coord.lat, coord.lng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
       _mOsmLabels.push(labelMarker);
 
       summaryData.push({ id: id, dist: ds + ' (lurus)', meters: meters, color: color });
