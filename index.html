@@ -262,6 +262,18 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .audit-table td { padding: 8px; border-bottom: 1px solid var(--border); }
 .audit-row.excluded { background: #fce8e6; opacity: 0.8; }
 .audit-row.excluded td { color: var(--red); }
+
+/* RaLAT v2: badge total adjustment & warning capped */
+.ralat-adj-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:10px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+.ralat-adj-low    { background:#dcfce7; color:#15803d; border:1px solid #86efac; }   /* < 10% */
+.ralat-adj-mid    { background:#fef9c3; color:#a16207; border:1px solid #fde047; }   /* 10–25% */
+.ralat-adj-high   { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }   /* > 25% */
+.ralat-adj-zero   { background:#e2e8f0; color:#475569; border:1px solid #cbd5e1; }   /* 0% / no model */
+.ralat-capped     { color:#dc2626; font-weight:700; }
+.ralat-driver-list { font-size:10px; line-height:1.45; color:#1e3a5f; }
+.ralat-driver-list .pos { color:#15803d; font-weight:700; }
+.ralat-driver-list .neg { color:#dc2626; font-weight:700; }
+.ralat-meta-line { font-size:10px; color:#64748b; margin-top:6px; padding:6px 8px; background:#f8fafc; border-radius:6px; border-left:3px solid #2d6be4; }
 .sbm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 15px; }
 .sbm-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
 .sbm-card input { width: 100%; text-align: center; font-weight: bold; margin-top: 5px; }
@@ -761,6 +773,60 @@ body.mmode-picking .mpick-hint { display: flex; }
           </div>
           <input type="date" id="valuationDateInput" class="form-input" style="width:170px; padding:5px 8px; font-size:12px;" onchange="setValuationDateFromInput(this.value)">
         </div>
+
+        <!-- ============ Karakter Aset Target (RaLAT v2) ============ -->
+        <div id="ralatAsetPanel" style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+            <div style="font-size:11px; color:#0c4a6e; font-weight:700;">
+              🏷️ Karakter Aset Target
+              <span style="color:#5a6a7e; font-weight:500;"> · dipakai oleh RaLAT v2 untuk variabel non-spasial</span>
+            </div>
+            <button type="button" onclick="document.getElementById('ralatAsetBody').classList.toggle('collapsed-body'); this.textContent = this.textContent === '▼' ? '▶' : '▼';" style="background:transparent; border:none; cursor:pointer; color:#0c4a6e; font-size:11px;" title="Sembunyikan/Tampilkan">▼</button>
+          </div>
+          <div id="ralatAsetBody" style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+            <div>
+              <label class="form-label" style="font-size:10px;">Luas Tanah Aset (m²)</label>
+              <input type="number" id="rlAsetLuas" class="form-input" placeholder="cth: 250" min="1" step="1" style="padding:5px 8px; font-size:12px;" oninput="updateAsetTargetMeta()">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Lebar Jalan Depan (m)</label>
+              <input type="number" id="rlAsetROW" class="form-input" placeholder="cth: 6" min="0" step="0.5" style="padding:5px 8px; font-size:12px;" oninput="updateAsetTargetMeta()">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Bentuk Tapak</label>
+              <select id="rlAsetBentuk" class="form-select" style="padding:5px 8px; font-size:12px;" onchange="updateAsetTargetMeta()">
+                <option value="Beraturan">Beraturan</option>
+                <option value="Tidak Beraturan">Tidak Beraturan</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:10px;">Posisi Tapak</label>
+              <select id="rlAsetPosisi" class="form-select" style="padding:5px 8px; font-size:12px;" onchange="updateAsetTargetMeta()">
+                <option value="Tengah">Tengah</option>
+                <option value="Hoek">Hoek (sudut)</option>
+                <option value="Tusuk Sate">Tusuk Sate</option>
+              </select>
+            </div>
+            <div class="span-2" style="grid-column: span 2;">
+              <label class="form-label" style="font-size:10px;">Penggunaan / Peruntukan</label>
+              <select id="rlAsetPeruntukan" class="form-select" style="padding:5px 8px; font-size:12px;" onchange="updateAsetTargetMeta()">
+                <option value="">— Auto (dari mayoritas pembanding) —</option>
+                <option>Pemukiman</option>
+                <option>Perumahan</option>
+                <option>Perdagangan dan Jasa</option>
+                <option>Pemerintahan</option>
+                <option>Industri</option>
+                <option>Pergudangan</option>
+                <option>Perkebunan</option>
+                <option>Ruang Hijau</option>
+              </select>
+            </div>
+          </div>
+          <div id="ralatAsetHint" style="font-size:10px; color:#5a6a7e; margin-top:6px;">
+            Field kosong → variabel terkait di RaLAT akan di-skip untuk pembanding tersebut.
+          </div>
+        </div>
+        <!-- ============ /Karakter Aset Target ============ -->
         <div style="display: flex; justify-content: space-between; align-items:flex-end;">
           <div>
             <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Dasar (Base Case Median)</div>
@@ -830,7 +896,8 @@ body.mmode-picking .mpick-hint { display: flex; }
                 <th style="width:40px; text-align:center;">Pakai</th>
                 <th>ID DP</th>
                 <th>Harga Terkoreksi (m²)</th>
-                <th>Penyesuaian RaLAT (Spasial)</th>
+                <th title="Total adjustment RaLAT (net) untuk pembanding ini">Total Adj %</th>
+                <th>Penyesuaian RaLAT (Top-3 Driver)</th>
                 <th>Status AVM (IQR)</th>
               </tr>
             </thead>
@@ -1196,6 +1263,18 @@ var _avmCurrentMedian = 0;
 var _asetPOIData = null; 
 window.regressionModels = {}; // Global var untuk menyimpan koefisien Ekonometrika
 
+// RaLAT v2: metadata aset target (diisi user di panel "Karakter Aset Target")
+var _asetTargetMeta = {
+  luasTanah:   null,   // angka (m²)
+  lebarJalan:  null,   // angka (m)
+  bentuk:      'Beraturan',
+  posisi:      'Tengah',
+  peruntukan:  ''      // string, default = auto pick dari pembanding
+};
+
+// RaLAT v2: cache hasil engine versi terakhir (untuk PDF & audit drill-down)
+var _ralatLastRun = { region: null, version: null, asetFeats: null, geocodeRes: null };
+
 var _drawingPolygon = false;
 var polyPoints = [];
 var polyLayer = null;
@@ -1498,13 +1577,32 @@ function switchAVMTab(tabName) {
 
 function initAVMAnalysis() {
   if (!currentData || currentData.length === 0) { toast('Lakukan pencarian data terlebih dahulu!', 'error'); return; }
-  
-  // Cek ketersediaan model regresi dari server
-  var modelName = currentData[0].provinsi || "Nasional";
-  var activeModel = window.regressionModels ? window.regressionModels[modelName] : null;
+
+  // ============ RaLAT v2: pilih model region & versi ============
+  // Pakai data pertama sebagai proxy untuk provinsi/kota dataset.
+  var probeRow = currentData[0];
+  var modelRegion = ralatPickModelRegion(probeRow.provinsi, probeRow.kota);
+  var regionMap = (modelRegion && window.regressionModels) ? window.regressionModels[modelRegion] : null;
+  var modelVersion = ralatPickLatestVersion(regionMap);
+  var activeModel = (regionMap && modelVersion) ? regionMap[modelVersion] : null;
+
+  // Backward compat: kalau struktur lama (flat per provinsi) masih dipakai backend lain,
+  // ralatNormalizeModels sudah membungkusnya ke {current: {...}}, jadi cabang ini selalu hit.
+  // Tapi kalau modelRegion tidak ditemukan, coba fallback ke key provinsi mentah.
+  if (!activeModel && window.regressionModels) {
+    var fallbackKey = probeRow.provinsi || 'Nasional';
+    var fallbackMap = window.regressionModels[fallbackKey];
+    if (fallbackMap) {
+      modelRegion = fallbackKey;
+      modelVersion = ralatPickLatestVersion(fallbackMap);
+      activeModel = fallbackMap[modelVersion];
+    }
+  }
 
   if (!activeModel) {
-      console.warn('Model Ekonometrika ' + modelName + ' tidak ditemukan. Memakai perhitungan tanpa penyesuaian spasial.');
+    console.warn('[RaLAT v2] Model untuk region "' + (modelRegion || probeRow.provinsi) + '" tidak ditemukan. Tanpa penyesuaian spasial.');
+  } else {
+    console.log('[RaLAT v2] Model aktif: ' + modelRegion + ' / ' + modelVersion + ' — ' + Object.keys(activeModel).length + ' variabel');
   }
 
   // Clamp time adjustment rate ke rentang wajar [-20%, +50%] per tahun
@@ -1515,83 +1613,242 @@ function initAVMAnalysis() {
       toast('Time Adjustment Rate dibatasi ke ' + timeAdjRate + '% (rentang valid: -20% s.d. +50%)', 'success');
   }
 
-  _avmOverrideState = {}; 
+  _avmOverrideState = {};
   _avmRawData = [];
 
-  // Peta variabel CSV ke tag POI OSM
-  var poiMapping = {
-      'Gerbang Tol': 'ln_distance_to_toll_gate',
-      'Pusat Belanja': 'ln_distance_to_mall',
-      'Rumah Sakit': 'ln_distance_to_hospital',
-      'Stasiun Kereta': 'ln_distance_to_train_station'
-  };
-
+  // Pusat radius (koordinat aset target). Ambil dari mapSearch.
   var centerLatLng = null;
+  var asetCoord = null;
   var inputSearch = document.getElementById('mapSearch').value.split(',');
-  if(inputSearch.length === 2 && !isNaN(parseFloat(inputSearch[0]))) {
-      centerLatLng = new google.maps.LatLng(parseFloat(inputSearch[0]), parseFloat(inputSearch[1]));
+  if (inputSearch.length === 2 && !isNaN(parseFloat(inputSearch[0]))) {
+    var aLat = parseFloat(inputSearch[0]);
+    var aLng = parseFloat(inputSearch[1]);
+    centerLatLng = new google.maps.LatLng(aLat, aLng);
+    asetCoord = { lat: aLat, lng: aLng };
   }
 
-  currentData.forEach(function(row) {
-    var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
-    var price = parseFloat(priceStr);
-    if (!isNaN(price) && price > 0) {
-      // Time Adjustment dengan fractional year (lebih akurat untuk Q3-2023, Mar-2023, dst.)
-      var rowParsed = _parseWaktuData(row.waktuData);
-      var rowFrac = rowParsed ? rowParsed.fractional : null;
-      var valFrac = _getValuationFractionalYear();
-      var diffYears = (rowFrac !== null) ? (valFrac - rowFrac) : 0;
-      if (diffYears > 0 && timeAdjRate !== 0) {
-          price = price * Math.pow(1 + (timeAdjRate / 100), diffYears);
-      }
+  // Sinkronkan UI form aset target → _asetTargetMeta
+  updateAsetTargetMeta();
 
-      // --- MESIN RaLAT (REGRESI) BEKERJA DI SINI ---
-      var ralatLog = [];
-      if (activeModel && _asetPOIData && row.koordinat && centerLatLng) {
-          var coordComp = _parseCoordJS(row.koordinat);
-          var coordAset = centerLatLng;
-
-          for (var poiName in poiMapping) {
-              var varName = poiMapping[poiName];
-              
-              if (activeModel[varName] && _asetPOIData[poiName] && _asetPOIData[poiName].best) {
-                  var koef = activeModel[varName].koefisien;
-                  var targetLatLng = new google.maps.LatLng(_asetPOIData[poiName].best.lat, _asetPOIData[poiName].best.lon);
-
-                  var distAset = google.maps.geometry.spherical.computeDistanceBetween(coordAset, targetLatLng);
-                  var distComp = google.maps.geometry.spherical.computeDistanceBetween(new google.maps.LatLng(coordComp.lat, coordComp.lng), targetLatLng);
-
-                  // Hindari ln(0)
-                  distAset = distAset <= 0 ? 1 : distAset;
-                  distComp = distComp <= 0 ? 1 : distComp;
-
-                  var selisihLn = Math.log(distAset) - Math.log(distComp);
-                  var adjPct = selisihLn * koef;
-
-                  price = price * (1 + adjPct);
-                  var sign = adjPct > 0 ? '+' : '';
-                  ralatLog.push(poiName + " (" + sign + (adjPct*100).toFixed(1) + "%)");
-              }
-          }
-      }
-
-      _avmRawData.push({ 
-          uid: row._uid, 
-          id: row.id, 
-          price: price, 
-          ralatInfo: ralatLog.join("<br>") || "-" 
-      });
-    }
-  });
-
-  if (_avmRawData.length === 0) { toast('Tidak ada data valid untuk dianalisa.', 'error'); return; }
-
-  recalcAVM(); 
-  switchAVMTab('sbm');
+  // Buka modal dulu untuk UX, tampilkan state loading.
+  var modalAuditBody = document.getElementById('auditTableBody');
+  if (modalAuditBody) {
+    modalAuditBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">' +
+      '<div class="spinner" style="width:20px;height:20px;display:inline-block;margin-right:8px;vertical-align:middle;"></div>' +
+      'Menjalankan RaLAT v2 (Overpass + Nominatim + ' + (activeModel ? Object.keys(activeModel).length : 0) + ' variabel)…' +
+      '</td></tr>';
+  }
+  document.getElementById('modalMedianPrice').textContent = 'Rp 0';
+  document.getElementById('modalDataCount').textContent = '… memuat';
+  switchAVMTab('audit');
   // Sinkronkan date picker dengan _valuationDate aktif
   var vdEl = document.getElementById('valuationDateInput');
   if (vdEl) vdEl.value = _formatValuationDateISO();
   document.getElementById('analyticsOverlay').classList.add('open');
+
+  // ============ Pipeline async RaLAT v2 ============
+  var pipelineStarted = Date.now();
+
+  // Step 1: time-adjusted price untuk SEMUA pembanding (tanpa RaLAT dulu).
+  // Sinkronkan dulu supaya kalau model tidak tersedia, AVM tetap jalan.
+  var rowsForRalat = [];
+  currentData.forEach(function(row) {
+    var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
+    var price = parseFloat(priceStr);
+    if (isNaN(price) || price <= 0) return;
+    var rowParsed = _parseWaktuData(row.waktuData);
+    var rowFrac = rowParsed ? rowParsed.fractional : null;
+    var valFrac = _getValuationFractionalYear();
+    var diffYears = (rowFrac !== null) ? (valFrac - rowFrac) : 0;
+    var priceTimeAdj = price;
+    if (diffYears > 0 && timeAdjRate !== 0) {
+      priceTimeAdj = price * Math.pow(1 + (timeAdjRate / 100), diffYears);
+    }
+    var coordComp = _parseCoordJS(row.koordinat);
+    rowsForRalat.push({
+      row: row,
+      coordComp: coordComp,   // {lat, lng} atau null
+      priceTimeAdj: priceTimeAdj,
+      diffYears: diffYears
+    });
+  });
+
+  if (rowsForRalat.length === 0) {
+    toast('Tidak ada data valid untuk dianalisa.', 'error');
+    if (modalAuditBody) modalAuditBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--red);">Tidak ada data valid.</td></tr>';
+    return;
+  }
+
+  // Path A: tidak ada model atau koordinat aset → langsung fallback (no RaLAT).
+  if (!activeModel || !asetCoord) {
+    rowsForRalat.forEach(function(item) {
+      _avmRawData.push({
+        uid:  item.row._uid,
+        id:   item.row.id,
+        price: item.priceTimeAdj,
+        ralatInfo: !asetCoord ? '<em>Pusat radius tidak diset</em>' : '<em>Model regresi tidak tersedia</em>',
+        breakdown: [],
+        adjPct: 0,
+        gross: 0,
+        capped: false
+      });
+    });
+    _ralatLastRun = { region: modelRegion || null, version: modelVersion || null, asetFeats: null, geocodeRes: null };
+    recalcAVM();
+    switchAVMTab('sbm');
+    return;
+  }
+
+  // Path B: jalankan pipeline penuh. Pakai meta aset dari form, fallback ke
+  // mayoritas peruntukan pembanding kalau user belum mengisi.
+  var asetMeta = Object.assign({}, _asetTargetMeta);
+  if (!asetMeta.peruntukan) asetMeta.peruntukan = ralatAutoPickPeruntukan(currentData);
+
+  // Promise: reverse-geocode + Overpass aset
+  var geocodePromise = ralatReverseGeocode(asetCoord.lat, asetCoord.lng);
+  var overpassAsetPromise = _ralatV2Fetch(asetCoord.lat, asetCoord.lng);
+
+  Promise.all([geocodePromise, overpassAsetPromise]).then(function(arr) {
+    var geocodeRes = arr[0];
+    var overpassAset = arr[1];
+    var asetFeats = ralatBuildFeatures(asetCoord, asetMeta, overpassAset, geocodeRes, activeModel);
+
+    _ralatLastRun = {
+      region: modelRegion,
+      version: modelVersion,
+      asetFeats: asetFeats,
+      geocodeRes: geocodeRes,
+      asetMeta: asetMeta
+    };
+
+    // Loop pembanding: butuh Overpass per koordinat (kebanyakan cache hit).
+    // Kita tidak reverse-geocode pembanding (pakai field row.kota langsung).
+    var compPromises = rowsForRalat.map(function(item) {
+      if (!item.coordComp) return Promise.resolve(null);
+      return _ralatV2Fetch(item.coordComp.lat, item.coordComp.lng)
+        .then(function(opRes) { return { item: item, opRes: opRes }; })
+        .catch(function() { return { item: item, opRes: { near:[], far:[] } }; });
+    });
+
+    return Promise.all(compPromises).then(function(results) {
+      results.forEach(function(slot) {
+        if (!slot) return;
+        var item = slot.item;
+        var opRes = slot.opRes;
+        var compMeta = {
+          luasTanah:  item.row.luasTanah,
+          lebarJalan: item.row.lebarJalanROW,
+          bentuk:     item.row.bentuk,
+          posisi:     item.row.posisi,
+          peruntukan: item.row.peruntukan,
+          objek:      item.row.objek,
+          tipeBangunan: item.row.tipeBangunan,
+          kota:       item.row.kota
+        };
+        // Untuk pembanding, kita pakai field row.kota sebagai bestCity (tanpa
+        // panggil Nominatim untuk hemat rate limit).
+        var compGeocode = { bestCity: item.row.kota || '', city: item.row.kota || '', state: item.row.provinsi || '' };
+        var compFeats = ralatBuildFeatures(item.coordComp, compMeta, opRes, compGeocode, activeModel);
+        var engineRes = ralatEngineV2(activeModel, asetFeats, compFeats);
+        var adjustedPrice = item.priceTimeAdj * (1 + engineRes.adjPct);
+
+        // Susun ralatInfo singkat (top-3 driver) untuk fallback display.
+        var top3 = engineRes.breakdown.slice(0, 3).map(function(b) {
+          var s = (b.kontribPct >= 0 ? '+' : '') + (b.kontribPct * 100).toFixed(1) + '%';
+          return _ralatVarLabel(b.var) + ' ' + s;
+        }).join('<br>');
+
+        _avmRawData.push({
+          uid:   item.row._uid,
+          id:    item.row.id,
+          price: adjustedPrice,
+          ralatInfo: top3 || '<em>Tidak ada variabel terhitung</em>',
+          breakdown: engineRes.breakdown,
+          adjPct: engineRes.adjPct,
+          rawAdjPct: engineRes.rawAdjPct,
+          gross: engineRes.gross,
+          capped: engineRes.capped,
+          asetFeats: asetFeats,
+          compFeats: compFeats
+        });
+      });
+    });
+  }).then(function() {
+    var elapsed = ((Date.now() - pipelineStarted) / 1000).toFixed(1);
+    console.log('[RaLAT v2] Pipeline selesai dalam ' + elapsed + 's untuk ' + _avmRawData.length + ' pembanding');
+    recalcAVM();
+    switchAVMTab('sbm');
+    toast('RaLAT v2 selesai · model ' + modelRegion + ' (' + modelVersion + ') · ' + _avmRawData.length + ' pembanding', 'success');
+  }).catch(function(err) {
+    console.error('[RaLAT v2] Pipeline gagal:', err);
+    toast('RaLAT v2 gagal: ' + (err && err.message ? err.message : err) + ' — fallback ke time-adjustment saja.', 'error');
+    // Fallback: pakai harga time-adjusted tanpa RaLAT
+    rowsForRalat.forEach(function(item) {
+      _avmRawData.push({
+        uid:  item.row._uid,
+        id:   item.row.id,
+        price: item.priceTimeAdj,
+        ralatInfo: '<span style="color:#dc2626;">RaLAT gagal · pakai time-adj</span>',
+        breakdown: [], adjPct: 0, gross: 0, capped: false
+      });
+    });
+    recalcAVM();
+    switchAVMTab('sbm');
+  });
+}
+
+// Label pendek untuk variabel di breakdown (lebih ramah daripada raw key).
+function _ralatVarLabel(name) {
+  var map = {
+    'ln_distance_to_mall':          'Mall',
+    'ln_distance_to_hospital':      'RS',
+    'ln_distance_to_school':        'Sekolah',
+    'ln_distance_to_university':    'Universitas',
+    'ln_distance_to_train_station': 'Stasiun KA',
+    'ln_distance_to_lrt':           'LRT',
+    'ln_distance_to_bus_stop':      'Halte Bus',
+    'ln_distance_to_toll_gate':     'Gerbang Tol',
+    'ln_distance_to_road':          'Jalan Utama',
+    'ln_distance_to_government':    'Pemerintahan',
+    'ln_distance_to_airport':       'Bandara',
+    'ln_distance_to_harbour':       'Pelabuhan',
+    'ln_distance_to_graveyard':     'Pemakaman',
+    'ln_distance_to_hotel':         'Hotel',
+    'ln_distance_to_retail':        'Retail',
+    'ln_distance_to_entertainment': 'Hiburan',
+    'ln_distance_to_restaurant':    'Restoran',
+    'ln_distance_to_historical':    'Situs Sejarah',
+    'ln_distance_to_coastline':     'Garis Pantai',
+    'ln_distance_to_river':         'Sungai',
+    'ln_distance_to_big_city':      'Kota Besar',
+    'ln_distance_to_small_city':    'Kota Kecil',
+    'ln_distance_to_jakarta':       'Jakarta (Monas)',
+    'ln_distance_to_bej':           'BEJ',
+    'ln_distance_to_krb':           'Kebun Raya Bogor',
+    'ln_distance_to_tigaraksa':     'Tigaraksa',
+    'ln_distance_to_tangsel':       'Tangsel',
+    'ln_luas_tanah':                'Luas Tanah',
+    'lebar_jalan_di_depan_adj':     'Lebar Jalan',
+    'industrial_area_percentage':   '% Kawasan Industri',
+    'tapak_beraturan':              'Tapak Beraturan',
+    'is_komersial':                 'Komersial',
+    'is_perumahan':                 'Perumahan',
+    'is_industrial':                'Industri',
+    'is_kebun':                     'Perkebunan',
+    'is_hook':                      'Hoek',
+    'luas_lower':                   'Luas <small>',
+    'luas_upper':                   'Luas <large>'
+  };
+  if (map[name]) return map[name];
+  // Generic: is_<city> → City, poi_<x>_<r>m → POI X (r m)
+  if (/^is_/.test(name)) {
+    return name.replace(/^is_/, '').replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+  }
+  if (/^poi_/.test(name)) {
+    var m = name.match(/^poi_(.+)_(\d+)m$/);
+    if (m) return 'POI ' + m[1].replace(/_/g, ' ') + ' (' + m[2] + 'm)';
+  }
+  return name;
 }
 
 function recalcAVM() {
@@ -1631,7 +1888,8 @@ function recalcAVM() {
                    '<td style="text-align:center;"><input type="checkbox" onchange="toggleAVMOverride(\'' + d.uid + '\', this.checked)" ' + checkedAttr + '></td>' +
                    '<td><strong>' + d.id + '</strong></td>' +
                    '<td>' + formatRupiah(Math.round(d.price)) + '</td>' +
-                   '<td style="font-size:10px; color:#2d6be4;">' + d.ralatInfo + '</td>' +
+                   '<td>' + _ralatRenderAdjBadge(d) + '</td>' +
+                   '<td style="font-size:10px;">' + _ralatRenderDrivers(d) + '</td>' +
                    '<td>' + statusText + '</td></tr>';
   });
 
@@ -1663,7 +1921,7 @@ function recalcAVM() {
       }
   }
 
-  document.getElementById('modalSmartInsight').innerHTML = insightMsg;
+  document.getElementById('modalSmartInsight').innerHTML = insightMsg + _ralatRenderModelMeta();
   document.getElementById('modalSmartInsight').style.borderLeftColor = "#16a34a";
 
   calculateSBM(); 
@@ -1786,15 +2044,28 @@ function downloadAVMPDF() {
     </table>
 
     <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Audit Trail & Penyesuaian Spasial (RaLAT)</h3>
-    <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
+    <table style="width:100%; border-collapse:collapse; font-size:10.5px; text-align:left;">
       <thead><tr>
         <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Digunakan</th>
         <th style="padding:6px; border-bottom:1px solid #d1dbe8;">ID Data</th>
         <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Harga Akhir</th>
-        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Penyesuaian Ekometrika</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Total Adj %</th>
+        <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Top-3 Driver</th>
       </tr></thead>
       <tbody>${auditHtml.replace(/<input type="checkbox"[^>]*checked[^>]*>/g, '✅').replace(/<input type="checkbox"[^>]*>/g, '❌').replace(/<td><span style="color:#(?:16a34a|dc2626);font-weight:bold;">.*?<\/span><\/td><\/tr>/g, '</tr>')}</tbody>
     </table>
+
+    ${_ralatRenderPDFBreakdown()}
+
+    <div style="margin-top:25px; padding:12px; background:#f8fafc; border-left:4px solid #2d6be4; font-size:10px; color:#475569; line-height:1.5; border-radius:4px;">
+      <strong style="color:#1e3a5f;">Disclaimer Ekonometrik:</strong> Adjustment dihitung dari koefisien
+      regresi hedonic log-log pada model
+      <code>${(_ralatLastRun && _ralatLastRun.region) ? _ralatLastRun.region : '–'}</code>
+      versi <code>${(_ralatLastRun && _ralatLastRun.version) ? _ralatLastRun.version : '–'}</code>.
+      Koefisien β tidak menyatakan hubungan kausalitas dan tidak menggantikan
+      <em>professional judgement</em> penilai. Sumber spasial: OpenStreetMap (Overpass) +
+      Nominatim, di-cache 7–30 hari.
+    </div>
 
     <div style="margin-top:40px; font-size:11px; color:#5a6a7e; text-align:right;">
       Disusun & Dikendalikan oleh: ${activeUsername}<br>
@@ -2027,7 +2298,8 @@ function doSearch() {
         
         // TAMBAHAN: Menyimpan Model Ekonometrika dari Server ke Memori Browser
         if (res.models) {
-            window.regressionModels = res.models;
+            // RaLAT v2: normalize ke struktur ber-versi & fix typo tipe
+            window.regressionModels = ralatNormalizeModels(res.models);
         }
 
         currentData = res.data.map(function(row, index) {
@@ -2439,6 +2711,870 @@ function analyzePOI(lat, lng, uid) {
         toast('Gagal menghubungi Overpass: ' + err.message, 'error');
     });
 }
+// ------------------------------------------------
+
+/* =========================================================================
+   ============================ RaLAT v2 ====================================
+   Fase 1.5: Penyesuaian Spasial Penuh menggunakan SELURUH koefisien dari
+   sheet Model_Regresi (bukan hanya 4 POI seperti v1).
+   Lihat .kiro/steering/ralat_v2_plan.md untuk blueprint.
+   --- Modul inline ---
+     [A] Province → Model Region mapping
+     [B] Landmark coords (Jakarta/BEJ/KRB/satelite/etc)
+     [C] Model loader & versioning normalizer
+     [D] Variable type classifier
+     [E] Extended Overpass query (jalan, sungai, coastline, dll)
+     [F] Nominatim reverse-geocode + cache 30 hari
+     [G] Feature builder (susun {fitur:nilai} per koordinat)
+     [H] RaLAT engine v2 (apply koefisien → adjPct + breakdown[])
+========================================================================= */
+
+/* ------- [A] Province → Model Region mapping ------- */
+// Mapping provinsi (BPS/sheet) ke nama region pada sheet Model_Regresi.
+// Untuk provinsi yang ambigu (Banten, Jawa Barat) gunakan kota dari Nominatim.
+var RALAT_PROVINCE_TO_REGION = {
+  'DKI JAKARTA':              'Jabodetabek',
+  'JAKARTA':                  'Jabodetabek',
+  'BANTEN':                   'Banten',          // override jika kota=Tangerang/Tangsel → Jabodetabek
+  'JAWA BARAT':               'Jawa Barat',      // override jika kota=Bekasi/Bogor/Depok → Jabodetabek
+  'JAWA TENGAH':              'Jawa Tengah - Yogyakarta',
+  'DI YOGYAKARTA':            'Jawa Tengah - Yogyakarta',
+  'DAERAH ISTIMEWA YOGYAKARTA':'Jawa Tengah - Yogyakarta',
+  'JAWA TIMUR':               'Jawa Timur',
+  'BALI':                     'Bali',
+  'NUSA TENGGARA BARAT':      'Nusa Tenggara',
+  'NUSA TENGGARA TIMUR':      'Nusa Tenggara',
+  'SUMATERA UTARA':           'Sumatra',
+  'SUMATERA BARAT':           'Sumatra',
+  'SUMATERA SELATAN':         'Sumatra',
+  'RIAU':                     'Sumatra',
+  'JAMBI':                    'Sumatra',
+  'BENGKULU':                 'Sumatra',
+  'LAMPUNG':                  'Sumatra',
+  'ACEH':                     'Sumatra',
+  'KEPULAUAN BANGKA BELITUNG':'Bangka Belitung',
+  'KEPULAUAN RIAU':           'Batam',
+  'KALIMANTAN BARAT':         'Kalimantan',
+  'KALIMANTAN TENGAH':        'Kalimantan',
+  'KALIMANTAN SELATAN':       'Kalimantan',
+  'KALIMANTAN TIMUR':         'Kalimantan',
+  'KALIMANTAN UTARA':         'Kalimantan',
+  'SULAWESI UTARA':           'Sulawesi',
+  'SULAWESI TENGAH':          'Sulawesi',
+  'SULAWESI SELATAN':         'Sulawesi',
+  'SULAWESI TENGGARA':        'Sulawesi',
+  'SULAWESI BARAT':           'Sulawesi',
+  'GORONTALO':                'Sulawesi',
+  'MALUKU':                   'Maluku Papua',
+  'MALUKU UTARA':             'Maluku Papua',
+  'PAPUA':                    'Maluku Papua',
+  'PAPUA BARAT':              'Maluku Papua'
+};
+
+// Kota yang memicu override region (kota → forced region)
+var RALAT_CITY_OVERRIDE = {
+  // Jabodetabek tarik dari Banten & Jawa Barat
+  'TANGERANG':         'Jabodetabek',
+  'TANGERANG SELATAN': 'Jabodetabek',
+  'KOTA TANGERANG':    'Jabodetabek',
+  'KAB TANGERANG':     'Jabodetabek',
+  'BEKASI':            'Jabodetabek',
+  'KOTA BEKASI':       'Jabodetabek',
+  'KAB BEKASI':        'Jabodetabek',
+  'BOGOR':             'Jabodetabek',
+  'KOTA BOGOR':        'Jabodetabek',
+  'KAB BOGOR':         'Jabodetabek',
+  'DEPOK':             'Jabodetabek',
+  'KOTA DEPOK':        'Jabodetabek',
+  // Batam
+  'BATAM':             'Batam',
+  'KOTA BATAM':        'Batam'
+};
+
+function _ralatNorm(s) {
+  return String(s || '').toUpperCase().replace(/[^A-Z ]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function ralatPickModelRegion(provinsi, kota) {
+  var pNorm = _ralatNorm(provinsi);
+  var kNorm = _ralatNorm(kota);
+  // 1. Cek city override dulu
+  if (kNorm && RALAT_CITY_OVERRIDE[kNorm]) return RALAT_CITY_OVERRIDE[kNorm];
+  // 2. Province mapping
+  if (pNorm && RALAT_PROVINCE_TO_REGION[pNorm]) return RALAT_PROVINCE_TO_REGION[pNorm];
+  // 3. Fallback: cari subset (mis. "KALIMANTAN BARAT" → "KALIMANTAN ...")
+  for (var key in RALAT_PROVINCE_TO_REGION) {
+    if (pNorm.indexOf(key) === 0 || key.indexOf(pNorm) === 0) {
+      return RALAT_PROVINCE_TO_REGION[key];
+    }
+  }
+  return null;
+}
+
+/* ------- [B] Landmark coords untuk variabel tetap ------- */
+// Variabel `ln_distance_to_jakarta`, `..._BEJ`, `..._KRB`, `..._tigaraksa`,
+// `..._tangsel`, `..._satelite_*` adalah jarak ke titik tetap (bukan POI OSM).
+// Sumber: pusat administratif / hardcode publicly known landmarks.
+var RALAT_LANDMARKS = {
+  'jakarta':       { lat: -6.1751, lng: 106.8650 },   // Monas
+  'bej':           { lat: -6.2247, lng: 106.8090 },   // Bursa Efek Jakarta (IDX), SCBD
+  'krb':           { lat: -6.5972, lng: 106.7997 },   // Kebun Raya Bogor
+  'tigaraksa':     { lat: -6.3214, lng: 106.4886 },   // Pusat Tigaraksa, Kab Tangerang
+  'tangsel':       { lat: -6.2876, lng: 106.7178 },   // Pusat Tangsel (Serpong)
+  // Satelite city = kota satelit Jabodetabek (ambil titik representatif)
+  'satelite_bekasi':  { lat: -6.2349, lng: 106.9896 },
+  'satelite_bogor':   { lat: -6.5950, lng: 106.8167 },
+  'satelite_depok':   { lat: -6.4025, lng: 106.7942 },
+  'satelite_tangerang': { lat: -6.1781, lng: 106.6300 }
+};
+
+/* ------- [C] Model loader & versioning normalizer ------- */
+// Backend mengembalikan window.regressionModels dalam bentuk:
+//   { "RegionName": { varName: { tipe, koefisien, ... } } }
+// Untuk RaLAT v2 kita butuh struktur ber-versi:
+//   { "RegionName": { "20241213": {varName:{...}}, "20241202":{...} } }
+// Backend belum mengekspos versioning, jadi normalizer ini idempotent:
+//   - Kalau struktur sudah ber-versi, biarkan.
+//   - Kalau belum (flat varName), bungkus ke pseudo-version "current".
+// Side effect: fix typo "katergori" → "kategori" pada field tipe.
+function ralatNormalizeModels(rawModels) {
+  if (!rawModels || typeof rawModels !== 'object') return {};
+  var out = {};
+  Object.keys(rawModels).forEach(function(region) {
+    var entry = rawModels[region];
+    if (!entry || typeof entry !== 'object') return;
+    // Deteksi: apakah entry ber-versi? Versi = key alfanumerik 8 char (YYYYMMDD)
+    var keys = Object.keys(entry);
+    var isVersioned = keys.length > 0 && keys.every(function(k) {
+      return /^\d{8}$/.test(k) || /^v\d/i.test(k);
+    });
+    if (isVersioned) {
+      out[region] = {};
+      keys.forEach(function(v) {
+        out[region][v] = _ralatFixVarTypes(entry[v]);
+      });
+    } else {
+      // Wrap flat dict ke pseudo-version 'current'
+      out[region] = { 'current': _ralatFixVarTypes(entry) };
+    }
+  });
+  return out;
+}
+
+function _ralatFixVarTypes(varDict) {
+  if (!varDict || typeof varDict !== 'object') return {};
+  var fixed = {};
+  Object.keys(varDict).forEach(function(name) {
+    var v = varDict[name];
+    if (!v || typeof v !== 'object') return;
+    var tipe = String(v.tipe || v.type || '').toLowerCase().trim();
+    // Normalisasi typo
+    if (tipe === 'katergori' || tipe === 'unknown' || tipe === '') tipe = 'kategori';
+    // Pastikan koefisien numeric
+    var koef = v.koefisien;
+    if (typeof koef === 'string') {
+      koef = parseFloat(String(koef).replace(',', '.'));
+    }
+    if (isNaN(koef)) koef = 0;
+    fixed[name] = Object.assign({}, v, { tipe: tipe, koefisien: koef });
+  });
+  return fixed;
+}
+
+function ralatPickLatestVersion(regionMap) {
+  if (!regionMap) return null;
+  var keys = Object.keys(regionMap);
+  if (keys.length === 0) return null;
+  // 'current' selalu kalah dari versi tanggal
+  keys.sort();
+  return keys[keys.length - 1];
+}
+
+/* ------- [D] Variable type classifier ------- */
+// Pendamping: deteksi nature variabel dari nama, kalau model.tipe tidak jelas.
+function ralatClassifyVar(name, declaredTipe) {
+  var n = String(name).toLowerCase();
+  // Konstanta — skip karena cancel di selisih
+  if (n === '_cons' || n === 'cons' || n === 'intercept' || n === 'konstanta') return 'konstanta';
+  if (n.indexOf('ln_distance_to_') === 0) return 'ln';
+  if (/^poi_.*_(\d+)m$/.test(n)) return 'poi_count';
+  if (n.indexOf('is_') === 0) return 'marking';
+  if (n === 'tapak_beraturan' || n === 'luas_lower' || n === 'luas_upper' || n === 'is_hook') return 'marking';
+  if (n === 'ln_luas_tanah') return 'numerik_ln';
+  if (n === 'lebar_jalan_di_depan_adj' || n === 'industrial_area_percentage') return 'numerik';
+  if (declaredTipe === 'kategori' || declaredTipe === 'marking') return 'marking';
+  if (declaredTipe === 'numerik' || declaredTipe === 'ln') return declaredTipe;
+  return declaredTipe || 'numerik';
+}
+
+/* ------- [E] Extended Overpass query untuk RaLAT v2 ------- */
+// Query gabungan yang menarik SEMUA tag yang dibutuhkan di seluruh region.
+// Beberapa region tidak butuh semua, tapi 1 query lebih murah daripada 20 query.
+// Default radius 5km; untuk variabel jarak ke kota besar/airport/harbour kita
+// pakai radius 20km dengan query terpisah (lihat _overpassQueryRalatV2Far).
+function _overpassQueryRalatV2(lat, lng, radius) {
+  var around = '(around:' + radius + ',' + lat + ',' + lng + ')';
+  return '[out:json][timeout:25];(' +
+    // Existing v1 tags (juga terambil)
+    'node["highway"="motorway_junction"]' + around + ';' +
+    'node["amenity"="hospital"]' + around + ';' +
+    'node["amenity"="school"]' + around + ';' +
+    'node["amenity"="university"]' + around + ';' +
+    'node["amenity"="townhall"]' + around + ';' +
+    'node["amenity"="restaurant"]' + around + ';' +
+    'node["amenity"="theatre"]' + around + ';' +
+    'node["amenity"="cinema"]' + around + ';' +
+    'node["amenity"="nightclub"]' + around + ';' +
+    'node["amenity"="ferry_terminal"]' + around + ';' +
+    'node["amenity"="grave_yard"]' + around + ';' +
+    'node["shop"="mall"]' + around + ';' +
+    'node["shop"="supermarket"]' + around + ';' +
+    'node["railway"="station"]' + around + ';' +
+    'node["highway"="bus_stop"]' + around + ';' +
+    'node["office"="government"]' + around + ';' +
+    'node["tourism"="hotel"]' + around + ';' +
+    'node["historic"]' + around + ';' +
+    // Way features (jalan, sungai, garis pantai) — pakai centroid via center
+    'way["highway"~"^(primary|trunk|motorway)$"]' + around + ';' +
+    'way["waterway"="river"]' + around + ';' +
+    'way["natural"="coastline"]' + around + ';' +
+    'way["landuse"="cemetery"]' + around + ';' +
+    'way["landuse"="retail"]' + around + ';' +
+    'way["landuse"="industrial"]' + around + ';' +
+    'way["landuse"="harbour"]' + around + ';' +
+    ');out tags center;';
+}
+
+// Far-radius query untuk fitur regional yang biasanya jauh (airport, kota besar)
+function _overpassQueryRalatV2Far(lat, lng, radius) {
+  var around = '(around:' + radius + ',' + lat + ',' + lng + ')';
+  return '[out:json][timeout:30];(' +
+    'node["aeroway"="aerodrome"]' + around + ';' +
+    'way["aeroway"="aerodrome"]' + around + ';' +
+    'node["place"="city"]' + around + ';' +
+    'node["place"="town"]' + around + ';' +
+    'node["station"="light_rail"]' + around + ';' +
+    'node["railway"="station"]["station"="light_rail"]' + around + ';' +
+    ');out tags center;';
+}
+
+// Cache key terpisah dari v1 (key v1 tetap dipakai untuk fitur POI sidebar).
+function _ralatV2CacheKey(lat, lng, radius, kind) {
+  return 'ralat2:' + (kind || 'near') + ':' + Number(lat).toFixed(3) + ',' + Number(lng).toFixed(3) + ':' + radius;
+}
+
+function _ralatV2CacheGet(lat, lng, radius, kind) {
+  try {
+    var raw = localStorage.getItem(_ralatV2CacheKey(lat, lng, radius, kind));
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (!obj || !obj.t || !obj.d) return null;
+    if ((Date.now() - obj.t) > OVERPASS_CACHE_TTL_MS) return null;
+    return obj.d;
+  } catch (e) { return null; }
+}
+
+function _ralatV2CacheSet(lat, lng, radius, kind, data) {
+  try {
+    localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind), JSON.stringify({ t: Date.now(), d: data }));
+  } catch (e) {
+    // Quota full → bersihkan cache ralat2 lama
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('ralat2:') === 0) localStorage.removeItem(k);
+      }
+      localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind), JSON.stringify({ t: Date.now(), d: data }));
+    } catch (e2) {}
+  }
+}
+
+// Fetch v2 — near (5km) + far (20km), parallel, dengan cache.
+function _ralatV2Fetch(lat, lng) {
+  var nearR = 5000, farR = 20000;
+  var nearCached = _ralatV2CacheGet(lat, lng, nearR, 'near');
+  var farCached  = _ralatV2CacheGet(lat, lng, farR, 'far');
+
+  var nearP = nearCached
+    ? Promise.resolve(nearCached)
+    : _overpassFetchWithFallback(_overpassQueryRalatV2(lat, lng, nearR))
+        .then(function(d) {
+          var els = (d && d.elements) ? d.elements : [];
+          _ralatV2CacheSet(lat, lng, nearR, 'near', els);
+          return els;
+        }).catch(function(){ return []; });
+
+  var farP = farCached
+    ? Promise.resolve(farCached)
+    : _overpassFetchWithFallback(_overpassQueryRalatV2Far(lat, lng, farR))
+        .then(function(d) {
+          var els = (d && d.elements) ? d.elements : [];
+          _ralatV2CacheSet(lat, lng, farR, 'far', els);
+          return els;
+        }).catch(function(){ return []; });
+
+  return Promise.all([nearP, farP]).then(function(arr) {
+    return { near: arr[0] || [], far: arr[1] || [] };
+  });
+}
+
+/* ------- [F] Nominatim reverse-geocode + cache 30 hari ------- */
+var NOMINATIM_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 hari
+
+function _nominatimCacheKey(lat, lng) {
+  return 'nomi:' + Number(lat).toFixed(3) + ',' + Number(lng).toFixed(3);
+}
+
+function _nominatimGet(lat, lng) {
+  try {
+    var raw = localStorage.getItem(_nominatimCacheKey(lat, lng));
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (!obj || !obj.t || !obj.d) return null;
+    if ((Date.now() - obj.t) > NOMINATIM_CACHE_TTL_MS) return null;
+    return obj.d;
+  } catch (e) { return null; }
+}
+
+function _nominatimSet(lat, lng, data) {
+  try {
+    localStorage.setItem(_nominatimCacheKey(lat, lng), JSON.stringify({ t: Date.now(), d: data }));
+  } catch (e) {}
+}
+
+// Reverse-geocode ke alamat administratif. Mengembalikan {city, town, county, state}.
+// Mematuhi Nominatim Usage Policy: User-Agent jelas, cache 30 hari, low rate.
+function ralatReverseGeocode(lat, lng) {
+  var cached = _nominatimGet(lat, lng);
+  if (cached) return Promise.resolve(cached);
+  var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' +
+            encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lng) +
+            '&zoom=10&accept-language=id';
+  return fetch(url, { headers: { 'Accept-Language': 'id' } })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      var addr = (data && data.address) ? data.address : {};
+      var picked = {
+        city:    addr.city || '',
+        town:    addr.town || '',
+        village: addr.village || '',
+        county:  addr.county || '',
+        state:   addr.state || '',
+        // Fallback: ambil yg paling spesifik
+        bestCity: addr.city || addr.town || addr.municipality || addr.county || addr.village || ''
+      };
+      _nominatimSet(lat, lng, picked);
+      return picked;
+    })
+    .catch(function() {
+      return { city:'', town:'', village:'', county:'', state:'', bestCity:'' };
+    });
+}
+
+/* ------- [G] Feature builder ------- */
+// Hitung jarak haversine (meter). Dipakai sebagai fallback kalau Google Maps
+// geometry library tidak ready (mis. saat unit test atau env terbatas).
+function _ralatHaversine(lat1, lng1, lat2, lng2) {
+  var R = 6371000; // m
+  var toRad = function(x){ return x * Math.PI / 180; };
+  var dLat = toRad(lat2 - lat1);
+  var dLng = toRad(lng2 - lng1);
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+          Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Ambil koordinat representatif dari elemen Overpass (node atau way center).
+function _ralatElCoord(el) {
+  if (el.type === 'node' && typeof el.lat === 'number') return { lat: el.lat, lng: el.lon };
+  if (el.center && typeof el.center.lat === 'number') return { lat: el.center.lat, lng: el.center.lon };
+  return null;
+}
+
+// Tag matchers: predicate (tags) → bool.
+var RALAT_TAG_MATCHERS = {
+  'ln_distance_to_mall':           function(t){ return t.shop === 'mall'; },
+  'ln_distance_to_hospital':       function(t){ return t.amenity === 'hospital'; },
+  'ln_distance_to_school':         function(t){ return t.amenity === 'school'; },
+  'ln_distance_to_university':     function(t){ return t.amenity === 'university'; },
+  'ln_distance_to_bus_stop':       function(t){ return t.highway === 'bus_stop'; },
+  'ln_distance_to_train_station':  function(t){ return t.railway === 'station'; },
+  'ln_distance_to_lrt':            function(t){ return t.railway === 'station' && (t.station === 'light_rail' || t.line === 'light_rail'); },
+  'ln_distance_to_toll_gate':      function(t){ return t.highway === 'motorway_junction'; },
+  'ln_distance_to_road':           function(t){ return t.highway === 'primary' || t.highway === 'trunk' || t.highway === 'motorway'; },
+  'ln_distance_to_government':     function(t){ return t.office === 'government' || t.amenity === 'townhall'; },
+  'ln_distance_to_airport':        function(t){ return t.aeroway === 'aerodrome'; },
+  'ln_distance_to_harbour':        function(t){ return t.harbour === 'yes' || t.landuse === 'harbour' || t.amenity === 'ferry_terminal'; },
+  'ln_distance_to_graveyard':      function(t){ return t.landuse === 'cemetery' || t.amenity === 'grave_yard'; },
+  'ln_distance_to_hotel':          function(t){ return t.tourism === 'hotel'; },
+  'ln_distance_to_retail':         function(t){ return t.landuse === 'retail' || (typeof t.shop === 'string' && t.shop.length > 0); },
+  'ln_distance_to_entertainment':  function(t){ return t.amenity === 'theatre' || t.amenity === 'cinema' || t.amenity === 'nightclub'; },
+  'ln_distance_to_restaurant':     function(t){ return t.amenity === 'restaurant'; },
+  'ln_distance_to_historical':     function(t){ return !!t.historic; },
+  'ln_distance_to_coastline':      function(t){ return t.natural === 'coastline'; },
+  'ln_distance_to_river':          function(t){ return t.waterway === 'river'; },
+  'ln_distance_to_big_city':       function(t){ return t.place === 'city'; },
+  'ln_distance_to_small_city':     function(t){ return t.place === 'town'; }
+};
+
+// Hitung jarak minimum dari coord ke elemen yang match tag matcher.
+// Returns meter atau null kalau tidak ada match.
+function _ralatMinDistance(coord, elements, matcher) {
+  var best = Infinity;
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (!el || !el.tags) continue;
+    if (!matcher(el.tags)) continue;
+    var c = _ralatElCoord(el);
+    if (!c) continue;
+    var d = _ralatHaversine(coord.lat, coord.lng, c.lat, c.lng);
+    if (d < best) best = d;
+  }
+  return isFinite(best) ? best : null;
+}
+
+// Hitung jumlah elemen yang match dalam radius tertentu.
+function _ralatCountInRadius(coord, elements, matcher, radiusM) {
+  var n = 0;
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (!el || !el.tags) continue;
+    if (!matcher(el.tags)) continue;
+    var c = _ralatElCoord(el);
+    if (!c) continue;
+    if (_ralatHaversine(coord.lat, coord.lng, c.lat, c.lng) <= radiusM) n++;
+  }
+  return n;
+}
+
+// Bangun feature dict {varName: nilai} untuk satu coord, sesuai variabel
+// yang ada di activeModel. Variabel yang tidak bisa dihitung → undefined.
+//   coord: {lat, lng}
+//   meta:  {luasTanah, lebarJalan, peruntukan, posisi, bentuk, objek, tipeBangunan, kota}
+//   overpassRes: {near:[], far:[]}
+//   geocodeRes:  {bestCity, county, state}
+//   activeModel: {varName:{tipe,koefisien}}
+function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
+  var feats = {};
+  if (!coord || !activeModel) return feats;
+  meta = meta || {};
+  overpassRes = overpassRes || { near: [], far: [] };
+  geocodeRes = geocodeRes || { bestCity: '' };
+  var allEls = (overpassRes.near || []).concat(overpassRes.far || []);
+  var cityKey = _ralatNorm(geocodeRes.bestCity);
+
+  Object.keys(activeModel).forEach(function(varName) {
+    var v = activeModel[varName];
+    var tipe = ralatClassifyVar(varName, v.tipe);
+
+    // --- Konstanta: skip (cancel di selisih) ---
+    if (tipe === 'konstanta') return;
+
+    // --- Variabel ln distance ke fitur OSM ---
+    if (tipe === 'ln' && /^ln_distance_to_/.test(varName)) {
+      // Cek dulu landmark hardcoded
+      var landmarkKey = varName.replace('ln_distance_to_', '');
+      if (RALAT_LANDMARKS[landmarkKey]) {
+        var lm = RALAT_LANDMARKS[landmarkKey];
+        feats[varName] = _ralatHaversine(coord.lat, coord.lng, lm.lat, lm.lng);
+        return;
+      }
+      // Cek matcher OSM
+      var matcher = RALAT_TAG_MATCHERS[varName];
+      if (matcher) {
+        var d = _ralatMinDistance(coord, allEls, matcher);
+        if (d !== null) feats[varName] = d;
+      }
+      return;
+    }
+
+    // --- POI count dalam radius ---
+    if (tipe === 'poi_count') {
+      var m = varName.match(/^poi_(.+)_(\d+)m$/i);
+      if (!m) return;
+      var poiKind = m[1].toLowerCase();
+      var radius = parseFloat(m[2]);
+      // Mapping poiKind → matcher
+      var poiMatcher = null;
+      if (poiKind === 'mall' || poiKind === 'shop')      poiMatcher = function(t){ return t.shop === 'mall' || t.shop === 'supermarket'; };
+      else if (poiKind === 'hospital')                    poiMatcher = function(t){ return t.amenity === 'hospital'; };
+      else if (poiKind === 'school')                      poiMatcher = function(t){ return t.amenity === 'school'; };
+      else if (poiKind === 'restaurant')                  poiMatcher = function(t){ return t.amenity === 'restaurant'; };
+      else if (poiKind === 'hotel')                       poiMatcher = function(t){ return t.tourism === 'hotel'; };
+      else if (poiKind === 'bus_stop' || poiKind === 'bus') poiMatcher = function(t){ return t.highway === 'bus_stop'; };
+      else if (poiKind === 'university')                  poiMatcher = function(t){ return t.amenity === 'university'; };
+      else if (poiKind === 'historical' || poiKind === 'historic') poiMatcher = function(t){ return !!t.historic; };
+      else if (poiKind === 'entertainment')               poiMatcher = function(t){ return t.amenity === 'theatre' || t.amenity === 'cinema' || t.amenity === 'nightclub'; };
+      if (poiMatcher) {
+        feats[varName] = _ralatCountInRadius(coord, allEls, poiMatcher, radius);
+      }
+      return;
+    }
+
+    // --- ln_luas_tanah (numerik_ln) ---
+    if (varName === 'ln_luas_tanah') {
+      var lt = _ralatParseLuas(meta.luasTanah);
+      if (lt !== null && lt > 0) feats[varName] = Math.log(lt);
+      return;
+    }
+
+    // --- lebar_jalan_di_depan_adj ---
+    if (varName === 'lebar_jalan_di_depan_adj') {
+      var lj = parseFloat(String(meta.lebarJalan || '').replace(',', '.'));
+      if (!isNaN(lj) && lj > 0) feats[varName] = lj;
+      return;
+    }
+
+    // --- industrial_area_percentage ---
+    if (varName === 'industrial_area_percentage') {
+      // MVP: kalau peruntukan = Industri/Pergudangan → 1, else 0.
+      // Advanced (TODO): hitung overlap polygon landuse=industrial.
+      var p = String(meta.peruntukan || '').toLowerCase();
+      feats[varName] = (p.indexOf('industri') !== -1 || p.indexOf('pergudangan') !== -1) ? 1 : 0;
+      return;
+    }
+
+    // --- Marker kota (is_<city>) ---
+    if (/^is_/.test(varName)) {
+      var token = varName.replace(/^is_/, '').toLowerCase();
+      // Special: kategori penggunaan
+      if (token === 'komersial')  { feats[varName] = _ralatIsKomersial(meta) ? 1 : 0; return; }
+      if (token === 'perumahan')  { feats[varName] = _ralatIsPerumahan(meta) ? 1 : 0; return; }
+      if (token === 'industrial' || token === 'industri') { feats[varName] = _ralatIsIndustrial(meta) ? 1 : 0; return; }
+      if (token === 'kebun' || token === 'perkebunan')    { feats[varName] = _ralatIsKebun(meta) ? 1 : 0; return; }
+      if (token === 'hook' || token === 'hoek')           { feats[varName] = _ralatIsHook(meta) ? 1 : 0; return; }
+      // City marker — match dengan reverse-geocode bestCity
+      var tokenNorm = token.replace(/[_\s]/g, '').toUpperCase();
+      var cityNorm = cityKey.replace(/[_\s]/g, '');
+      // Fuzzy: cocok kalau cityNorm mengandung tokenNorm atau sebaliknya
+      if (cityNorm && tokenNorm && (cityNorm.indexOf(tokenNorm) !== -1 || tokenNorm.indexOf(cityNorm) !== -1)) {
+        feats[varName] = 1;
+      } else {
+        feats[varName] = 0;
+      }
+      return;
+    }
+
+    // --- tapak_beraturan ---
+    if (varName === 'tapak_beraturan') {
+      var b = String(meta.bentuk || '').toLowerCase();
+      var beraturan = (b.indexOf('beraturan') !== -1 && b.indexOf('tidak') === -1) ||
+                      b.indexOf('bujur') !== -1 ||
+                      b.indexOf('persegi') !== -1 ||
+                      b.indexOf('trapesium') !== -1;
+      feats[varName] = beraturan ? 1 : 0;
+      return;
+    }
+
+    // --- luas_lower / luas_upper (size class dummies) ---
+    // Asumsi: lower < median, upper > median. Threshold ditentukan dari
+    // distribusi dataset. Untuk MVP: pakai threshold 200 m² (lower) dan 1000 m² (upper).
+    if (varName === 'luas_lower' || varName === 'luas_upper') {
+      var ltC = _ralatParseLuas(meta.luasTanah);
+      if (ltC === null || ltC <= 0) { feats[varName] = 0; return; }
+      if (varName === 'luas_lower') feats[varName] = (ltC < 200) ? 1 : 0;
+      else                          feats[varName] = (ltC > 1000) ? 1 : 0;
+      return;
+    }
+
+    // Default: tidak bisa dihitung → biarkan undefined (skip di engine)
+  });
+
+  return feats;
+}
+
+// Helpers untuk kategori dummy
+// Parse luas tanah dari string yang mungkin punya satuan ("250 m2", "250.5 m²",
+// "1.250" dengan pemisah ribuan, dll). Ambil angka pertama yang valid.
+function _ralatParseLuas(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number') return isFinite(raw) && raw > 0 ? raw : null;
+  var s = String(raw).trim();
+  if (!s) return null;
+  // Cari token angka pertama (dengan optional decimal . atau ,)
+  // Pemisah ribuan diabaikan secara konservatif: kita ambil angka utuh saja.
+  var m = s.match(/[-+]?\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  var n = parseFloat(m[0].replace(',', '.'));
+  return (isFinite(n) && n > 0) ? n : null;
+}
+
+function _ralatIsKomersial(meta) {
+  var p = String(meta.peruntukan || '').toLowerCase();
+  var o = String(meta.objek || '').toLowerCase();
+  return p.indexOf('perdagangan') !== -1 || p.indexOf('komersial') !== -1 ||
+         o === 'ruko' || o === 'office';
+}
+function _ralatIsPerumahan(meta) {
+  var p = String(meta.peruntukan || '').toLowerCase();
+  return p.indexOf('pemukiman') !== -1 || p.indexOf('perumahan') !== -1;
+}
+function _ralatIsIndustrial(meta) {
+  var p = String(meta.peruntukan || '').toLowerCase();
+  return p.indexOf('industri') !== -1 || p.indexOf('pergudangan') !== -1;
+}
+function _ralatIsKebun(meta) {
+  var p = String(meta.peruntukan || '').toLowerCase();
+  return p.indexOf('perkebunan') !== -1 || p.indexOf('kebun') !== -1;
+}
+function _ralatIsHook(meta) {
+  var pos = String(meta.posisi || '').toLowerCase();
+  return pos.indexOf('hoek') !== -1 || pos.indexOf('hook') !== -1 ||
+         pos.indexOf('sudut') !== -1 || pos.indexOf('pojok') !== -1;
+}
+
+/* ------- [H] RaLAT engine v2 ------- */
+// Apply koefisien regresi → hasilkan adjPct + breakdown (audit trail).
+//   activeModel: {varName:{tipe,koefisien}}
+//   asetFeats:   {varName: nilai}
+//   compFeats:   {varName: nilai}
+// Returns: {
+//   adjPct: number (decimal, e.g. 0.07 = +7%),
+//   capped: boolean,
+//   gross:  number (sum dari |kontribPct|),
+//   breakdown: [{var, tipe, asetVal, compVal, koef, kontribPct, capped}]
+// }
+var RALAT_CAP = 0.50; // Hard cap ±50%
+var RALAT_LN_FLOOR_M = 50;
+
+function ralatEngineV2(activeModel, asetFeats, compFeats) {
+  var rawSum = 0;
+  var gross = 0;
+  var breakdown = [];
+
+  Object.keys(activeModel).forEach(function(name) {
+    var v = activeModel[name];
+    var tipe = ralatClassifyVar(name, v.tipe);
+    if (tipe === 'konstanta') return;
+
+    var aVal = asetFeats[name];
+    var cVal = compFeats[name];
+    // Skip jika salah satu sisi tidak punya data (variabel tidak bisa dihitung)
+    if (aVal === undefined || cVal === undefined || aVal === null || cVal === null) return;
+
+    var kontrib = 0;
+    if (tipe === 'ln' || tipe === 'numerik_ln') {
+      var aFl = Math.max(parseFloat(aVal), RALAT_LN_FLOOR_M);
+      var cFl = Math.max(parseFloat(cVal), RALAT_LN_FLOOR_M);
+      // Untuk numerik_ln (ln_luas_tanah), nilai sudah dalam ln, jadi langsung
+      // selisih nilai. Untuk ln_distance_to_*, nilai dalam meter → ln dulu.
+      if (tipe === 'numerik_ln') {
+        // aVal/cVal sudah ln(luas), tinggal selisih
+        kontrib = (parseFloat(aVal) - parseFloat(cVal)) * v.koefisien;
+      } else {
+        kontrib = (Math.log(aFl) - Math.log(cFl)) * v.koefisien;
+      }
+    } else {
+      // poi_count, marking, numerik, kategori → linear difference
+      kontrib = (parseFloat(aVal) - parseFloat(cVal)) * v.koefisien;
+    }
+
+    if (!isFinite(kontrib)) kontrib = 0;
+    rawSum += kontrib;
+    gross  += Math.abs(kontrib);
+    breakdown.push({
+      var: name, tipe: tipe,
+      asetVal: aVal, compVal: cVal,
+      koef: v.koefisien,
+      kontribPct: kontrib
+    });
+  });
+
+  // Cap ±50%
+  var capped = false;
+  var adj = rawSum;
+  if (adj > RALAT_CAP)  { adj = RALAT_CAP;  capped = true; }
+  if (adj < -RALAT_CAP) { adj = -RALAT_CAP; capped = true; }
+
+  // Sort breakdown by |kontribPct| desc (untuk Top-3 driver)
+  breakdown.sort(function(a, b) { return Math.abs(b.kontribPct) - Math.abs(a.kontribPct); });
+
+  return {
+    adjPct: adj,
+    rawAdjPct: rawSum,
+    capped: capped,
+    gross: gross,
+    breakdown: breakdown
+  };
+}
+
+/* ------- [I] UI helpers untuk form aset target ------- */
+function updateAsetTargetMeta() {
+  function num(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var v = parseFloat(String(el.value).replace(',', '.'));
+    return isNaN(v) ? null : v;
+  }
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+  _asetTargetMeta = {
+    luasTanah:  num('rlAsetLuas'),
+    lebarJalan: num('rlAsetROW'),
+    bentuk:     val('rlAsetBentuk') || 'Beraturan',
+    posisi:     val('rlAsetPosisi') || 'Tengah',
+    peruntukan: val('rlAsetPeruntukan') || ''
+  };
+}
+
+// Auto-pick peruntukan dari mayoritas pembanding (modus). Hanya dipakai
+// kalau user belum mengisi field "Penggunaan" secara eksplisit.
+function ralatAutoPickPeruntukan(rows) {
+  if (!rows || rows.length === 0) return '';
+  var counts = {};
+  rows.forEach(function(r) {
+    var p = String(r.peruntukan || '').trim();
+    if (!p) return;
+    counts[p] = (counts[p] || 0) + 1;
+  });
+  var best = '', bestN = 0;
+  Object.keys(counts).forEach(function(k) {
+    if (counts[k] > bestN) { best = k; bestN = counts[k]; }
+  });
+  return best;
+}
+
+/* ------- [K] Render helpers untuk audit trail v2 ------- */
+function _ralatAdjClass(absPct) {
+  if (absPct === 0 || absPct === null || absPct === undefined) return 'ralat-adj-zero';
+  if (absPct < 0.10) return 'ralat-adj-low';
+  if (absPct < 0.25) return 'ralat-adj-mid';
+  return 'ralat-adj-high';
+}
+
+function _ralatRenderAdjBadge(d) {
+  if (!d || d.adjPct === undefined || d.adjPct === null) {
+    return '<span class="ralat-adj-badge ralat-adj-zero">—</span>';
+  }
+  var pct = d.adjPct;
+  var abs = Math.abs(pct);
+  var sign = pct >= 0 ? '+' : '';
+  var cls = _ralatAdjClass(abs);
+  var txt = sign + (pct * 100).toFixed(1) + '%';
+  var capWarn = d.capped ? ' <span class="ralat-capped" title="Adjustment di-clamp ke ±50%">⚠️</span>' : '';
+  var grossTxt = (d.gross !== undefined && d.gross !== null)
+    ? '<div style="font-size:9px; color:#64748b; margin-top:2px;">gross ' + (d.gross * 100).toFixed(1) + '%</div>'
+    : '';
+  var titleTxt = d.capped
+    ? 'Adjustment di-clamp ke ±50%. Nilai mentah: ' + (d.rawAdjPct * 100).toFixed(1) + '%'
+    : 'Net adjustment dari ' + ((d.breakdown && d.breakdown.length) || 0) + ' variabel';
+  return '<span class="ralat-adj-badge ' + cls + '" title="' + titleTxt + '">' + txt + capWarn + '</span>' + grossTxt;
+}
+
+function _ralatRenderDrivers(d) {
+  if (!d || !d.breakdown || d.breakdown.length === 0) {
+    // Fallback ke string ralatInfo lama (kompat dengan path tanpa model)
+    return '<span style="color:#64748b;">' + (d.ralatInfo || '—') + '</span>';
+  }
+  var top3 = d.breakdown.slice(0, 3);
+  var lines = top3.map(function(b) {
+    var sign = b.kontribPct >= 0 ? '+' : '';
+    var pctTxt = sign + (b.kontribPct * 100).toFixed(1) + '%';
+    var cls = b.kontribPct >= 0 ? 'pos' : 'neg';
+    var label = _ralatVarLabel(b.var);
+    var detail = _ralatFormatVarDetail(b);
+    return '<div title="' + detail + '">• ' + label + ' <span class="' + cls + '">' + pctTxt + '</span></div>';
+  });
+  var more = d.breakdown.length > 3
+    ? '<div style="color:#94a3b8; font-size:9px;">+ ' + (d.breakdown.length - 3) + ' variabel lain</div>'
+    : '';
+  return '<div class="ralat-driver-list">' + lines.join('') + more + '</div>';
+}
+
+function _ralatFormatVarDetail(b) {
+  function fmt(v) {
+    if (v === null || v === undefined) return '–';
+    if (typeof v !== 'number') return String(v);
+    if (b.tipe === 'ln' || b.tipe === 'numerik_ln') {
+      // Untuk ln distance, val dalam meter; untuk numerik_ln (ln_luas) sudah ln
+      if (b.tipe === 'ln') return v >= 1000 ? (v/1000).toFixed(2) + 'km' : Math.round(v) + 'm';
+      return v.toFixed(3);
+    }
+    if (b.tipe === 'marking' || b.tipe === 'kategori') return v ? '1' : '0';
+    return Number(v).toFixed(2);
+  }
+  return b.var + ' · aset=' + fmt(b.asetVal) + ' vs comp=' + fmt(b.compVal) + ' · β=' + (b.koef >= 0 ? '+' : '') + b.koef.toFixed(4);
+}
+
+function _ralatRenderModelMeta() {
+  if (!_ralatLastRun || !_ralatLastRun.region) return '';
+  var meta = _ralatLastRun;
+  var nVar = meta.asetFeats ? Object.keys(meta.asetFeats).length : 0;
+  var city = (meta.geocodeRes && meta.geocodeRes.bestCity) ? meta.geocodeRes.bestCity : '–';
+  return '<div class="ralat-meta-line">' +
+         '🛰️ <strong>RaLAT v2</strong> · model <code>' + meta.region + '</code> versi <code>' + meta.version + '</code> · ' +
+         nVar + ' variabel terhitung · kota terdeteksi: <strong>' + city + '</strong>' +
+         '</div>';
+}
+
+/* ------- [M] PDF: render tabel breakdown RaLAT lengkap ------- */
+// Untuk PDF kita render tabel detail per pembanding: untuk setiap pembanding,
+// tampilkan SEMUA variabel breakdown (bukan hanya top-3). Format per pembanding
+// adalah block terpisah supaya muat di halaman A4.
+function _ralatRenderPDFBreakdown() {
+  if (!_avmRawData || _avmRawData.length === 0) return '';
+  var hasAny = _avmRawData.some(function(d) { return d.breakdown && d.breakdown.length > 0; });
+  if (!hasAny) return '';
+
+  var blocks = _avmRawData.map(function(d) {
+    if (!d.breakdown || d.breakdown.length === 0) return '';
+    var rows = d.breakdown.map(function(b) {
+      var aetVal = _ralatPDFFmtVal(b, b.asetVal);
+      var compVal = _ralatPDFFmtVal(b, b.compVal);
+      var koefTxt = (b.koef >= 0 ? '+' : '') + b.koef.toFixed(4);
+      var pct = (b.kontribPct >= 0 ? '+' : '') + (b.kontribPct * 100).toFixed(2) + '%';
+      var color = b.kontribPct >= 0 ? '#15803d' : '#dc2626';
+      return '<tr>' +
+             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; font-family:monospace; font-size:10px;">' + _ralatVarLabel(b.var) + '</td>' +
+             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-size:10px;">' + aetVal + '</td>' +
+             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-size:10px;">' + compVal + '</td>' +
+             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-family:monospace; font-size:10px;">' + koefTxt + '</td>' +
+             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; color:' + color + '; font-weight:700; font-size:10px;">' + pct + '</td>' +
+             '</tr>';
+    }).join('');
+
+    var totalSign = d.adjPct >= 0 ? '+' : '';
+    var totalPct = totalSign + (d.adjPct * 100).toFixed(2) + '%';
+    var capWarn = d.capped ? ' <span style="color:#dc2626;">(di-cap dari ' + (d.rawAdjPct * 100).toFixed(1) + '%)</span>' : '';
+    var grossTxt = (d.gross !== undefined) ? ' · gross ' + (d.gross * 100).toFixed(2) + '%' : '';
+
+    return '<div style="margin-top:14px; page-break-inside:avoid; border:1px solid #e2e8f0; border-radius:4px; overflow:hidden;">' +
+           '<div style="background:#f8fafc; padding:6px 10px; font-weight:700; font-size:11px; color:#1e3a5f; border-bottom:1px solid #e2e8f0;">' +
+           '📍 ' + d.id + ' · Total: <span style="color:' + (d.adjPct >= 0 ? '#15803d' : '#dc2626') + ';">' + totalPct + '</span>' + capWarn + grossTxt +
+           '</div>' +
+           '<table style="width:100%; border-collapse:collapse;">' +
+           '<thead><tr style="background:#fafafa;">' +
+           '<th style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:10px;">Variabel</th>' +
+           '<th style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:10px;">Aset</th>' +
+           '<th style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:10px;">Pembanding</th>' +
+           '<th style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:10px;">β</th>' +
+           '<th style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:10px;">Kontribusi</th>' +
+           '</tr></thead>' +
+           '<tbody>' + rows + '</tbody>' +
+           '</table>' +
+           '</div>';
+  }).filter(Boolean).join('');
+
+  return '<h3 style="color:#1e3a5f; font-size:14px; margin:30px 0 6px 0;">Komposisi Penyesuaian Spasial (RaLAT) — Per Pembanding</h3>' +
+         '<p style="font-size:10px; color:#5a6a7e; margin-bottom:8px;">Daftar lengkap kontribusi setiap variabel regresi terhadap penyesuaian harga per pembanding. Variabel dengan koefisien β positif → kenaikan harga searah dengan kenaikan nilai variabel.</p>' +
+         blocks;
+}
+
+function _ralatPDFFmtVal(b, v) {
+  if (v === null || v === undefined) return '–';
+  if (typeof v !== 'number') return String(v);
+  if (b.tipe === 'ln') {
+    return v >= 1000 ? (v/1000).toFixed(2) + ' km' : Math.round(v) + ' m';
+  }
+  if (b.tipe === 'numerik_ln') return 'ln=' + v.toFixed(3);
+  if (b.tipe === 'marking' || b.tipe === 'kategori') return v ? '✓' : '–';
+  if (b.tipe === 'poi_count') return Math.round(v);
+  return Number(v).toFixed(2);
+}
+
+/* =========================== END RaLAT v2 ============================== */
 // ------------------------------------------------
 
 function renderTable(data) {
