@@ -754,6 +754,13 @@ body.mmode-picking .mpick-hint { display: flex; }
       </div>
 
       <div id="tab-sbm" class="avm-tab-content active">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; background:#fff7e0; border:1px solid #f4b400; border-radius:8px; margin-bottom:14px;">
+          <div style="font-size:11px; color:#1e3a5f;">
+            <strong>📅 Tanggal Penilaian</strong>
+            <span style="color:#5a6a7e;"> · digunakan sebagai titik referensi Time Adjustment & Aging</span>
+          </div>
+          <input type="date" id="valuationDateInput" class="form-input" style="width:170px; padding:5px 8px; font-size:12px;" onchange="setValuationDateFromInput(this.value)">
+        </div>
         <div style="display: flex; justify-content: space-between; align-items:flex-end;">
           <div>
             <div class="result-label" style="font-weight:bold; color:var(--text-sub); font-size:13px;">Nilai Dasar (Base Case Median)</div>
@@ -774,18 +781,18 @@ body.mmode-picking .mpick-hint { display: flex; }
             <div style="font-size:11px; color:var(--text-sub); font-weight:bold;">Skenario Pesimis</div>
             <div class="form-group" style="margin-top:10px;">
               <label class="form-label" style="font-size:10px;">Probabilitas (%)</label>
-              <input type="number" id="sbmProbPess" class="form-input" value="15" onchange="calculateSBM()">
+              <input type="number" id="sbmProbPess" class="form-input" value="15" min="0" max="100" step="1" oninput="calculateSBM()" onchange="calculateSBM()">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <label class="form-label" style="font-size:10px;">Koreksi Harga (%)</label>
-              <input type="number" id="sbmAdjPess" class="form-input" value="-15" onchange="calculateSBM()">
+              <input type="number" id="sbmAdjPess" class="form-input" value="-15" min="-90" max="200" step="0.5" oninput="calculateSBM()" onchange="calculateSBM()">
             </div>
           </div>
           <div class="sbm-card" style="border-color:#2d6be4; background:#e8f0fe;">
             <div style="font-size:11px; color:#2d6be4; font-weight:bold;">Skenario Normal (Base)</div>
             <div class="form-group" style="margin-top:10px;">
               <label class="form-label" style="font-size:10px;">Probabilitas (%)</label>
-              <input type="number" id="sbmProbBase" class="form-input" value="60" onchange="calculateSBM()">
+              <input type="number" id="sbmProbBase" class="form-input" value="60" min="0" max="100" step="1" oninput="calculateSBM()" onchange="calculateSBM()">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <label class="form-label" style="font-size:10px;">Koreksi Harga (%)</label>
@@ -796,11 +803,11 @@ body.mmode-picking .mpick-hint { display: flex; }
             <div style="font-size:11px; color:var(--text-sub); font-weight:bold;">Skenario Optimis</div>
             <div class="form-group" style="margin-top:10px;">
               <label class="form-label" style="font-size:10px;">Probabilitas (%)</label>
-              <input type="number" id="sbmProbOpt" class="form-input" value="25" onchange="calculateSBM()">
+              <input type="number" id="sbmProbOpt" class="form-input" value="25" min="0" max="100" step="1" oninput="calculateSBM()" onchange="calculateSBM()">
             </div>
             <div class="form-group" style="margin-top:10px;">
               <label class="form-label" style="font-size:10px;">Koreksi Harga (%)</label>
-              <input type="number" id="sbmAdjOpt" class="form-input" value="10" onchange="calculateSBM()">
+              <input type="number" id="sbmAdjOpt" class="form-input" value="10" min="-90" max="200" step="0.5" oninput="calculateSBM()" onchange="calculateSBM()">
             </div>
           </div>
         </div>
@@ -1139,6 +1146,49 @@ var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
 
+// Tanggal Penilaian eksplisit (SPI 103 wajib). Default: hari ini.
+// Diset oleh user melalui date picker di modal Analisa.
+var _valuationDate = new Date();
+
+function _getValuationFractionalYear() {
+  var d = (_valuationDate instanceof Date && !isNaN(_valuationDate)) ? _valuationDate : new Date();
+  var y = d.getFullYear();
+  var startOfYear = new Date(y, 0, 1).getTime();
+  var startOfNext = new Date(y + 1, 0, 1).getTime();
+  return y + (d.getTime() - startOfYear) / (startOfNext - startOfYear);
+}
+
+function _formatValuationDateID() {
+  var d = (_valuationDate instanceof Date && !isNaN(_valuationDate)) ? _valuationDate : new Date();
+  try {
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  } catch (e) {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+function _formatValuationDateISO() {
+  var d = (_valuationDate instanceof Date && !isNaN(_valuationDate)) ? _valuationDate : new Date();
+  var pad = function(n){ return n < 10 ? '0' + n : '' + n; };
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
+
+function setValuationDateFromInput(val) {
+  if (!val) { _valuationDate = new Date(); }
+  else {
+    var d = new Date(val + 'T00:00:00');
+    if (!isNaN(d)) _valuationDate = d;
+  }
+  _currentYear = _valuationDate.getFullYear();
+  // Re-render modal AVM jika sedang terbuka
+  var modalOpen = document.getElementById('analyticsOverlay').classList.contains('open');
+  if (modalOpen && _avmRawData && _avmRawData.length > 0) {
+    initAVMAnalysis();
+  }
+  // Refresh aging flag di tabel
+  if (currentData && currentData.length > 0) renderTable(currentData);
+}
+
 // Variabel SBM, Audit & AI Agent Edge (Dengan Dukungan Model Regresi)
 var _avmOverrideState = {}; 
 var _avmRawData = []; 
@@ -1156,8 +1206,15 @@ var activeUsername = sessionStorage.getItem('userName');
 var PIN_COLORS = { 'Tanah Kosong': '#4285f4', 'Tanah Bangunan': '#0f9d58', 'Ruko': '#ab47bc', 'Office/Retail/Unit Apartemen': '#f4b400' };
 
 function getAgingFlag(yrStr) {
-  var yr = parseInt(String(yrStr));
-  if (!isNaN(yr) && yr <= _currentYear - 2) return ' <span style="font-size:10.5px; color:#dc2626; cursor:help;" title="Data Lama (> 1 Tahun)">⏳</span>';
+  var parsed = _parseWaktuData(yrStr);
+  if (!parsed) return '';
+  // Bandingkan dengan tanggal penilaian (fractional) — data lebih lama dari 1 tahun ditandai
+  var nowFrac = (typeof _getValuationFractionalYear === 'function')
+                ? _getValuationFractionalYear()
+                : (_currentYear + 0.5);
+  if (parsed.fractional <= (nowFrac - 1)) {
+    return ' <span style="font-size:10.5px; color:#dc2626; cursor:help;" title="Data Lama (> 1 Tahun dari Tanggal Penilaian)">⏳</span>';
+  }
   return '';
 }
 
@@ -1450,7 +1507,13 @@ function initAVMAnalysis() {
       console.warn('Model Ekonometrika ' + modelName + ' tidak ditemukan. Memakai perhitungan tanpa penyesuaian spasial.');
   }
 
-  var timeAdjRate = parseFloat(document.getElementById('timeAdjRate').value) || 0;
+  // Clamp time adjustment rate ke rentang wajar [-20%, +50%] per tahun
+  var rawRate = document.getElementById('timeAdjRate').value;
+  var timeAdjRate = _clamp(rawRate, -20, 50, 0);
+  if (String(rawRate).trim() !== '' && String(rawRate) !== String(timeAdjRate)) {
+      document.getElementById('timeAdjRate').value = timeAdjRate;
+      toast('Time Adjustment Rate dibatasi ke ' + timeAdjRate + '% (rentang valid: -20% s.d. +50%)', 'success');
+  }
 
   _avmOverrideState = {}; 
   _avmRawData = [];
@@ -1472,9 +1535,12 @@ function initAVMAnalysis() {
   currentData.forEach(function(row) {
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
-    if (!isNaN(price) && price > 0) { 
-      var rowYear = parseInt(row.waktuData) || _currentYear;
-      var diffYears = _currentYear - rowYear;
+    if (!isNaN(price) && price > 0) {
+      // Time Adjustment dengan fractional year (lebih akurat untuk Q3-2023, Mar-2023, dst.)
+      var rowParsed = _parseWaktuData(row.waktuData);
+      var rowFrac = rowParsed ? rowParsed.fractional : null;
+      var valFrac = _getValuationFractionalYear();
+      var diffYears = (rowFrac !== null) ? (valFrac - rowFrac) : 0;
       if (diffYears > 0 && timeAdjRate !== 0) {
           price = price * Math.pow(1 + (timeAdjRate / 100), diffYears);
       }
@@ -1521,7 +1587,10 @@ function initAVMAnalysis() {
   if (_avmRawData.length === 0) { toast('Tidak ada data valid untuk dianalisa.', 'error'); return; }
 
   recalcAVM(); 
-  switchAVMTab('sbm'); 
+  switchAVMTab('sbm');
+  // Sinkronkan date picker dengan _valuationDate aktif
+  var vdEl = document.getElementById('valuationDateInput');
+  if (vdEl) vdEl.value = _formatValuationDateISO();
   document.getElementById('analyticsOverlay').classList.add('open');
 }
 
@@ -1605,26 +1674,51 @@ function toggleAVMOverride(uid, isChecked) {
   recalcAVM(); 
 }
 
+/* Helper: clamp angka ke rentang [min,max], default = fallback bila NaN */
+function _clamp(val, min, max, fallback) {
+  var n = parseFloat(val);
+  if (isNaN(n)) return fallback;
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
 function calculateSBM() {
-  var pPess = parseFloat(document.getElementById('sbmProbPess').value) || 0;
-  var aPess = parseFloat(document.getElementById('sbmAdjPess').value) || 0;
+  // Clamp probabilitas ke [0, 100], adjustment ke [-90, +200]
+  var elPP = document.getElementById('sbmProbPess');
+  var elPB = document.getElementById('sbmProbBase');
+  var elPO = document.getElementById('sbmProbOpt');
+  var elAP = document.getElementById('sbmAdjPess');
+  var elAO = document.getElementById('sbmAdjOpt');
 
-  var pBase = parseFloat(document.getElementById('sbmProbBase').value) || 0;
-  var aBase = 0; 
+  var pPess = _clamp(elPP.value, 0, 100, 0);
+  var pBase = _clamp(elPB.value, 0, 100, 0);
+  var pOpt  = _clamp(elPO.value, 0, 100, 0);
+  var aPess = _clamp(elAP.value, -90, 200, 0);
+  var aOpt  = _clamp(elAO.value, -90, 200, 0);
+  var aBase = 0;
 
-  var pOpt = parseFloat(document.getElementById('sbmProbOpt').value) || 0;
-  var aOpt = parseFloat(document.getElementById('sbmAdjOpt').value) || 0;
+  // Tulis balik nilai yang sudah di-clamp agar UI konsisten dengan perhitungan
+  if (String(elPP.value) !== String(pPess)) elPP.value = pPess;
+  if (String(elPB.value) !== String(pBase)) elPB.value = pBase;
+  if (String(elPO.value) !== String(pOpt))  elPO.value  = pOpt;
+  if (String(elAP.value) !== String(aPess)) elAP.value = aPess;
+  if (String(elAO.value) !== String(aOpt))  elAO.value  = aOpt;
 
   var totalProb = pPess + pBase + pOpt;
-  
-  if(totalProb !== 100) {
-      document.getElementById('sbmWarning').style.display = 'block';
-      document.getElementById('sbmExpectedValue').textContent = "ERROR";
-      document.getElementById('sbmExpectedValue').style.color = "#fca5a5";
+  var warnEl = document.getElementById('sbmWarning');
+  var evEl = document.getElementById('sbmExpectedValue');
+
+  if (Math.abs(totalProb - 100) > 0.01) {
+      warnEl.style.display = 'block';
+      warnEl.textContent = '⚠️ Total probabilitas saat ini = ' + totalProb.toFixed(1) +
+                           '%. Wajib 100% (Pesimis + Normal + Optimis).';
+      evEl.textContent = 'ERROR';
+      evEl.style.color = '#fca5a5';
       return;
   } else {
-      document.getElementById('sbmWarning').style.display = 'none';
-      document.getElementById('sbmExpectedValue').style.color = "#fff";
+      warnEl.style.display = 'none';
+      evEl.style.color = '#fff';
   }
 
   var valPess = _avmCurrentMedian * (1 + (aPess/100)) * (pPess/100);
@@ -1633,7 +1727,7 @@ function calculateSBM() {
 
   var expectedValue = valPess + valBase + valOpt;
 
-  document.getElementById('sbmExpectedValue').textContent = formatRupiah(Math.round(expectedValue)) + " /m²";
+  evEl.textContent = formatRupiah(Math.round(expectedValue)) + " /m²";
 }
 
 function closeAnalyticsModal() { document.getElementById('analyticsOverlay').classList.remove('open'); }
@@ -1658,7 +1752,7 @@ function downloadAVMPDF() {
   template.innerHTML = `
     <div style="border-bottom: 3px solid #2d6be4; padding-bottom:15px; margin-bottom:20px;">
       <h1 style="color:#1e3a5f; margin:0;">Laporan Valuasi Skenario Hibrida (SBM)</h1>
-      <p style="color:#5a6a7e; margin:5px 0 0 0;">Dihasilkan oleh WebGIS Appraisal System (IVS 200 Compliant)</p>
+      <p style="color:#5a6a7e; margin:5px 0 0 0;">Dihasilkan oleh WebGIS Appraisal System (mengacu IVS 400 — Real Property Interests)</p>
     </div>
     
     <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
@@ -1703,7 +1797,9 @@ function downloadAVMPDF() {
     </table>
 
     <div style="margin-top:40px; font-size:11px; color:#5a6a7e; text-align:right;">
-      Disusun & Dikendalikan oleh: ${activeUsername} | Tanggal: ${new Date().toLocaleString('id-ID')}
+      Disusun & Dikendalikan oleh: ${activeUsername}<br>
+      Tanggal Penilaian: ${_formatValuationDateID()}<br>
+      Tanggal Laporan: ${new Date().toLocaleString('id-ID')}
     </div>
   `;
 
@@ -1716,6 +1812,85 @@ function downloadAVMPDF() {
 function formatRupiah(val) { if (val === null || val === undefined || val === '') return '–'; var digits = String(val).replace(/[^0-9]/g, ''); if (!digits) return String(val); return 'Rp ' + digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 function _getPinLabel(id) { var s = String(id || '').toUpperCase().trim(); return s.indexOf('DP') !== -1 ? 'DP' : 'Ob'; }
 function _parseCoordJS(val) { if (!val) return null; var s = String(val).trim(); if (s.indexOf(',') !== -1) { var p = s.split(','); var lat = parseFloat(p[0].trim()), lng = parseFloat(p[1].trim()); if (!isNaN(lat) && !isNaN(lng)) return { lat: lat, lng: lng }; } var sp = s.split(/\s+/); if (sp.length >= 2) { var lat = parseFloat(sp[0]), lng = parseFloat(sp[1]); if (!isNaN(lat) && !isNaN(lng)) return { lat: lat, lng: lng }; } return null; }
+
+/* Parse waktu data ke { year, fractional }
+ * Mendukung format:
+ *   - "2023"               → { year:2023, fractional:2023.5 }   (asumsi tengah tahun)
+ *   - "Q3 2023" / "2023 Q3" / "2023Q3" → fractional sesuai kuartal (titik tengah)
+ *   - "Mar 2023" / "Maret 2023" / "2023-03" / "03/2023" → fractional bulanan
+ *   - "2023-03-15" / "15/03/2023" / "15-03-2023" → fractional harian
+ * Mengembalikan null jika tidak dapat di-parse.
+ */
+function _parseWaktuData(raw) {
+  if (raw === null || raw === undefined) return null;
+  var s = String(raw).trim();
+  if (!s || s === '–' || s === '-') return null;
+
+  var monthMap = {
+    'jan':1,'januari':1,'january':1,
+    'feb':2,'februari':2,'february':2,
+    'mar':3,'maret':3,'march':3,
+    'apr':4,'april':4,
+    'mei':5,'may':5,
+    'jun':6,'juni':6,'june':6,
+    'jul':7,'juli':7,'july':7,
+    'agu':8,'agus':8,'agustus':8,'aug':8,'august':8,
+    'sep':9,'sept':9,'september':9,
+    'okt':10,'oktober':10,'oct':10,'october':10,
+    'nov':11,'november':11,
+    'des':12,'desember':12,'dec':12,'december':12
+  };
+
+  // 1. Format kuartal: Q3-2023 / 2023-Q3 / Q3 2023 / 2023Q3
+  var mQ = s.match(/Q\s*([1-4])[\s\-/]*(\d{4})/i) || s.match(/(\d{4})[\s\-/]*Q\s*([1-4])/i);
+  if (mQ) {
+    var y, q;
+    if (/^Q/i.test(mQ[0])) { q = parseInt(mQ[1], 10); y = parseInt(mQ[2], 10); }
+    else                   { y = parseInt(mQ[1], 10); q = parseInt(mQ[2], 10); }
+    // Titik tengah kuartal (bulan ke 1.5/4.5/7.5/10.5 → fractional)
+    var qMid = (q - 1) * 3 + 1.5;
+    return { year: y, fractional: y + (qMid - 0.5) / 12 };
+  }
+
+  // 2. Tanggal lengkap: ISO 2023-03-15 atau 2023/03/15
+  var mISO = s.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})$/);
+  if (mISO) {
+    var y = +mISO[1], mo = +mISO[2], d = +mISO[3];
+    if (mo>=1&&mo<=12&&d>=1&&d<=31) return { year: y, fractional: y + ((mo-1)*30 + (d-1)) / 365 };
+  }
+  // 3. Tanggal D/M/Y: 15-03-2023 atau 15/03/2023
+  var mDMY = s.match(/^(\d{1,2})[\-\/](\d{1,2})[\-\/](\d{4})$/);
+  if (mDMY) {
+    var d = +mDMY[1], mo = +mDMY[2], y = +mDMY[3];
+    if (mo>=1&&mo<=12&&d>=1&&d<=31) return { year: y, fractional: y + ((mo-1)*30 + (d-1)) / 365 };
+  }
+  // 4. Bulan-Tahun: Mar 2023 / Maret 2023 / Maret-2023
+  var mMY = s.match(/^([A-Za-z]{3,})[\s\-/]+(\d{4})$/);
+  if (mMY) {
+    var mo = monthMap[mMY[1].toLowerCase()];
+    var y = +mMY[2];
+    if (mo) return { year: y, fractional: y + (mo - 0.5) / 12 };
+  }
+  // 5. Tahun-Bulan: 2023-03 / 2023/03
+  var mYM = s.match(/^(\d{4})[\-\/](\d{1,2})$/);
+  if (mYM) {
+    var y = +mYM[1], mo = +mYM[2];
+    if (mo>=1&&mo<=12) return { year: y, fractional: y + (mo - 0.5) / 12 };
+  }
+  // 6. Bulan/Tahun: 03/2023
+  var mMY2 = s.match(/^(\d{1,2})[\-\/](\d{4})$/);
+  if (mMY2) {
+    var mo = +mMY2[1], y = +mMY2[2];
+    if (mo>=1&&mo<=12) return { year: y, fractional: y + (mo - 0.5) / 12 };
+  }
+  // 7. Hanya angka tahun: "2023"
+  var mY = s.match(/(\d{4})/);
+  if (mY) {
+    var y = parseInt(mY[1], 10);
+    if (y >= 1900 && y <= 2100) return { year: y, fractional: y + 0.5 };
+  }
+  return null;
+}
 
 function makePinIcon(color, label) {
   var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26S36 31.5 36 18C36 8.06 27.94 0 18 0z" fill="' + color + '" stroke="white" stroke-width="1.5"/><circle cx="18" cy="18" r="9" fill="white" opacity="0.9"/><text x="18" y="22" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="700" fill="' + color + '">' + label + '</text></svg>';
@@ -2027,6 +2202,112 @@ function buildPopup(row) {
 }
 function _iwr(k, v) { return '<div class="iw-row"><span class="iw-key">' + k + '</span><span class="iw-val">' + v + '</span></div>'; }
 
+/* =========================================================================
+   ANALISIS POI (OVERPASS) — dengan cache localStorage, mirror fallback,
+   dan radius adaptif (2.5 km -> 5 km -> 10 km).
+   Cache: key = `poi:{lat3},{lng3}` (presisi 3 desimal ≈ ~110m), TTL 7 hari.
+========================================================================= */
+
+var OVERPASS_MIRRORS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.openstreetmap.fr/api/interpreter'
+];
+var OVERPASS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 hari
+var OVERPASS_RADII_M = [2500, 5000, 10000];          // radius adaptif
+
+function _poiCacheKey(lat, lng, radius) {
+    // Presisi 3 desimal ≈ ~110 m; cukup untuk POI yang dipakai sebagai konteks lokasi
+    return 'poi:' + Number(lat).toFixed(3) + ',' + Number(lng).toFixed(3) + ':' + radius;
+}
+
+function _poiCacheGet(lat, lng, radius) {
+    try {
+        var raw = localStorage.getItem(_poiCacheKey(lat, lng, radius));
+        if (!raw) return null;
+        var obj = JSON.parse(raw);
+        if (!obj || !obj.t || !obj.d) return null;
+        if ((Date.now() - obj.t) > OVERPASS_CACHE_TTL_MS) return null;
+        return obj.d;
+    } catch (e) { return null; }
+}
+
+function _poiCacheSet(lat, lng, radius, data) {
+    try {
+        localStorage.setItem(_poiCacheKey(lat, lng, radius), JSON.stringify({ t: Date.now(), d: data }));
+    } catch (e) {
+        // Quota exceeded → bersih-bersih cache POI lama
+        try {
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf('poi:') === 0) localStorage.removeItem(k);
+            }
+            localStorage.setItem(_poiCacheKey(lat, lng, radius), JSON.stringify({ t: Date.now(), d: data }));
+        } catch (e2) { /* abaikan */ }
+    }
+}
+
+function _overpassQuery(lat, lng, radius) {
+    return '[out:json][timeout:20];(' +
+        'node["highway"="motorway_junction"](around:' + radius + ',' + lat + ',' + lng + ');' +
+        'node["amenity"="hospital"](around:' + radius + ',' + lat + ',' + lng + ');' +
+        'node["amenity"="school"](around:' + radius + ',' + lat + ',' + lng + ');' +
+        'node["shop"="mall"](around:' + radius + ',' + lat + ',' + lng + ');' +
+        'node["shop"="supermarket"](around:' + radius + ',' + lat + ',' + lng + ');' +
+        'node["railway"="station"](around:' + radius + ',' + lat + ',' + lng + ');' +
+        ');out body;>;out skel qt;';
+}
+
+// Coba mirror satu per satu sampai dapat respons valid
+function _overpassFetchWithFallback(query, mirrorIdx) {
+    mirrorIdx = mirrorIdx || 0;
+    if (mirrorIdx >= OVERPASS_MIRRORS.length) {
+        return Promise.reject(new Error('Semua mirror Overpass gagal merespons.'));
+    }
+    var url = OVERPASS_MIRRORS[mirrorIdx];
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query)
+    })
+    .then(function(resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+    })
+    .catch(function() {
+        return _overpassFetchWithFallback(query, mirrorIdx + 1);
+    });
+}
+
+// Fetch satu radius dengan cache; resolve { elements, radius, fromCache }
+function _fetchOverpassForRadius(lat, lng, radius) {
+    var cached = _poiCacheGet(lat, lng, radius);
+    if (cached) {
+        return Promise.resolve({ elements: cached, radius: radius, fromCache: true });
+    }
+    return _overpassFetchWithFallback(_overpassQuery(lat, lng, radius))
+        .then(function(data) {
+            var elements = (data && data.elements) ? data.elements : [];
+            _poiCacheSet(lat, lng, radius, elements);
+            return { elements: elements, radius: radius, fromCache: false };
+        });
+}
+
+// Coba radius bertingkat: 2.5 → 5 → 10 km, berhenti saat dapat hasil yang berarti.
+// "Berarti" = setidaknya ada 1 node bertag (bukan helper node tanpa tag).
+function _fetchOverpassAdaptive(lat, lng, idx) {
+    idx = idx || 0;
+    if (idx >= OVERPASS_RADII_M.length) {
+        return Promise.resolve({ elements: [], radius: OVERPASS_RADII_M[OVERPASS_RADII_M.length - 1], fromCache: false });
+    }
+    var radius = OVERPASS_RADII_M[idx];
+    return _fetchOverpassForRadius(lat, lng, radius).then(function(res) {
+        var hasUseful = (res.elements || []).some(function(el) { return el && el.tags; });
+        if (hasUseful || idx === OVERPASS_RADII_M.length - 1) return res;
+        return _fetchOverpassAdaptive(lat, lng, idx + 1);
+    });
+}
+
 function analyzePOI(lat, lng, uid) {
     var btn = document.getElementById('btn_poi_' + uid);
     var resDiv = document.getElementById('poi_res_' + uid);
@@ -2040,22 +2321,13 @@ function analyzePOI(lat, lng, uid) {
     poiLayerGroup.forEach(function(item){ item.setMap(null); });
     poiLayerGroup = [];
 
-    var radius = 2500; 
-    
-    var query = '[out:json][timeout:15];(node["highway"="motorway_junction"](around:' + radius + ',' + lat + ',' + lng + ');node["amenity"="hospital"](around:' + radius + ',' + lat + ',' + lng + ');node["amenity"="school"](around:' + radius + ',' + lat + ',' + lng + ');node["shop"="mall"](around:' + radius + ',' + lat + ',' + lng + ');node["shop"="supermarket"](around:' + radius + ',' + lat + ',' + lng + ');node["railway"="station"](around:' + radius + ',' + lat + ',' + lng + '););out body;>;out skel qt;';
+    _fetchOverpassAdaptive(lat, lng, 0)
+    .then(function(res) {
+        var elements = res.elements || [];
+        var radius = res.radius;
+        btn.style.display = 'none';
 
-    var url = 'https://overpass-api.de/api/interpreter';
-
-    fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: "data=" + encodeURIComponent(query)
-    })
-    .then(function(response) { return response.json(); })
-    .then(function(data) {
-        btn.style.display = 'none'; 
-
-        if(!data.elements || data.elements.length === 0) {
+        if (elements.length === 0) {
             resDiv.innerHTML = '<div style="color:#5a6a7e; text-align:center; padding:10px 0;">Tidak ditemukan fasilitas utama dalam radius ' + (radius/1000) + ' KM.</div>';
             return;
         }
@@ -2070,7 +2342,7 @@ function analyzePOI(lat, lng, uid) {
 
         var propLatLng = new google.maps.LatLng(lat, lng);
 
-        data.elements.forEach(function(el) {
+        elements.forEach(function(el) {
             if (el.type === 'node' && el.tags) {
                 var elLatLng = new google.maps.LatLng(el.lat, el.lon);
                 var dist = google.maps.geometry.spherical.computeDistanceBetween(propLatLng, elLatLng);
@@ -2079,8 +2351,8 @@ function analyzePOI(lat, lng, uid) {
                 for (var cat in categories) {
                     var match = false;
                     var catDef = categories[cat].tags;
-                    
-                    if (Array.isArray(catDef[0])) { 
+
+                    if (Array.isArray(catDef[0])) {
                         for(var i=0; i<catDef.length; i++) { if(el.tags[catDef[i][0]] === catDef[i][1]) match = true; }
                     } else {
                         if(el.tags[catDef[0]] === catDef[1]) match = true;
@@ -2099,7 +2371,11 @@ function analyzePOI(lat, lng, uid) {
             _asetPOIData = categories;
         }
 
-        var html = '<div style="font-size:10px; color:#8a9ab0; margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">📍 Fasilitas Terdekat</div>';
+        var radiusBadge = (radius/1000).toFixed(radius >= 10000 ? 0 : 1) + ' KM' + (res.fromCache ? ' · cache' : '');
+        var html = '<div style="font-size:10px; color:#8a9ab0; margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px; display:flex; justify-content:space-between; align-items:center;">' +
+                   '<span>📍 Fasilitas Terdekat</span>' +
+                   '<span style="background:#e8f0fe; color:#2d6be4; padding:2px 6px; border-radius:10px; font-weight:700; letter-spacing:0;">R ' + radiusBadge + '</span>' +
+                   '</div>';
         var foundAny = false;
         var poiBounds = new google.maps.LatLngBounds();
         poiBounds.extend(propLatLng);
@@ -2113,18 +2389,24 @@ function analyzePOI(lat, lng, uid) {
                         '<span class="poi-name" title="' + item.name + '">' + cat + ': ' + item.name + '</span>' +
                         '<span class="poi-dist">' + distText + '</span></div>';
 
+                // FIX: strokeOpacity sebelumnya didefinisikan dua kali (1 lalu 0) sehingga
+                // garis polyline tidak terlihat sama sekali, hanya titik-titik dotted yang muncul.
+                // Sekarang: garis solid semi-transparan + dot overlay untuk memperkuat visual.
                 var line = new google.maps.Polyline({
                     path: [{lat: lat, lng: lng}, {lat: item.lat, lng: item.lon}],
                     strokeColor: '#2d6be4',
-                    strokeOpacity: 1,
-                    strokeWeight: 4,
+                    strokeOpacity: 0.55,
+                    strokeWeight: 3,
                     geodesic: true,
-                    icons: [{icon: {path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3}, offset: '0', repeat: '16px'}],
-                    strokeOpacity: 0,
+                    icons: [{
+                        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#1e3a5f', scale: 3 },
+                        offset: '0',
+                        repeat: '14px'
+                    }],
                     map: gMap
                 });
                 poiLayerGroup.push(line);
-                
+
                 var poiMarker = new google.maps.Marker({
                     position: {lat: item.lat, lng: item.lon},
                     map: gMap,
@@ -2154,7 +2436,7 @@ function analyzePOI(lat, lng, uid) {
     .catch(function(err) {
         btn.disabled = false;
         btn.innerHTML = '⚠️ Gagal. Coba Lagi';
-        toast('Gagal menghubungi satelit Overpass: ' + err.message, 'error');
+        toast('Gagal menghubungi Overpass: ' + err.message, 'error');
     });
 }
 // ------------------------------------------------
