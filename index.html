@@ -710,8 +710,8 @@ body.mmode-picking .mpick-hint { display: flex; }
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
         <button class="btn-view" id="btnHeatmap" onclick="toggleHeatmap()" style="color:#ea4335; border-color:#ea4335;">🔥 Heatmap</button>
         <div class="mode-dropdown-wrap" style="position:relative;">
-          <button class="btn-view active" id="btnModeToggle" type="button" onclick="toggleModeMenu(event)" style="color:#4285f4; border-color:#4285f4; font-weight:bold;">
-            <span id="btnModeLabel">🌐 Mode: Google Maps</span>
+          <button class="btn-view active" id="btnModeToggle" type="button" onclick="toggleModeMenu(event)" style="color:#2d6be4; border-color:#2d6be4; font-weight:bold;">
+            <span id="btnModeLabel">🗺️ Mode: OpenStreetMap</span>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           <div class="mode-dropdown-menu" id="modeMenu" style="display:none; position:absolute; top:calc(100% + 4px); left:0; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 6px 20px rgba(30,58,95,.18); z-index:200; min-width:180px; overflow:hidden;">
@@ -731,8 +731,8 @@ body.mmode-picking .mpick-hint { display: flex; }
 
     <div class="content-area">
       <div class="map-loading" id="mapLoading"><div class="spinner"></div><div style="color:#5a6a7e;font-size:12px;">Memuat peta…</div></div>
-      <div id="map"></div>
-      <div id="osmMap" style="position:absolute; inset:0; width:100%; height:100%; z-index:1; display:none;"></div>
+      <div id="map" style="display:none;"></div>
+      <div id="osmMap" style="position:absolute; inset:0; width:100%; height:100%; z-index:1; display:block;"></div>
       <div class="table-view" id="tableView">
         <table class="data-table">
           <thead>
@@ -1116,8 +1116,8 @@ body.mmode-picking .mpick-hint { display: flex; }
 
   <!-- Peta Measurement -->
   <div class="measure-map-wrap">
-    <div id="measureMap"></div>
-    <div id="measureOsmMap"></div>
+    <div id="measureMap" style="display:none;"></div>
+    <div id="measureOsmMap" class="active"></div>
 
     <div class="mroute-loading" id="mRouteLoading"><div class="dotspin"></div><span id="mRouteLoadingTxt">Menghitung rute…</span></div>
 
@@ -1135,9 +1135,9 @@ body.mmode-picking .mpick-hint { display: flex; }
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Tutup
       </button>
-      <button class="mmap-osm-toggle" id="btnMeasureOsm" onclick="toggleMeasureOSM()">
+      <button class="mmap-osm-toggle active" id="btnMeasureOsm" onclick="toggleMeasureOSM()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        OpenStreetMap
+        Google Maps
       </button>
     </div>
 
@@ -1381,7 +1381,7 @@ function toggle3D() {
   // Legacy — replaced by switchMapMode
 }
 
-var _currentMapMode = 'gmaps'; // 'gmaps' or 'osm'
+var _currentMapMode = 'osm'; // 'gmaps' or 'osm' — default OpenStreetMap saat pertama dibuka
 var _osmMap = null;
 var _osmMarkers = [];
 
@@ -2239,7 +2239,21 @@ function initMap() {
     }
   });
 
-  document.getElementById('mapLoading').style.display = 'none'; doSearch();
+  document.getElementById('mapLoading').style.display = 'none';
+
+  // Default mode = OpenStreetMap. Init Leaflet map + sync setelah pencarian awal selesai.
+  if (_currentMapMode === 'osm') {
+    if (!_osmMap) {
+      _osmMap = L.map('osmMap', { zoomControl: true }).setView([-6.175, 106.827], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(_osmMap);
+    }
+    setTimeout(function() { if (_osmMap) _osmMap.invalidateSize(); }, 200);
+  }
+
+  doSearch();
 }
 
 document.addEventListener('click', function (e) {
@@ -4325,7 +4339,7 @@ function _mRedraw() {
 }
 
 // ═══════════════════════════ MEASUREMENT OSM TOGGLE ═══════════════════════════
-var _mOsmActive = false;       // Status: apakah sedang mode OSM
+var _mOsmActive = true;        // Status: default mode = OpenStreetMap
 var _mOsmMap = null;           // Instance Leaflet map
 var _mOsmInited = false;       // Sudah init?
 var _mOsmMarkers = [];         // Leaflet markers
@@ -4359,6 +4373,11 @@ function toggleMeasureOSM() {
     oMap.classList.remove('active');
     gMap.style.display = '';
 
+    // Init Google Maps measurement saat pertama kali dipakai (karena default-nya OSM)
+    if (!_mMapInited) {
+      _mInitMap();
+      _mMapInited = true;
+    }
     if (_mMap) {
       google.maps.event.trigger(_mMap, 'resize');
     }
