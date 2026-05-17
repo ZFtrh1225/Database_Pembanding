@@ -1,0 +1,10 @@
+# Dev-only smoke tests for RaLAT v2 (run with `node .kiro/_ralat_v2_smoke.js`)
+.kiro/_ralat_v2_smoke.js
+.kiro/_*.js
+
+# Editor / OS clutter
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
