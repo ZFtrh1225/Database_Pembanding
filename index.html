@@ -2720,7 +2720,7 @@ function renderMCResults(result) {
   auditLog += '<div><strong>Variabel 4 — Bootstrap:</strong> ' + (a.boot.enabled ? 'Empirical resample (n=' + a.boot.samplesPerIter + ' per iterasi, with replacement)' : '<em>OFF</em>') + '</div>';
   auditLog += '<div><strong>Variabel 5 — SBM Dirichlet:</strong> ' + (a.dir.enabled ? 'Dirichlet(α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa + ')' : '<em>OFF</em>') + '</div>';
   auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
-  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Standar acuan: SPI 103 §5.5 (Valuation Uncertainty), IVS 105 §40.7, SPI 366 §7.2 (VaR untuk agunan), KEPI Pasal 8 (justifikasi metode).</em></div>';
+  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Standar acuan: SPI 103 Pasal 5.5 (Valuation Uncertainty), IVS 105 Pasal 40.7, SPI 366 Pasal 7.2 (VaR untuk agunan), KEPI Pasal 8 (justifikasi metode).</em></div>';
   document.getElementById('mcAuditLog').innerHTML = auditLog;
 }
 
@@ -2743,54 +2743,54 @@ function downloadMCPDF() {
   var tornadoImg = _mcChartTornado ? _mcChartTornado.toBase64Image() : '';
 
   var sensRows = r.sensitivity.map(function(x, i) {
-    var sign = x.corr >= 0 ? '+' : '−';
+    var sign = x.corr >= 0 ? '+' : '-';
     var cls = Math.abs(x.corr) > 0.5 ? 'Tinggi' : Math.abs(x.corr) > 0.25 ? 'Sedang' : 'Rendah';
     return '<tr><td style="padding:6px; border:1px solid #d1dbe8;">' + (i + 1) + '. ' + x.name + '</td>' +
            '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + sign + Math.abs(x.corr).toFixed(3) + '</td>' +
            '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + cls + '</td></tr>';
   }).join('');
 
-  function _yn(b) { return b ? '✅ Aktif' : '⛔ Nonaktif'; }
+  function _yn(b) { return b ? '[ AKTIF ]' : '[ NONAKTIF ]'; }
 
   var assumptionRows =
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">1. Time Rate</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Triangular</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.time.enabled ? 'min=' + a.time.min + '%, mode=' + a.time.mode + '%, max=' + a.time.max + '%' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.time.enabled ? 'min=' + a.time.min + '%, mode=' + a.time.mode + '%, max=' + a.time.max + '%' : '-') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.time.enabled) + '</td></tr>' +
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">2. RaLAT Residual</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Normal</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.ralat.enabled ? 'μ=0%, σ=' + a.ralat.sigma + '%' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.ralat.enabled ? 'mu=0%, sigma=' + a.ralat.sigma + '%' : '-') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.ralat.enabled) + '</td></tr>' +
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">3. Market Shock</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Triangular Asimetris</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.shock.enabled ? 'min=' + a.shock.min + '%, mode=' + a.shock.mode + '%, max=' + a.shock.max + '%' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.shock.enabled ? 'min=' + a.shock.min + '%, mode=' + a.shock.mode + '%, max=' + a.shock.max + '%' : '-') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.shock.enabled) + '</td></tr>' +
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">4. Bootstrap</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Empirical</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.boot.enabled ? 'Resample n=' + a.boot.samplesPerIter + ' with replacement' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.boot.enabled ? 'Resample n=' + a.boot.samplesPerIter + ' with replacement' : '-') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.boot.enabled) + '</td></tr>' +
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">5. SBM Probability Mix</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Dirichlet</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.dir.enabled ? 'α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.dir.enabled ? 'alpha=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], kappa=' + a.dir.kappa : '-') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.dir.enabled) + '</td></tr>';
 
   template.innerHTML =
     '<div style="border-bottom: 3px solid #7c3aed; padding-bottom:15px; margin-bottom:20px;">' +
       '<h1 style="color:#1e3a5f; margin:0;">Laporan Monte Carlo Simulation</h1>' +
-      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Quantifying Valuation Uncertainty · Mengacu SPI 103 §5.5 &amp; IVS 105 §40.7</p>' +
+      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Quantifying Valuation Uncertainty &middot; Mengacu SPI 103 Pasal 5.5 &amp; IVS 105 Pasal 40.7</p>' +
     '</div>' +
 
     '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
       '<tr>' +
         '<td style="padding:15px; background:#f0f4f8; border-radius:8px 0 0 8px; width:50%;">' +
           '<div style="font-size:12px; color:#5a6a7e;">Nilai Dasar (Base Case)</div>' +
-          '<div style="font-size:22px; color:#1a2332; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(a.baseValue)) + '/m²</div>' +
+          '<div style="font-size:22px; color:#1a2332; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(a.baseValue)) + '/m&sup2;</div>' +
           '<div style="font-size:10px; color:#8a9ab0; margin-top:5px;">Validasi: ' + a.validCount + ' pembanding (IQR)</div>' +
         '</td>' +
         '<td style="padding:15px; background:#ede9fe; border-radius:0 8px 8px 0; width:50%; text-align:right;">' +
           '<div style="font-size:12px; color:#7c3aed; font-weight:700;">EXPECTED VALUE (Mean)</div>' +
-          '<div style="font-size:24px; color:#7c3aed; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(s.mean)) + '/m²</div>' +
-          '<div style="font-size:10px; color:#7c3aed; margin-top:5px;">' + a.iterations.toLocaleString('id-ID') + ' iterasi · ' + a.elapsedMs + ' ms</div>' +
+          '<div style="font-size:24px; color:#7c3aed; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(s.mean)) + '/m&sup2;</div>' +
+          '<div style="font-size:10px; color:#7c3aed; margin-top:5px;">' + a.iterations.toLocaleString('id-ID') + ' iterasi &middot; ' + a.elapsedMs + ' ms</div>' +
         '</td>' +
       '</tr>' +
     '</table>' +
@@ -2800,20 +2800,20 @@ function downloadMCPDF() {
       '<tr>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Median (P50)</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p50)) + '</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Mean (μ)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Mean (Mu)</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.mean)) + '</td>' +
       '</tr>' +
       '<tr>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Stdev (σ)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Stdev (Sigma)</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.std)) + '</td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Coeff. of Variation</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8;">' + s.cv.toFixed(2) + '%</td>' +
       '</tr>' +
       '<tr>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Min · Max</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.min)) + ' · ' + formatRupiah(Math.round(s.max)) + '</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>P25 · P75</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p25)) + ' · ' + formatRupiah(Math.round(s.p75)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Min &amp; Max</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.min)) + ' &middot; ' + formatRupiah(Math.round(s.max)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>P25 &amp; P75</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p25)) + ' &middot; ' + formatRupiah(Math.round(s.p75)) + '</td>' +
       '</tr>' +
     '</table>' +
 
@@ -2824,17 +2824,17 @@ function downloadMCPDF() {
         '<th style="padding:8px; border:1px solid #1e3a5f;">Nilai</th>' +
         '<th style="padding:8px; border:1px solid #1e3a5f;">Interpretasi</th>' +
       '</tr>' +
-      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 90% (P5–P95)</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p5)) + ' — ' + formatRupiah(Math.round(s.p95)) + '</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Range nilai wajar untuk pelaporan SPI 103.5.5</td></tr>' +
-      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 98% (P1–P99)</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p1)) + ' — ' + formatRupiah(Math.round(s.p99)) + '</td>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 90% (P5 - P95)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p5)) + ' s/d ' + formatRupiah(Math.round(s.p95)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Range nilai wajar untuk pelaporan SPI 103 Pasal 5.5</td></tr>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 98% (P1 - P99)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p1)) + ' s/d ' + formatRupiah(Math.round(s.p99)) + '</td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Rentang ekstrem untuk laporan high-stakes (M&amp;A, litigasi)</td></tr>' +
       '<tr style="background:#fef2f2;"><td style="padding:8px; border:1px solid #d1dbe8;"><strong>VaR 95%</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var95)) + '/m²</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Potensi kerugian dengan probabilitas ≤ 5% (SPI 366 — agunan)</td></tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var95)) + '/m&sup2;</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Potensi kerugian dengan probabilitas maksimal 5% (SPI 366 - agunan)</td></tr>' +
       '<tr style="background:#fef2f2;"><td style="padding:8px; border:1px solid #d1dbe8;"><strong>VaR 99%</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var99)) + '/m²</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var99)) + '/m&sup2;</td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Stress scenario untuk PSAK 71 / Basel III</td></tr>' +
       '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>P[Nilai &lt; ' + formatRupiah(Math.round(s.threshold)) + ']</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; font-weight:bold; color:' + (s.probBelowThreshold > 20 ? '#dc2626' : s.probBelowThreshold > 5 ? '#d97706' : '#15803d') + ';">' + s.probBelowThreshold.toFixed(2) + '%</td>' +
@@ -2855,34 +2855,42 @@ function downloadMCPDF() {
         '<th style="padding:6px; border:1px solid #d1dbe8;">Tingkat Pengaruh</th></tr>' + sensRows + '</table>'
       : '') +
 
-    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Audit Log Asumsi (Reproducibility)</h3>' +
-    '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
+    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px; page-break-after:avoid;">Audit Log Asumsi (Reproducibility)</h3>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px; page-break-inside:avoid;">' +
       '<tr style="background:#fafafa;"><th style="padding:6px; border:1px solid #d1dbe8; text-align:left;">Variabel</th>' +
         '<th style="padding:6px; border:1px solid #d1dbe8;">Distribusi</th>' +
         '<th style="padding:6px; border:1px solid #d1dbe8;">Parameter</th>' +
         '<th style="padding:6px; border:1px solid #d1dbe8;">Status</th></tr>' + assumptionRows + '</table>' +
 
-    '<div style="margin-top:20px; padding:12px; background:#f8fafc; border-left:4px solid #7c3aed; font-size:10px; color:#475569; line-height:1.5; border-radius:4px;">' +
+    '<div style="margin-top:20px; padding:12px; background:#f8fafc; border-left:4px solid #7c3aed; font-size:10px; color:#475569; line-height:1.5; border-radius:4px; page-break-inside:avoid;">' +
       '<strong style="color:#1e3a5f;">Disclaimer Statistik:</strong> Hasil simulasi merepresentasikan ' + a.iterations.toLocaleString('id-ID') + ' skenario probabilistik berdasarkan asumsi distribusi yang ditentukan penilai. Confidence Interval &amp; VaR adalah estimasi statistik, bukan prediksi pasti, dan tidak menggantikan <em>professional judgement</em>. Asumsi distribusi wajib didukung riset pasar (BI Property Index, REI, Colliers, Knight Frank) sesuai KEPI Pasal 8.' +
     '</div>' +
 
     '<div style="margin-top:30px; font-size:11px; color:#5a6a7e; text-align:right;">' +
-      'Disusun &amp; Dikendalikan oleh: ' + (typeof activeUsername !== 'undefined' ? activeUsername : '–') + '<br>' +
-      'Tanggal Penilaian: ' + (typeof _formatValuationDateID === 'function' ? _formatValuationDateID() : '–') + '<br>' +
+      'Disusun &amp; Dikendalikan oleh: ' + (typeof activeUsername !== 'undefined' ? activeUsername : '-') + '<br>' +
+      'Tanggal Penilaian: ' + (typeof _formatValuationDateID === 'function' ? _formatValuationDateID() : '-') + '<br>' +
       'Tanggal Laporan: ' + new Date().toLocaleString('id-ID') +
     '</div>';
 
   template.style.display = 'block';
-  html2pdf().set({
-    margin: 15,
-    filename: 'Monte_Carlo_AVM_' + new Date().toISOString().slice(0, 10) + '.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  }).from(template).save().then(function() {
-    template.style.display = 'none';
-    toast('Laporan Monte Carlo berhasil diunduh!', 'success');
-  });
+  // Beri waktu browser reflow sebelum render canvas (kunci agar konten panjang tidak terpotong)
+  setTimeout(function() {
+    html2pdf().set({
+      margin: [12, 12, 15, 12],
+      filename: 'Monte_Carlo_AVM_' + new Date().toISOString().slice(0, 10) + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).from(template).save().then(function() {
+      template.style.display = 'none';
+      toast('Laporan Monte Carlo berhasil diunduh!', 'success');
+    }).catch(function(err) {
+      template.style.display = 'none';
+      console.error('PDF MC error:', err);
+      toast('Gagal membuat PDF Monte Carlo. Coba lagi.', 'error');
+    });
+  }, 100);
 }
 
 // ---------- Toggle aktifkan/nonaktifkan card berdasarkan checkbox ----------
