@@ -3002,8 +3002,39 @@ function downloadAVMPDF() {
     </div>
   `;
 
-  template.style.display = 'block'; 
-  html2pdf().set({ margin: 15, filename: 'Valuasi_SBM_' + new Date().toISOString().slice(0,10) + '.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(template).save().then(function() { template.style.display = 'none'; toast('Laporan SBM Berhasil Diunduh!', 'success'); });
+  template.style.display = 'block';
+  // Beri waktu browser reflow sebelum render canvas (kunci agar konten panjang
+  // / banyak pembanding tidak terpotong / kosong saat html2canvas menabrak
+  // batas dimensi canvas browser ±16.384 px).
+  setTimeout(function() {
+    // Skala adaptif: kalau konten pendek pakai scale tinggi (tajam),
+    // kalau panjang turunkan ke 1.5 supaya canvas tidak overflow.
+    var contentHeightPx = template.scrollHeight || 0;
+    var safeScale = contentHeightPx > 6000 ? 1.5 : 2;
+
+    html2pdf().set({
+      margin: [12, 12, 15, 12],
+      filename: 'Valuasi_SBM_' + new Date().toISOString().slice(0, 10) + '.pdf',
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: {
+        scale: safeScale,
+        useCORS: true,
+        letterRendering: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: template.scrollWidth
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).from(template).save().then(function() {
+      template.style.display = 'none';
+      toast('Laporan SBM Berhasil Diunduh!', 'success');
+    }).catch(function(err) {
+      template.style.display = 'none';
+      console.error('PDF AVM error:', err);
+      toast('Gagal membuat PDF SBM. Coba lagi.', 'error');
+    });
+  }, 100);
 }
 
 /* ========================================================================= */
