@@ -280,6 +280,37 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .ev-box { background: var(--navy); color: #fff; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; box-shadow: 0 4px 15px rgba(30,58,95,.2); }
 
 /* =========================================================
+   🎲 MONTE CARLO SIMULATION — TAB 3
+   ========================================================= */
+.mc-iter-btn { background:#fff; border:1.5px solid var(--border); border-radius:6px; padding:6px 8px; font-family:var(--font); font-size:11px; font-weight:700; color:var(--text-sub); cursor:pointer; transition:all .2s; }
+.mc-iter-btn:hover { border-color:#7c3aed; color:#7c3aed; }
+.mc-iter-btn.active { background:#7c3aed; color:#fff; border-color:#7c3aed; box-shadow:0 2px 8px rgba(124,58,237,.25); }
+
+.mc-var-card { background:#fff; border:1px solid var(--border); border-left:4px solid #7c3aed; border-radius:8px; padding:10px 12px; margin-top:8px; transition:border-color .18s, opacity .18s; }
+.mc-var-card.disabled { opacity:.45; border-left-color:#cbd5e1; }
+.mc-var-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; font-size:12px; color:var(--navy); }
+.mc-var-badge { display:inline-block; padding:1px 6px; border-radius:8px; font-size:9px; font-weight:800; letter-spacing:.5px; }
+.mc-var-badge.tier1 { background:#dbeafe; color:#1d4ed8; }
+.mc-var-badge.tier2 { background:#f3e8ff; color:#7c3aed; }
+.mc-var-dist { background:#f0fdf4; color:#15803d; font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:8px; border:1px solid #bbf7d0; }
+.mc-var-toggle { margin-left:auto; font-size:10.5px; color:var(--text-sub); display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; }
+.mc-var-toggle input { cursor:pointer; }
+.mc-var-desc { font-size:10.5px; color:var(--text-sub); line-height:1.45; margin-bottom:6px; }
+.mc-var-grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.mc-var-grid3 label { font-size:10px; color:var(--text-sub); display:block; margin-bottom:2px; font-weight:600; }
+.mc-input { padding:5px 8px !important; font-size:11.5px !important; }
+
+.mc-stat-card { background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:8px 10px; text-align:center; }
+.mc-stat-label { font-size:10px; color:var(--text-sub); font-weight:600; }
+.mc-stat-val { font-size:13px; font-weight:800; color:var(--navy); margin-top:3px; line-height:1.2; }
+
+@media (max-width: 768px) {
+  .mc-var-grid3 { grid-template-columns:1fr; }
+  #mcResultWrap > div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns:repeat(2,1fr) !important; }
+  #mcResultWrap > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
+}
+
+/* =========================================================
    📱 RESPONSIVE MOBILE TWEAKS
    ========================================================= */
 @media (max-width: 768px) {
@@ -761,8 +792,9 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div class="modal-body" id="modalAnalisaContent" style="padding: 20px;">
       
       <div class="avm-tabs">
-        <button class="avm-tab-btn active" onclick="switchAVMTab('sbm')">1. Proyeksi Skenario (SBM)</button>
-        <button class="avm-tab-btn" onclick="switchAVMTab('audit')">2. Audit Trail & RaLAT</button>
+        <button class="avm-tab-btn active" data-tab="sbm" onclick="switchAVMTab('sbm')">1. Proyeksi Skenario (SBM)</button>
+        <button class="avm-tab-btn" data-tab="audit" onclick="switchAVMTab('audit')">2. Audit Trail &amp; RaLAT</button>
+        <button class="avm-tab-btn" data-tab="mc" onclick="switchAVMTab('mc')">3. 🎲 Monte Carlo</button>
       </div>
 
       <div id="tab-sbm" class="avm-tab-content active">
@@ -907,11 +939,173 @@ body.mmode-picking .mpick-hint { display: flex; }
         </div>
       </div>
 
+      <!-- ============ TAB 3: MONTE CARLO SIMULATION (SPI 103.5.5 / IVS 105.40.7) ============ -->
+      <div id="tab-mc" class="avm-tab-content">
+        <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.5;">
+          <strong>🎲 Monte Carlo Simulation</strong> — Mengkuantifikasi <em>valuation uncertainty</em> dengan ribuan iterasi acak. Mengacu <strong>SPI 103 §5.5</strong> dan <strong>IVS 105 §40.7</strong>.
+        </div>
+
+        <!-- Ringkasan basis & jumlah iterasi -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; color:#0c4a6e; font-weight:600;">Basis (Median IQR-validated)</div>
+            <div id="mcBaseValue" style="font-size:18px; font-weight:800; color:#0369a1; margin-top:4px;">Rp 0</div>
+            <div id="mcBaseCount" style="font-size:10px; color:#64748b; margin-top:2px;">0 pembanding valid</div>
+          </div>
+          <div style="background:#fff7e0; border:1px solid #f4b400; border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; color:#1e3a5f; font-weight:600;">Jumlah Iterasi</div>
+            <div style="display:flex; gap:4px; margin-top:6px;">
+              <button type="button" class="mc-iter-btn active" data-iter="10000" onclick="setMCIterations(10000, this)" style="flex:1;">🚀 10K</button>
+              <button type="button" class="mc-iter-btn" data-iter="50000" onclick="setMCIterations(50000, this)" style="flex:1;">⚖️ 50K</button>
+              <button type="button" class="mc-iter-btn" data-iter="100000" onclick="setMCIterations(100000, this)" style="flex:1;">🔬 100K</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Variabel Acak -->
+        <div style="font-size:12px; font-weight:700; color:var(--navy); margin:10px 0 6px;">⚙️ Variabel Acak (5 Faktor Risiko)</div>
+
+        <!-- TIER 1 -->
+        <div class="mc-var-card">
+          <div class="mc-var-head">
+            <span class="mc-var-badge tier1">T1</span>
+            <strong>1. Time Rate Risk</strong>
+            <span class="mc-var-dist">Triangular</span>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableTime" checked> Aktifkan</label>
+          </div>
+          <div class="mc-var-desc">Ketidakpastian rate eskalasi pasar properti per tahun (BI Property Price Index, REI, Colliers).</div>
+          <div class="mc-var-grid3">
+            <div><label>Min (%)</label><input type="number" id="mcTimeMin" value="-3" step="0.5" class="form-input mc-input"></div>
+            <div><label>Most Likely (%)</label><input type="number" id="mcTimeMode" value="5" step="0.5" class="form-input mc-input"></div>
+            <div><label>Max (%)</label><input type="number" id="mcTimeMax" value="12" step="0.5" class="form-input mc-input"></div>
+          </div>
+        </div>
+
+        <div class="mc-var-card">
+          <div class="mc-var-head">
+            <span class="mc-var-badge tier1">T1</span>
+            <strong>2. RaLAT Residual Error</strong>
+            <span class="mc-var-dist">Normal</span>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableRalat" checked> Aktifkan</label>
+          </div>
+          <div class="mc-var-desc">Residual error model regresi spasial yang tidak tertangkap fitur POI (CLT-based).</div>
+          <div class="mc-var-grid3">
+            <div><label>Mean μ (%)</label><input type="number" id="mcRalatMu" value="0" step="0.5" class="form-input mc-input" disabled style="opacity:0.6;"></div>
+            <div><label>Stdev σ (%)</label><input type="number" id="mcRalatSigma" value="8" min="0" max="30" step="0.5" class="form-input mc-input"></div>
+            <div style="font-size:10px; color:#64748b; align-self:end; padding-bottom:8px;">μ=0 (unbiased estimator)</div>
+          </div>
+        </div>
+
+        <div class="mc-var-card">
+          <div class="mc-var-head">
+            <span class="mc-var-badge tier1">T1</span>
+            <strong>3. Market Sentiment Shock</strong>
+            <span class="mc-var-dist">Triangular Asimetris</span>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableShock" checked> Aktifkan</label>
+          </div>
+          <div class="mc-var-desc">Kejutan makro non-properti (BI rate, kurs, force majeure). Asimetri ke bawah (1998: -40%, 2008: -15%, COVID: -8%).</div>
+          <div class="mc-var-grid3">
+            <div><label>Min (%)</label><input type="number" id="mcShockMin" value="-20" step="1" class="form-input mc-input"></div>
+            <div><label>Most Likely (%)</label><input type="number" id="mcShockMode" value="0" step="0.5" class="form-input mc-input"></div>
+            <div><label>Max (%)</label><input type="number" id="mcShockMax" value="5" step="1" class="form-input mc-input"></div>
+          </div>
+        </div>
+
+        <!-- TIER 2 -->
+        <div class="mc-var-card">
+          <div class="mc-var-head">
+            <span class="mc-var-badge tier2">T2</span>
+            <strong>4. Comparable Sampling Risk</strong>
+            <span class="mc-var-dist">Bootstrap (Empirical)</span>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableBoot" checked> Aktifkan</label>
+          </div>
+          <div class="mc-var-desc">Resample acak pembanding dengan replacement — menjawab "kalau saya pakai pembanding lain, hasilnya berapa?".</div>
+          <div style="font-size:10px; color:#64748b; padding:6px 0 0;">Ukuran sample = jumlah pembanding valid · tanpa parameter manual.</div>
+        </div>
+
+        <div class="mc-var-card">
+          <div class="mc-var-head">
+            <span class="mc-var-badge tier2">T2</span>
+            <strong>5. SBM Probability Mix</strong>
+            <span class="mc-var-dist">Dirichlet</span>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableDirichlet" checked> Aktifkan</label>
+          </div>
+          <div class="mc-var-desc">Goyang probabilitas SBM (Pess/Base/Opt) dengan total tetap 100%. α dari nilai SBM tab 1.</div>
+          <div class="mc-var-grid3">
+            <div><label>Concentration κ</label><input type="number" id="mcDirichletK" value="10" min="1" max="100" step="1" class="form-input mc-input"></div>
+            <div style="grid-column: span 2; font-size:10px; color:#64748b; align-self:end; padding-bottom:8px;">κ tinggi = probabilitas stabil di sekitar SBM. κ rendah = lebih liar.</div>
+          </div>
+        </div>
+
+        <!-- Threshold for Probability of Loss -->
+        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 12px; margin-top:8px;">
+          <label style="font-size:11px; font-weight:700; color:#991b1b;">⚠️ Threshold Risiko (P[Nilai &lt; threshold])</label>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <input type="number" id="mcThreshold" placeholder="cth: 9000000" step="100000" class="form-input mc-input" style="flex:1;">
+            <span style="font-size:10px; color:#64748b;">/m² · kosongkan untuk auto (90% × Base)</span>
+          </div>
+        </div>
+
+        <!-- Tombol Run -->
+        <button type="button" id="btnRunMC" onclick="runMonteCarloSimulation()" style="width:100%; margin-top:12px; padding:11px; background:linear-gradient(135deg,#7c3aed,#2d6be4); color:#fff; border:none; border-radius:8px; font-weight:800; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Jalankan Simulasi
+        </button>
+
+        <!-- Hasil simulasi -->
+        <div id="mcResultWrap" style="display:none; margin-top:14px;">
+          <!-- Statistik utama -->
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px;">
+            <div class="mc-stat-card"><div class="mc-stat-label">Mean</div><div class="mc-stat-val" id="mcStatMean">–</div></div>
+            <div class="mc-stat-card"><div class="mc-stat-label">Median (P50)</div><div class="mc-stat-val" id="mcStatP50">–</div></div>
+            <div class="mc-stat-card" style="background:#dcfce7;"><div class="mc-stat-label">P5 (Worst 5%)</div><div class="mc-stat-val" id="mcStatP5" style="color:#15803d;">–</div></div>
+            <div class="mc-stat-card" style="background:#fee2e2;"><div class="mc-stat-label">P95 (Best 5%)</div><div class="mc-stat-val" id="mcStatP95" style="color:#991b1b;">–</div></div>
+          </div>
+
+          <!-- VaR & Confidence Interval -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div style="background:#1e3a5f; color:#fff; border-radius:8px; padding:10px 12px;">
+              <div style="font-size:11px; color:#a9c6f5; font-weight:600;">CI 90% (P5 — P95)</div>
+              <div id="mcCI90" style="font-size:13px; font-weight:700; margin-top:4px;">–</div>
+              <div style="font-size:10px; color:#a9c6f5; margin-top:4px;">Range nilai wajar untuk laporan SPI 103</div>
+            </div>
+            <div style="background:#7c2d12; color:#fff; border-radius:8px; padding:10px 12px;">
+              <div style="font-size:11px; color:#fed7aa; font-weight:600;">VaR 95% &amp; 99%</div>
+              <div id="mcVaR" style="font-size:13px; font-weight:700; margin-top:4px;">–</div>
+              <div style="font-size:10px; color:#fed7aa; margin-top:4px;">Nilai terburuk untuk agunan (SPI 366)</div>
+            </div>
+          </div>
+
+          <!-- Probability of Threshold -->
+          <div id="mcThresholdResult" style="background:#f8fafc; border-left:4px solid #7c3aed; padding:10px 12px; border-radius:4px; font-size:12px; margin-bottom:12px;"></div>
+
+          <!-- Histogram -->
+          <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:var(--navy); margin-bottom:8px;">📊 Distribusi Nilai Aset (Histogram + KDE)</div>
+            <div style="position:relative; height:220px;"><canvas id="mcHistogramChart"></canvas></div>
+          </div>
+
+          <!-- Tornado Sensitivity -->
+          <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:var(--navy); margin-bottom:8px;">🌪️ Sensitivity (Tornado Chart)</div>
+            <div style="position:relative; height:180px;"><canvas id="mcTornadoChart"></canvas></div>
+          </div>
+
+          <!-- Audit log asumsi -->
+          <details id="mcAuditDetails" style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:11px;">
+            <summary style="cursor:pointer; font-weight:700; color:var(--navy);">📋 Audit Log Asumsi Simulasi (untuk laporan)</summary>
+            <div id="mcAuditLog" style="margin-top:8px; line-height:1.6; color:#334155;"></div>
+          </details>
+        </div>
+      </div>
+      <!-- ============ /TAB 3: MONTE CARLO ============ -->
+
     </div>
     
     <div class="modal-footer" style="justify-content: flex-end; align-items: center; background: #fafafa;">
         <button class="btn-submit" onclick="closeAnalyticsModal()" style="width: auto; background:transparent; color:var(--text-sub); border:1px solid var(--border); margin-right:5px;">Tutup</button>
         <button class="btn-submit" onclick="downloadAVMPDF()" style="width: auto; background:#f4b400; color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Unduh Laporan SBM</button>
+        <button class="btn-submit" id="btnDownloadMCPDF" onclick="downloadMCPDF()" style="width: auto; background:#7c3aed; color:#fff; display:none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Unduh Laporan Monte Carlo</button>
     </div>
   </div>
 </div>
@@ -1170,6 +1364,8 @@ body.mmode-picking .mpick-hint { display: flex; }
 <div id="pdfTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:180mm; box-sizing:border-box; background:white;"></div>
 
 <div id="pdfAVMTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:180mm; box-sizing:border-box; background:white;"></div>
+
+<div id="pdfMCTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:180mm; box-sizing:border-box; background:white;"></div>
 
 <div class="toast-container" id="toastContainer"></div>
 
@@ -1565,13 +1761,18 @@ function calculateSidebarStats(data) {
 function switchAVMTab(tabName) {
   document.querySelectorAll('.avm-tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.avm-tab-content').forEach(content => content.classList.remove('active'));
-  
-  if(tabName === 'sbm') {
-      document.querySelector('.avm-tab-btn:nth-child(1)').classList.add('active');
-      document.getElementById('tab-sbm').classList.add('active');
-  } else {
-      document.querySelector('.avm-tab-btn:nth-child(2)').classList.add('active');
-      document.getElementById('tab-audit').classList.add('active');
+
+  // Aktifkan button berdasarkan data-tab
+  var activeBtn = document.querySelector('.avm-tab-btn[data-tab="' + tabName + '"]');
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Aktifkan content berdasarkan id
+  var contentEl = document.getElementById('tab-' + tabName);
+  if (contentEl) contentEl.classList.add('active');
+
+  // Auto-render Monte Carlo summary saat tab dibuka pertama kali
+  if (tabName === 'mc') {
+    syncMCBaseFromAVM();
   }
 }
 
@@ -1989,6 +2190,725 @@ function calculateSBM() {
 }
 
 function closeAnalyticsModal() { document.getElementById('analyticsOverlay').classList.remove('open'); }
+
+/* =========================================================================
+   🎲 MONTE CARLO SIMULATION ENGINE (SPI 103.5.5 / IVS 105.40.7)
+   - 5 variabel acak: Time, RaLAT, Shock, Bootstrap, Dirichlet
+   - Distribusi hybrid: Triangular / Normal (Box-Muller) / Empirical / Dirichlet (Gamma sum)
+========================================================================= */
+
+var _mcIterations = 10000;
+var _mcLastResult = null; // { samples, stats, assumptions, baseValue, sensitivity }
+
+// ---------- Random Number Generators ----------
+
+function _mcRandom() { return Math.random(); }
+
+// Box-Muller transform → Normal(μ, σ)
+function _mcSampleNormal(mu, sigma) {
+  var u1 = 1 - _mcRandom();
+  var u2 = 1 - _mcRandom();
+  var z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return mu + z * sigma;
+}
+
+// Triangular(min, mode, max) — inverse CDF method
+function _mcSampleTriangular(min, mode, max) {
+  if (max < min) { var t = min; min = max; max = t; }
+  if (mode < min) mode = min;
+  if (mode > max) mode = max;
+  if (max === min) return min;
+  var u = _mcRandom();
+  var Fc = (mode - min) / (max - min);
+  if (u < Fc) {
+    return min + Math.sqrt(u * (max - min) * (mode - min));
+  } else {
+    return max - Math.sqrt((1 - u) * (max - min) * (max - mode));
+  }
+}
+
+// Gamma(shape α, scale θ=1) — Marsaglia & Tsang 2000
+function _mcSampleGamma(alpha) {
+  if (alpha < 1) {
+    // Boost: Gamma(α) = Gamma(α+1) × U^(1/α)
+    var g = _mcSampleGamma(alpha + 1);
+    return g * Math.pow(_mcRandom(), 1 / alpha);
+  }
+  var d = alpha - 1 / 3;
+  var c = 1 / Math.sqrt(9 * d);
+  while (true) {
+    var x, v;
+    do {
+      x = _mcSampleNormal(0, 1);
+      v = 1 + c * x;
+    } while (v <= 0);
+    v = v * v * v;
+    var u = _mcRandom();
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+
+// Dirichlet(α₁..αₖ) → vektor probabilitas yang sum = 1
+function _mcSampleDirichlet(alphas) {
+  var gammas = alphas.map(function(a) { return _mcSampleGamma(Math.max(a, 0.01)); });
+  var sum = gammas.reduce(function(a, b) { return a + b; }, 0);
+  if (sum <= 0) return alphas.map(function() { return 1 / alphas.length; });
+  return gammas.map(function(g) { return g / sum; });
+}
+
+// Empirical bootstrap → resample array dengan replacement
+function _mcBootstrapMedian(arr) {
+  if (!arr.length) return 0;
+  var n = arr.length;
+  var sample = new Array(n);
+  for (var i = 0; i < n; i++) {
+    sample[i] = arr[Math.floor(_mcRandom() * n)];
+  }
+  sample.sort(function(a, b) { return a - b; });
+  var mid = Math.floor(n / 2);
+  return n % 2 !== 0 ? sample[mid] : (sample[mid - 1] + sample[mid]) / 2;
+}
+
+// ---------- Statistik ----------
+
+function _mcPercentile(sortedArr, p) {
+  if (!sortedArr.length) return 0;
+  var idx = (p / 100) * (sortedArr.length - 1);
+  var lo = Math.floor(idx);
+  var hi = Math.ceil(idx);
+  if (lo === hi) return sortedArr[lo];
+  return sortedArr[lo] + (sortedArr[hi] - sortedArr[lo]) * (idx - lo);
+}
+
+function _mcMean(arr) {
+  if (!arr.length) return 0;
+  var s = 0;
+  for (var i = 0; i < arr.length; i++) s += arr[i];
+  return s / arr.length;
+}
+
+function _mcStdev(arr, mean) {
+  if (arr.length < 2) return 0;
+  var s = 0;
+  for (var i = 0; i < arr.length; i++) {
+    var d = arr[i] - mean;
+    s += d * d;
+  }
+  return Math.sqrt(s / (arr.length - 1));
+}
+
+// ---------- UI Sync ----------
+
+function syncMCBaseFromAVM() {
+  var baseEl = document.getElementById('mcBaseValue');
+  var countEl = document.getElementById('mcBaseCount');
+  if (!baseEl) return;
+  if (_avmCurrentMedian > 0) {
+    baseEl.textContent = formatRupiah(Math.round(_avmCurrentMedian));
+    var validCount = (_avmRawData || []).filter(function(d) {
+      var ov = _avmOverrideState.hasOwnProperty(d.uid);
+      // Hitung yang benar2 included (perkiraan; recalcAVM yang otoritatif)
+      return true;
+    }).length;
+    countEl.textContent = validCount + ' pembanding terdaftar';
+  } else {
+    baseEl.textContent = 'Rp 0';
+    countEl.textContent = 'Jalankan Analisa dulu';
+  }
+}
+
+function setMCIterations(n, btnEl) {
+  _mcIterations = n;
+  document.querySelectorAll('.mc-iter-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btnEl) btnEl.classList.add('active');
+}
+
+// ---------- Inti Simulasi ----------
+
+function _mcGetValidPrices() {
+  if (!_avmRawData || !_avmRawData.length) return [];
+
+  // Replikasi logika IQR di recalcAVM untuk menentukan pembanding valid.
+  var allPrices = _avmRawData.map(function(d) { return d.price; }).sort(function(a, b) { return a - b; });
+  var lowerBound = 0, upperBound = Infinity;
+  function getMed(arr) {
+    if (!arr.length) return 0;
+    var mid = Math.floor(arr.length / 2);
+    return arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+  }
+  if (allPrices.length >= 4) {
+    var q1 = getMed(allPrices.slice(0, Math.floor(allPrices.length / 2)));
+    var q3 = getMed(allPrices.slice(Math.ceil(allPrices.length / 2)));
+    var iqr = q3 - q1;
+    lowerBound = q1 - 1.5 * iqr;
+    upperBound = q3 + 1.5 * iqr;
+  }
+
+  var valid = [];
+  _avmRawData.forEach(function(d) {
+    var systemIncluded = (d.price >= lowerBound && d.price <= upperBound);
+    var override = _avmOverrideState.hasOwnProperty(d.uid) ? _avmOverrideState[d.uid] : systemIncluded;
+    if (override) valid.push(d.price);
+  });
+  return valid;
+}
+
+function runMonteCarloSimulation() {
+  if (!_avmRawData || _avmRawData.length === 0 || _avmCurrentMedian <= 0) {
+    toast('Jalankan tombol "Analisa" terlebih dulu agar Base Case tersedia.', 'error');
+    return;
+  }
+
+  var validPrices = _mcGetValidPrices();
+  if (validPrices.length < 2) {
+    toast('Minimal 2 pembanding valid diperlukan untuk simulasi Monte Carlo.', 'error');
+    return;
+  }
+
+  var baseMedian = _avmCurrentMedian;
+  var N = _mcIterations;
+  var btn = document.getElementById('btnRunMC');
+  var origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;margin-right:6px;vertical-align:middle;"></div> Menjalankan ' + N.toLocaleString('id-ID') + ' iterasi…';
+
+  // Baca asumsi user
+  var enTime = document.getElementById('mcEnableTime').checked;
+  var enRalat = document.getElementById('mcEnableRalat').checked;
+  var enShock = document.getElementById('mcEnableShock').checked;
+  var enBoot = document.getElementById('mcEnableBoot').checked;
+  var enDir = document.getElementById('mcEnableDirichlet').checked;
+
+  var timeMin = parseFloat(document.getElementById('mcTimeMin').value) || 0;
+  var timeMode = parseFloat(document.getElementById('mcTimeMode').value) || 0;
+  var timeMax = parseFloat(document.getElementById('mcTimeMax').value) || 0;
+
+  var ralatSigma = Math.max(0, parseFloat(document.getElementById('mcRalatSigma').value) || 0);
+
+  var shockMin = parseFloat(document.getElementById('mcShockMin').value) || 0;
+  var shockMode = parseFloat(document.getElementById('mcShockMode').value) || 0;
+  var shockMax = parseFloat(document.getElementById('mcShockMax').value) || 0;
+
+  var dirK = Math.max(1, parseFloat(document.getElementById('mcDirichletK').value) || 10);
+
+  // SBM probabilitas saat ini sebagai mean Dirichlet
+  var pPess = _clamp(document.getElementById('sbmProbPess').value, 0, 100, 15) / 100;
+  var pBase = _clamp(document.getElementById('sbmProbBase').value, 0, 100, 60) / 100;
+  var pOpt  = _clamp(document.getElementById('sbmProbOpt').value, 0, 100, 25) / 100;
+  var sumP = pPess + pBase + pOpt;
+  if (sumP > 0) { pPess /= sumP; pBase /= sumP; pOpt /= sumP; }
+  else { pPess = 0.15; pBase = 0.60; pOpt = 0.25; }
+  var alphaPess = pPess * dirK;
+  var alphaBase = pBase * dirK;
+  var alphaOpt  = pOpt  * dirK;
+
+  var aPess = _clamp(document.getElementById('sbmAdjPess').value, -90, 200, -15) / 100;
+  var aOpt  = _clamp(document.getElementById('sbmAdjOpt').value, -90, 200, 10) / 100;
+
+  var thresholdRaw = document.getElementById('mcThreshold').value;
+  var threshold = thresholdRaw && !isNaN(parseFloat(thresholdRaw)) ? parseFloat(thresholdRaw) : (baseMedian * 0.9);
+
+  // Eksekusi async (setTimeout supaya UI sempat update spinner)
+  setTimeout(function() {
+    var t0 = performance.now();
+    var samples = new Float64Array(N);
+
+    // Untuk Tornado / sensitivity analysis: simpan kontribusi tiap variabel
+    // (delta nilai dari mean per iterasi). Pakai sampling residu (correlation method).
+    var contribTime = new Float64Array(N);
+    var contribRalat = new Float64Array(N);
+    var contribShock = new Float64Array(N);
+    var contribBoot = new Float64Array(N);
+    var contribDir = new Float64Array(N);
+
+    for (var i = 0; i < N; i++) {
+      // Variabel 4: Bootstrap → goyangkan median basis
+      var medSample = enBoot ? _mcBootstrapMedian(validPrices) : baseMedian;
+
+      // Variabel 1: Time Rate (Triangular) → faktor (1 + r%)
+      var fTime = enTime ? (1 + _mcSampleTriangular(timeMin, timeMode, timeMax) / 100) : 1;
+
+      // Variabel 2: RaLAT residual (Normal) → faktor (1 + e%)
+      var fRalat = enRalat ? (1 + _mcSampleNormal(0, ralatSigma) / 100) : 1;
+
+      // Variabel 3: Market Shock (Triangular asimetris) → faktor (1 + s%)
+      var fShock = enShock ? (1 + _mcSampleTriangular(shockMin, shockMode, shockMax) / 100) : 1;
+
+      // Variabel 5: Dirichlet probabilitas + adj SBM tetap
+      var probs;
+      if (enDir) {
+        probs = _mcSampleDirichlet([alphaPess, alphaBase, alphaOpt]);
+      } else {
+        probs = [pPess, pBase, pOpt];
+      }
+      var fSbm = (1 + aPess) * probs[0] + 1 * probs[1] + (1 + aOpt) * probs[2];
+
+      var v = medSample * fTime * fRalat * fShock * fSbm;
+      // Floor ke 0 (tidak ada nilai negatif)
+      if (v < 0) v = 0;
+      samples[i] = v;
+
+      // Catat kontribusi (deviasi dari nilai netral) — untuk tornado.
+      contribTime[i]  = enTime  ? (fTime - 1) : 0;
+      contribRalat[i] = enRalat ? (fRalat - 1) : 0;
+      contribShock[i] = enShock ? (fShock - 1) : 0;
+      contribBoot[i]  = enBoot  ? (medSample / baseMedian - 1) : 0;
+      contribDir[i]   = enDir   ? (fSbm - ((1 + aPess) * pPess + 1 * pBase + (1 + aOpt) * pOpt)) : 0;
+    }
+
+    var t1 = performance.now();
+    var elapsedMs = (t1 - t0).toFixed(0);
+
+    // Statistik
+    var sortedArr = Array.prototype.slice.call(samples).sort(function(a, b) { return a - b; });
+    var mean = _mcMean(sortedArr);
+    var std = _mcStdev(sortedArr, mean);
+
+    var stats = {
+      mean: mean,
+      std: std,
+      cv: mean > 0 ? (std / mean * 100) : 0,
+      p1:  _mcPercentile(sortedArr, 1),
+      p5:  _mcPercentile(sortedArr, 5),
+      p25: _mcPercentile(sortedArr, 25),
+      p50: _mcPercentile(sortedArr, 50),
+      p75: _mcPercentile(sortedArr, 75),
+      p95: _mcPercentile(sortedArr, 95),
+      p99: _mcPercentile(sortedArr, 99),
+      min: sortedArr[0],
+      max: sortedArr[sortedArr.length - 1]
+    };
+
+    // VaR (loss = baseMedian - sample). VaR95 = nilai kerugian dengan probabilitas 5%
+    stats.var95 = baseMedian - stats.p5;
+    stats.var99 = baseMedian - stats.p1;
+
+    // P(value < threshold)
+    var below = 0;
+    for (var k = 0; k < sortedArr.length; k++) if (sortedArr[k] < threshold) below++;
+    stats.probBelowThreshold = (below / N) * 100;
+    stats.threshold = threshold;
+
+    // Sensitivity: korelasi Pearson |r| antara contribX dan samples
+    var sensitivity = [
+      { name: 'Bootstrap Pembanding',  enabled: enBoot,  corr: enBoot  ? _mcCorr(contribBoot,  samples) : 0 },
+      { name: 'Time Rate',             enabled: enTime,  corr: enTime  ? _mcCorr(contribTime,  samples) : 0 },
+      { name: 'RaLAT Residual',        enabled: enRalat, corr: enRalat ? _mcCorr(contribRalat, samples) : 0 },
+      { name: 'Market Shock',          enabled: enShock, corr: enShock ? _mcCorr(contribShock, samples) : 0 },
+      { name: 'SBM Dirichlet Mix',     enabled: enDir,   corr: enDir   ? _mcCorr(contribDir,   samples) : 0 }
+    ].filter(function(s) { return s.enabled; })
+     .sort(function(a, b) { return Math.abs(b.corr) - Math.abs(a.corr); });
+
+    var assumptions = {
+      iterations: N,
+      elapsedMs: elapsedMs,
+      baseValue: baseMedian,
+      validCount: validPrices.length,
+      time:   { enabled: enTime,  min: timeMin, mode: timeMode, max: timeMax },
+      ralat:  { enabled: enRalat, sigma: ralatSigma },
+      shock:  { enabled: enShock, min: shockMin, mode: shockMode, max: shockMax },
+      boot:   { enabled: enBoot, samplesPerIter: validPrices.length },
+      dir:    { enabled: enDir, kappa: dirK, alphas: [alphaPess, alphaBase, alphaOpt], pSbm: [pPess, pBase, pOpt], adjSbm: [aPess, 0, aOpt] },
+      threshold: threshold
+    };
+
+    _mcLastResult = {
+      samples: sortedArr,
+      stats: stats,
+      assumptions: assumptions,
+      sensitivity: sensitivity
+    };
+
+    renderMCResults(_mcLastResult);
+
+    btn.disabled = false;
+    btn.innerHTML = origText;
+    document.getElementById('btnDownloadMCPDF').style.display = 'inline-flex';
+    toast('Simulasi selesai · ' + N.toLocaleString('id-ID') + ' iterasi dalam ' + elapsedMs + ' ms', 'success');
+  }, 50);
+}
+
+function _mcCorr(x, y) {
+  var n = x.length;
+  if (n < 2) return 0;
+  var mx = 0, my = 0;
+  for (var i = 0; i < n; i++) { mx += x[i]; my += y[i]; }
+  mx /= n; my /= n;
+  var num = 0, dx = 0, dy = 0;
+  for (var j = 0; j < n; j++) {
+    var a = x[j] - mx;
+    var b = y[j] - my;
+    num += a * b;
+    dx += a * a;
+    dy += b * b;
+  }
+  var denom = Math.sqrt(dx * dy);
+  return denom === 0 ? 0 : (num / denom);
+}
+
+// ---------- Render Hasil ----------
+
+var _mcChartHist = null;
+var _mcChartTornado = null;
+
+function _mcBuildHistogram(samples, bins) {
+  bins = bins || 40;
+  var min = samples[0];
+  var max = samples[samples.length - 1];
+  if (max === min) max = min + 1;
+  var width = (max - min) / bins;
+  var counts = new Array(bins).fill(0);
+  var labels = new Array(bins);
+  for (var i = 0; i < bins; i++) labels[i] = min + (i + 0.5) * width;
+  for (var j = 0; j < samples.length; j++) {
+    var idx = Math.floor((samples[j] - min) / width);
+    if (idx >= bins) idx = bins - 1;
+    if (idx < 0) idx = 0;
+    counts[idx]++;
+  }
+  return { labels: labels, counts: counts, width: width, min: min, max: max };
+}
+
+function renderMCResults(result) {
+  var s = result.stats;
+  var resultWrap = document.getElementById('mcResultWrap');
+  resultWrap.style.display = 'block';
+
+  // Stat cards
+  document.getElementById('mcStatMean').textContent = formatRupiah(Math.round(s.mean));
+  document.getElementById('mcStatP50').textContent = formatRupiah(Math.round(s.p50));
+  document.getElementById('mcStatP5').textContent = formatRupiah(Math.round(s.p5));
+  document.getElementById('mcStatP95').textContent = formatRupiah(Math.round(s.p95));
+
+  // CI 90%
+  document.getElementById('mcCI90').innerHTML =
+    formatRupiah(Math.round(s.p5)) + ' — ' + formatRupiah(Math.round(s.p95)) +
+    '<div style="font-size:10px; opacity:.85; margin-top:2px;">CV: ' + s.cv.toFixed(2) + '% · σ: ' + formatRupiah(Math.round(s.std)) + '</div>';
+
+  // VaR
+  document.getElementById('mcVaR').innerHTML =
+    'VaR<sub>95</sub>: ' + formatRupiah(Math.round(s.var95)) +
+    '<br>VaR<sub>99</sub>: ' + formatRupiah(Math.round(s.var99));
+
+  // Threshold result
+  var thColor = s.probBelowThreshold > 20 ? '#dc2626' : (s.probBelowThreshold > 5 ? '#d97706' : '#15803d');
+  document.getElementById('mcThresholdResult').innerHTML =
+    '<strong>P(Nilai &lt; ' + formatRupiah(Math.round(s.threshold)) + '/m²) = </strong>' +
+    '<span style="color:' + thColor + '; font-size:16px; font-weight:800;">' + s.probBelowThreshold.toFixed(2) + '%</span>' +
+    '<div style="font-size:10.5px; color:#64748b; margin-top:4px;">' +
+      'Probabilitas nilai aset jatuh di bawah ambang batas dari ' + result.assumptions.iterations.toLocaleString('id-ID') + ' simulasi.' +
+    '</div>';
+
+  // Histogram
+  var hist = _mcBuildHistogram(result.samples, 40);
+  if (_mcChartHist) { _mcChartHist.destroy(); _mcChartHist = null; }
+  var ctxH = document.getElementById('mcHistogramChart').getContext('2d');
+
+  // Annotations untuk garis P5, P50, P95, threshold
+  function _binIdx(value) {
+    var idx = Math.floor((value - hist.min) / hist.width);
+    if (idx < 0) return 0;
+    if (idx >= hist.labels.length) return hist.labels.length - 1;
+    return idx;
+  }
+
+  // Warna bar berdasarkan posisi dalam distribusi
+  var barColors = hist.labels.map(function(label) {
+    if (label < s.p5) return 'rgba(220,38,38,0.65)';   // tail kiri (worst)
+    if (label > s.p95) return 'rgba(22,163,74,0.65)';  // tail kanan (best)
+    return 'rgba(124,58,237,0.55)';                     // center
+  });
+
+  _mcChartHist = new Chart(ctxH, {
+    type: 'bar',
+    data: {
+      labels: hist.labels.map(function(v) { return formatRupiah(Math.round(v)); }),
+      datasets: [{
+        label: 'Frekuensi',
+        data: hist.counts,
+        backgroundColor: barColors,
+        borderColor: 'rgba(124,58,237,0.9)',
+        borderWidth: 0.5,
+        barPercentage: 1.0,
+        categoryPercentage: 1.0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function(items) {
+              var i = items[0].dataIndex;
+              var lo = hist.min + i * hist.width;
+              var hi = lo + hist.width;
+              return formatRupiah(Math.round(lo)) + ' – ' + formatRupiah(Math.round(hi));
+            },
+            label: function(item) {
+              var pct = (item.parsed.y / result.samples.length * 100).toFixed(2);
+              return item.parsed.y + ' iterasi (' + pct + '%)';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { display: false }, grid: { display: false } },
+        y: { ticks: { font: { size: 9 } }, grid: { color: 'rgba(0,0,0,0.05)' }, title: { display: true, text: 'Frekuensi', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // Tornado chart (sensitivitas)
+  if (_mcChartTornado) { _mcChartTornado.destroy(); _mcChartTornado = null; }
+  var ctxT = document.getElementById('mcTornadoChart').getContext('2d');
+  var tornadoData = result.sensitivity.map(function(s) { return Math.abs(s.corr); });
+  var tornadoLabels = result.sensitivity.map(function(s) { return s.name; });
+  var tornadoColors = result.sensitivity.map(function(s) {
+    var v = Math.abs(s.corr);
+    if (v > 0.5) return 'rgba(220,38,38,0.85)';
+    if (v > 0.25) return 'rgba(217,119,6,0.85)';
+    return 'rgba(45,107,228,0.85)';
+  });
+
+  _mcChartTornado = new Chart(ctxT, {
+    type: 'bar',
+    data: {
+      labels: tornadoLabels,
+      datasets: [{
+        label: '|Korelasi Pearson|',
+        data: tornadoData,
+        backgroundColor: tornadoColors,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(item) {
+              var orig = result.sensitivity[item.dataIndex];
+              var sign = orig.corr >= 0 ? '+' : '−';
+              return 'r = ' + sign + Math.abs(orig.corr).toFixed(3) +
+                ' · ' + (Math.abs(orig.corr) > 0.5 ? 'Tinggi' : Math.abs(orig.corr) > 0.25 ? 'Sedang' : 'Rendah');
+            }
+          }
+        }
+      },
+      scales: {
+        x: { min: 0, max: 1, ticks: { font: { size: 9 } }, grid: { color: 'rgba(0,0,0,0.05)' }, title: { display: true, text: '|r| Pengaruh terhadap Nilai (0–1)', font: { size: 10 } } },
+        y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Audit log
+  var a = result.assumptions;
+  var auditLog = '';
+  auditLog += '<div><strong>Iterasi:</strong> ' + a.iterations.toLocaleString('id-ID') + ' (waktu eksekusi: ' + a.elapsedMs + ' ms)</div>';
+  auditLog += '<div><strong>Basis (Median IQR-validated):</strong> ' + formatRupiah(Math.round(a.baseValue)) + ' · ' + a.validCount + ' pembanding</div>';
+  auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
+  auditLog += '<div><strong>Variabel 1 — Time Rate:</strong> ' + (a.time.enabled ? 'Triangular(' + a.time.min + '%, ' + a.time.mode + '%, ' + a.time.max + '%)' : '<em>OFF</em>') + '</div>';
+  auditLog += '<div><strong>Variabel 2 — RaLAT Residual:</strong> ' + (a.ralat.enabled ? 'Normal(0, σ=' + a.ralat.sigma + '%)' : '<em>OFF</em>') + '</div>';
+  auditLog += '<div><strong>Variabel 3 — Market Shock:</strong> ' + (a.shock.enabled ? 'Triangular(' + a.shock.min + '%, ' + a.shock.mode + '%, ' + a.shock.max + '%)' : '<em>OFF</em>') + '</div>';
+  auditLog += '<div><strong>Variabel 4 — Bootstrap:</strong> ' + (a.boot.enabled ? 'Empirical resample (n=' + a.boot.samplesPerIter + ' per iterasi, with replacement)' : '<em>OFF</em>') + '</div>';
+  auditLog += '<div><strong>Variabel 5 — SBM Dirichlet:</strong> ' + (a.dir.enabled ? 'Dirichlet(α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa + ')' : '<em>OFF</em>') + '</div>';
+  auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
+  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Standar acuan: SPI 103 §5.5 (Valuation Uncertainty), IVS 105 §40.7, SPI 366 §7.2 (VaR untuk agunan), KEPI Pasal 8 (justifikasi metode).</em></div>';
+  document.getElementById('mcAuditLog').innerHTML = auditLog;
+}
+
+// ---------- PDF Laporan Monte Carlo ----------
+
+function downloadMCPDF() {
+  if (!_mcLastResult) {
+    toast('Jalankan simulasi Monte Carlo terlebih dulu.', 'error');
+    return;
+  }
+  toast('Membangun Laporan PDF Monte Carlo…', 'loading');
+
+  var template = document.getElementById('pdfMCTemplate');
+  var r = _mcLastResult;
+  var s = r.stats;
+  var a = r.assumptions;
+
+  // Convert chart canvas → image
+  var histImg = _mcChartHist ? _mcChartHist.toBase64Image() : '';
+  var tornadoImg = _mcChartTornado ? _mcChartTornado.toBase64Image() : '';
+
+  var sensRows = r.sensitivity.map(function(x, i) {
+    var sign = x.corr >= 0 ? '+' : '−';
+    var cls = Math.abs(x.corr) > 0.5 ? 'Tinggi' : Math.abs(x.corr) > 0.25 ? 'Sedang' : 'Rendah';
+    return '<tr><td style="padding:6px; border:1px solid #d1dbe8;">' + (i + 1) + '. ' + x.name + '</td>' +
+           '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + sign + Math.abs(x.corr).toFixed(3) + '</td>' +
+           '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + cls + '</td></tr>';
+  }).join('');
+
+  function _yn(b) { return b ? '✅ Aktif' : '⛔ Nonaktif'; }
+
+  var assumptionRows =
+    '<tr><td style="padding:6px; border:1px solid #d1dbe8;">1. Time Rate</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">Triangular</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.time.enabled ? 'min=' + a.time.min + '%, mode=' + a.time.mode + '%, max=' + a.time.max + '%' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.time.enabled) + '</td></tr>' +
+    '<tr><td style="padding:6px; border:1px solid #d1dbe8;">2. RaLAT Residual</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">Normal</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.ralat.enabled ? 'μ=0%, σ=' + a.ralat.sigma + '%' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.ralat.enabled) + '</td></tr>' +
+    '<tr><td style="padding:6px; border:1px solid #d1dbe8;">3. Market Shock</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">Triangular Asimetris</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.shock.enabled ? 'min=' + a.shock.min + '%, mode=' + a.shock.mode + '%, max=' + a.shock.max + '%' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.shock.enabled) + '</td></tr>' +
+    '<tr><td style="padding:6px; border:1px solid #d1dbe8;">4. Bootstrap</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">Empirical</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.boot.enabled ? 'Resample n=' + a.boot.samplesPerIter + ' with replacement' : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.boot.enabled) + '</td></tr>' +
+    '<tr><td style="padding:6px; border:1px solid #d1dbe8;">5. SBM Probability Mix</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">Dirichlet</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.dir.enabled ? 'α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa : '–') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.dir.enabled) + '</td></tr>';
+
+  template.innerHTML =
+    '<div style="border-bottom: 3px solid #7c3aed; padding-bottom:15px; margin-bottom:20px;">' +
+      '<h1 style="color:#1e3a5f; margin:0;">Laporan Monte Carlo Simulation</h1>' +
+      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Quantifying Valuation Uncertainty · Mengacu SPI 103 §5.5 &amp; IVS 105 §40.7</p>' +
+    '</div>' +
+
+    '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
+      '<tr>' +
+        '<td style="padding:15px; background:#f0f4f8; border-radius:8px 0 0 8px; width:50%;">' +
+          '<div style="font-size:12px; color:#5a6a7e;">Nilai Dasar (Base Case)</div>' +
+          '<div style="font-size:22px; color:#1a2332; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(a.baseValue)) + '/m²</div>' +
+          '<div style="font-size:10px; color:#8a9ab0; margin-top:5px;">Validasi: ' + a.validCount + ' pembanding (IQR)</div>' +
+        '</td>' +
+        '<td style="padding:15px; background:#ede9fe; border-radius:0 8px 8px 0; width:50%; text-align:right;">' +
+          '<div style="font-size:12px; color:#7c3aed; font-weight:700;">EXPECTED VALUE (Mean)</div>' +
+          '<div style="font-size:24px; color:#7c3aed; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(s.mean)) + '/m²</div>' +
+          '<div style="font-size:10px; color:#7c3aed; margin-top:5px;">' + a.iterations.toLocaleString('id-ID') + ' iterasi · ' + a.elapsedMs + ' ms</div>' +
+        '</td>' +
+      '</tr>' +
+    '</table>' +
+
+    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Statistik Distribusi Nilai</h3>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
+      '<tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Median (P50)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p50)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Mean (μ)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.mean)) + '</td>' +
+      '</tr>' +
+      '<tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Stdev (σ)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.std)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Coeff. of Variation</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + s.cv.toFixed(2) + '%</td>' +
+      '</tr>' +
+      '<tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>Min · Max</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.min)) + ' · ' + formatRupiah(Math.round(s.max)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;"><strong>P25 · P75</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p25)) + ' · ' + formatRupiah(Math.round(s.p75)) + '</td>' +
+      '</tr>' +
+    '</table>' +
+
+    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Confidence Interval &amp; Value at Risk (VaR)</h3>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
+      '<tr style="background:#1e3a5f; color:#fff;">' +
+        '<th style="padding:8px; border:1px solid #1e3a5f;">Indikator</th>' +
+        '<th style="padding:8px; border:1px solid #1e3a5f;">Nilai</th>' +
+        '<th style="padding:8px; border:1px solid #1e3a5f;">Interpretasi</th>' +
+      '</tr>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 90% (P5–P95)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p5)) + ' — ' + formatRupiah(Math.round(s.p95)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Range nilai wajar untuk pelaporan SPI 103.5.5</td></tr>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 98% (P1–P99)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p1)) + ' — ' + formatRupiah(Math.round(s.p99)) + '</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Rentang ekstrem untuk laporan high-stakes (M&amp;A, litigasi)</td></tr>' +
+      '<tr style="background:#fef2f2;"><td style="padding:8px; border:1px solid #d1dbe8;"><strong>VaR 95%</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var95)) + '/m²</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Potensi kerugian dengan probabilitas ≤ 5% (SPI 366 — agunan)</td></tr>' +
+      '<tr style="background:#fef2f2;"><td style="padding:8px; border:1px solid #d1dbe8;"><strong>VaR 99%</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var99)) + '/m²</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Stress scenario untuk PSAK 71 / Basel III</td></tr>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>P[Nilai &lt; ' + formatRupiah(Math.round(s.threshold)) + ']</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-weight:bold; color:' + (s.probBelowThreshold > 20 ? '#dc2626' : s.probBelowThreshold > 5 ? '#d97706' : '#15803d') + ';">' + s.probBelowThreshold.toFixed(2) + '%</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Probabilitas threshold (negosiasi/cut-off)</td></tr>' +
+    '</table>' +
+
+    (histImg ?
+      '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Distribusi Nilai (Histogram)</h3>' +
+      '<div style="border:1px solid #d1dbe8; border-radius:6px; padding:8px; background:#fff; margin-bottom:20px;"><img src="' + histImg + '" style="width:100%;"/></div>'
+      : '') +
+
+    (tornadoImg ?
+      '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Sensitivity Analysis (Tornado)</h3>' +
+      '<div style="border:1px solid #d1dbe8; border-radius:6px; padding:8px; background:#fff; margin-bottom:15px;"><img src="' + tornadoImg + '" style="width:100%;"/></div>' +
+      '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
+        '<tr style="background:#fafafa;"><th style="padding:6px; border:1px solid #d1dbe8; text-align:left;">Variabel</th>' +
+        '<th style="padding:6px; border:1px solid #d1dbe8;">|r| Pearson</th>' +
+        '<th style="padding:6px; border:1px solid #d1dbe8;">Tingkat Pengaruh</th></tr>' + sensRows + '</table>'
+      : '') +
+
+    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Audit Log Asumsi (Reproducibility)</h3>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
+      '<tr style="background:#fafafa;"><th style="padding:6px; border:1px solid #d1dbe8; text-align:left;">Variabel</th>' +
+        '<th style="padding:6px; border:1px solid #d1dbe8;">Distribusi</th>' +
+        '<th style="padding:6px; border:1px solid #d1dbe8;">Parameter</th>' +
+        '<th style="padding:6px; border:1px solid #d1dbe8;">Status</th></tr>' + assumptionRows + '</table>' +
+
+    '<div style="margin-top:20px; padding:12px; background:#f8fafc; border-left:4px solid #7c3aed; font-size:10px; color:#475569; line-height:1.5; border-radius:4px;">' +
+      '<strong style="color:#1e3a5f;">Disclaimer Statistik:</strong> Hasil simulasi merepresentasikan ' + a.iterations.toLocaleString('id-ID') + ' skenario probabilistik berdasarkan asumsi distribusi yang ditentukan penilai. Confidence Interval &amp; VaR adalah estimasi statistik, bukan prediksi pasti, dan tidak menggantikan <em>professional judgement</em>. Asumsi distribusi wajib didukung riset pasar (BI Property Index, REI, Colliers, Knight Frank) sesuai KEPI Pasal 8.' +
+    '</div>' +
+
+    '<div style="margin-top:30px; font-size:11px; color:#5a6a7e; text-align:right;">' +
+      'Disusun &amp; Dikendalikan oleh: ' + (typeof activeUsername !== 'undefined' ? activeUsername : '–') + '<br>' +
+      'Tanggal Penilaian: ' + (typeof _formatValuationDateID === 'function' ? _formatValuationDateID() : '–') + '<br>' +
+      'Tanggal Laporan: ' + new Date().toLocaleString('id-ID') +
+    '</div>';
+
+  template.style.display = 'block';
+  html2pdf().set({
+    margin: 15,
+    filename: 'Monte_Carlo_AVM_' + new Date().toISOString().slice(0, 10) + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(template).save().then(function() {
+    template.style.display = 'none';
+    toast('Laporan Monte Carlo berhasil diunduh!', 'success');
+  });
+}
+
+// ---------- Toggle aktifkan/nonaktifkan card berdasarkan checkbox ----------
+
+(function setupMCToggleListeners() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var pairs = [
+      ['mcEnableTime', null],
+      ['mcEnableRalat', null],
+      ['mcEnableShock', null],
+      ['mcEnableBoot', null],
+      ['mcEnableDirichlet', null]
+    ];
+    pairs.forEach(function(p) {
+      var cb = document.getElementById(p[0]);
+      if (!cb) return;
+      var card = cb.closest('.mc-var-card');
+      function sync() {
+        if (!cb.checked) card.classList.add('disabled');
+        else card.classList.remove('disabled');
+      }
+      cb.addEventListener('change', sync);
+      sync();
+    });
+  });
+})();
 
 function downloadAVMPDF() {
   toast('Membangun Laporan PDF AVM...', 'loading');
