@@ -1361,8 +1361,6 @@ body.mmode-picking .mpick-hint { display: flex; }
   </div>
 </div>
 
-<div id="pdfTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:180mm; box-sizing:border-box; background:white;"></div>
-
 <div id="pdfAVMTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:180mm; box-sizing:border-box; background:white;"></div>
 
 <div id="pdfMCTemplate" style="display:none; padding:30px; font-family:'Plus Jakarta Sans',sans-serif; width:180mm; box-sizing:border-box; background:white;"></div>
@@ -3405,9 +3403,13 @@ function buildPopup(row) {
                 '<div id="poi_res_' + row._uid + '"></div></div>';
   }
 
-  return '<div class="iw-wrap">' + fotoHtml + '<div class="iw-header"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + f(row.id) + '</span><span class="iw-badge">' + f(row.legalitas) + '</span><div style="display:flex; gap:4px;">'
+  // Keterangan header popup: format "ID - Sumber" (contoh: "DP1 - Bapak Endro - Pemilik")
+  var headerLabel = f(row.id);
+  if (f(row.sumber) !== '–') headerLabel += ' - ' + f(row.sumber);
+
+  return '<div class="iw-wrap">' + fotoHtml + '<div class="iw-header"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + headerLabel.replace(/"/g,'&quot;') + '">' + headerLabel + '</span><span class="iw-badge">' + f(row.legalitas) + '</span><div style="display:flex; gap:4px;">'
     + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" ' + disabledAttr + '>⚖️</button>'
-    + '<button class="iw-foto-btn" style="background:#ec4899; border-color:#ec4899;" onclick="downloadPDF(\'' + f(row.id) + '\')" title="Download PDF Brief" ' + disabledAttr + '>📄</button>'
+    + '<button class="iw-foto-btn" style="background:#1e3a5f; border-color:#1e3a5f;" onclick="openDetailModal(\'' + row._uid + '\')" title="Lihat Data">👁</button>'
     + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\', \'' + f(row.koordinat) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
     + '<button class="iw-foto-btn" onclick="triggerFotoUpdate(\'' + f(row.id) + '\',\'' + f(row.koordinat) + '\',\'' + esc(row.sumber) + '\')" title="Tambah Foto" ' + disabledAttr + '>+</button>'
     + '</div></div><div class="iw-body">' + _iwr('Alamat', f(row.alamat)) + _iwr('Kota/Prov.', f(row.kota) + ' / ' + f(row.provinsi)) + _iwr('Tipe Bangunan', f(row.tipeBangunan)) + _iwr('Luas Tanah', f(row.luasTanah) !== '–' ? f(row.luasTanah) + ' m²' : '–') + _iwr('Luas Bangunan', f(row.luasBangunan) !== '–' ? f(row.luasBangunan) + ' m²' : '–') + _iwr('Harga', '<span class="iw-harga">' + formatRupiah(row.harga) + '</span>') + _iwr('Ind. Nilai/m²', '<span class="iw-harga">' + formatRupiah(row.indikasiNilai) + '</span>') + _iwr('ROW Jalan', f(row.lebarJalanROW) !== '–' ? f(row.lebarJalanROW) + ' m' : '–') + _iwr('Peruntukan', f(row.peruntukan)) + _iwr('Status Harga', f(row.statusHarga)) + _iwr('Waktu Data', f(row.waktuData) + getAgingFlag(row.waktuData)) + _iwr('Sumber / HP', f(row.sumber) + ' / ' + f(row.hp))
@@ -4877,43 +4879,6 @@ function showCompareModal() {
   document.getElementById('compareBar').style.display = 'none'; 
 }
 
-function downloadPDF(id) {
-  var row = currentData.find(function(r) { return r.id === id; }); 
-  if (!row) return; 
-  toast('Menyiapkan file PDF...', 'loading');
-  
-  var template = document.getElementById('pdfTemplate'), imgHtml = '';
-  if (row.foto && row.foto !== '–') { 
-    imgHtml = '<img src="' + row.foto.split(',')[0] + '" style="width:100%; max-height:400px; object-fit:cover; border-radius:8px; margin-bottom:20px;">'; 
-  }
-  
-  function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
-  
-  template.innerHTML = '<h1 style="color:#1e3a5f; border-bottom:3px solid #16a34a; padding-bottom:10px; font-size:24px;">Brief Penilaian: ' + f(row.id) + '</h1>' +
-    '<p style="color:#5a6a7e; margin-bottom:20px; font-size:12px;">Dicetak pada: ' + new Date().toLocaleString('id-ID') + ' (Oleh: ' + activeUsername + ')</p>' + 
-    imgHtml + 
-    '<table style="width:100%; border-collapse:collapse; font-size:14px; margin-top:20px;">' +
-    '<tr><td style="padding:12px; border-bottom:1px solid #ddd; font-weight:bold; width:35%;">Alamat</td><td style="padding:12px; border-bottom:1px solid #ddd;">' + f(row.alamat) + ', ' + f(row.kota) + '</td></tr>' +
-    '<tr><td style="padding:12px; border-bottom:1px solid #ddd; font-weight:bold;">Jenis Properti</td><td style="padding:12px; border-bottom:1px solid #ddd;">' + f(row.objek) + ' (' + f(row.legalitas) + ')</td></tr>' +
-    '<tr><td style="padding:12px; border-bottom:1px solid #ddd; font-weight:bold;">Dimensi (LT / LB)</td><td style="padding:12px; border-bottom:1px solid #ddd;">' + f(row.luasTanah) + ' m² / ' + f(row.luasBangunan) + ' m²</td></tr>' +
-    '<tr><td style="padding:12px; border-bottom:1px solid #ddd; font-weight:bold;">ROW Jalan</td><td style="padding:12px; border-bottom:1px solid #ddd;">' + f(row.lebarJalanROW) + ' meter</td></tr>' +
-    '<tr><td style="padding:12px; border-bottom:1px solid #ddd; font-weight:bold;">Harga ' + f(row.statusHarga) + '</td><td style="padding:12px; border-bottom:1px solid #ddd; color:#16a34a; font-weight:bold; font-size:16px;">' + formatRupiah(row.harga) + '</td></tr>' +
-    '<tr><td style="padding:12px; font-weight:bold;">Indikasi Nilai Pasar</td><td style="padding:12px; color:#2d6be4; font-weight:bold; font-size:16px;">' + formatRupiah(row.indikasiNilai) + ' / m²</td></tr>' +
-    '</table>';
-    
-  template.style.display = 'block'; 
-  html2pdf().set({ 
-    margin: 15, 
-    filename: 'Brief_Properti_' + row.id + '.pdf', 
-    image: { type: 'jpeg', quality: 0.98 }, 
-    html2canvas: { scale: 2 }, 
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
-  }).from(template).save().then(function() { 
-    template.style.display = 'none'; 
-    toast('PDF Berhasil Diunduh!', 'success'); 
-  });
-}
-  
 function toast(msg, type) {
   var el = document.createElement('div'); el.className = 'toast ' + (type || ''); var icon = 'ℹ️';
   if (type === 'success') icon = '✅'; else if (type === 'error') icon = '❌'; else if (type === 'loading') icon = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#ffffff;margin-bottom:0;"></div>';
