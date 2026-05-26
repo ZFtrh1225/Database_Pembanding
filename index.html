@@ -311,12 +311,11 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 }
 
 /* =========================================================
-   📱 RESPONSIVE MOBILE TWEAKS
+   📱 RESPONSIVE MOBILE TWEAKS (legacy — kept for backward compat)
    ========================================================= */
 @media (max-width: 768px) {
   .topbar { padding: 0 10px; }
   .topbar-brand span { display: none; } 
-  .btn-top { padding: 6px 8px; font-size: 11px; }
   .panel-filter { position: absolute; top: 0; left: 0; bottom: 0; width: 100% !important; max-width: 100% !important; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.3); }
   .panel-filter.collapsed { display: none; } 
   .map-toolbar { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
@@ -335,6 +334,139 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .compare-bar { width: 90%; justify-content: space-between; padding: 10px; font-size: 11px; bottom: 10px;}
   .compare-bar button { padding: 6px 10px;}
   .sbm-grid { grid-template-columns: 1fr; }
+}
+
+/* =========================================================
+   📱 ENHANCED MOBILE UX (≤768px) — tanpa mengubah desktop
+   ========================================================= */
+@media (max-width: 768px) {
+  /* ── TOPBAR: kompak, ikon saja di layar kecil ── */
+  .topbar { height: 46px; padding: 0 8px; }
+  .topbar-brand .icon { width: 26px; height: 26px; font-size: 14px; }
+  .topbar-actions { gap: 4px; flex-wrap: wrap; }
+  .btn-top { padding: 7px 8px; font-size: 11px; border-radius: 8px; min-height: 34px; }
+  .btn-top svg { width: 13px; height: 13px; }
+  .btn-measurement { padding: 7px 8px; font-size: 11px; border-radius: 8px; min-height: 34px; }
+  .btn-measurement svg { width: 12px; height: 12px; }
+
+  /* ── LAYOUT: full height adjustment ── */
+  .layout { height: calc(100vh - 46px); }
+
+  /* ── FILTER PANEL: full overlay, scrollable ── */
+  .panel-filter { 
+    top: 46px !important; bottom: 0 !important; height: calc(100vh - 46px) !important;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+  .filter-header { padding: 12px 14px 10px; }
+  .filter-title { font-size: 14px; }
+  .filter-body { padding: 12px 14px; gap: 12px; }
+  .cb-item { padding: 6px 10px; font-size: 12px; min-height: 32px; }
+  .cb-dot { width: 14px; height: 14px; }
+  .form-input, .form-select { padding: 9px 12px; font-size: 14px; min-height: 40px; border-radius: 8px; }
+  .form-label { font-size: 11px; margin-bottom: 5px; }
+  .btn-search { padding: 12px 0; font-size: 15px; border-radius: 10px; min-height: 44px; }
+  .btn-reset { padding: 10px 0; font-size: 13px; min-height: 40px; }
+
+  /* ── MAP TOOLBAR: stacked, touch-friendly ── */
+  .map-toolbar { padding: 8px; gap: 6px; }
+  .map-search-input { padding: 10px 12px 10px 36px; font-size: 14px; min-height: 40px; border-radius: 10px; }
+  .map-search-icon { left: 12px; }
+  .view-toggle { grid-template-columns: 1fr 1fr; gap: 4px; }
+  .view-toggle .btn-view { padding: 9px 6px; font-size: 11px; min-height: 36px; border-radius: 8px; }
+  .btn-add { padding: 11px; font-size: 13px; border-radius: 10px; min-height: 42px; }
+
+  /* ── TABLE VIEW: horizontal scroll hint, larger text ── */
+  .table-view { -webkit-overflow-scrolling: touch; }
+  .data-table { font-size: 11.5px; }
+  .data-table thead th { padding: 8px 10px; font-size: 10.5px; }
+  .data-table tbody td { padding: 8px 10px; }
+  .data-table tbody td button { min-width: 32px; min-height: 32px; font-size: 13px; padding: 6px 10px; }
+
+  /* ── POPUP / INFOWINDOW: wider for mobile ── */
+  .iw-wrap { width: 280px !important; min-width: 260px !important; max-width: 92vw !important; font-size: 12px; }
+  .iw-header { padding: 10px 12px; font-size: 12px; }
+  .iw-foto-btn { width: 28px; height: 28px; font-size: 15px; }
+  .iw-body { padding: 10px 12px; }
+  .iw-row { padding: 5px 0; }
+  .iw-key { font-size: 11px; }
+  .iw-val { font-size: 11px; }
+  .iw-footer { gap: 6px; flex-wrap: wrap; }
+  .btn-gmaps { padding: 7px 10px; font-size: 11px; }
+
+  /* ── MODALS: full-screen on mobile ── */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal { 
+    width: 100% !important; max-width: 100% !important; 
+    max-height: 92vh; margin: 0 !important; 
+    border-radius: 16px 16px 0 0; padding: 0;
+    animation: slideUpMobile .3s ease;
+  }
+  @keyframes slideUpMobile { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-header { padding: 14px 16px; border-radius: 16px 16px 0 0; }
+  .modal-title { font-size: 14px; }
+  .btn-close { width: 32px; height: 32px; font-size: 18px; }
+  .modal-body { padding: 16px; }
+  .modal-footer { padding: 12px 16px; }
+  .btn-submit { padding: 11px 20px; font-size: 14px; min-height: 42px; border-radius: 10px; }
+
+  /* ── DETAIL TABLE (Lihat Data modal) ── */
+  .detail-table { font-size: 12.5px; }
+  .detail-table th { padding: 10px 12px; font-size: 11.5px; width: 38%; }
+  .detail-table td { padding: 10px 12px; }
+
+  /* ── COMPARE BAR ── */
+  .compare-bar { bottom: 12px; padding: 10px 14px; border-radius: 20px; font-size: 12px; gap: 10px; }
+  .compare-bar button { padding: 8px 12px; font-size: 11px; min-height: 32px; }
+
+  /* ── TOAST: wider on mobile ── */
+  .toast-container { bottom: 12px; right: 12px; left: 12px; }
+  .toast { max-width: 100%; font-size: 12px; padding: 12px 14px; }
+
+  /* ── MEASUREMENT OVERLAY: vertical layout ── */
+  .measure-overlay { flex-direction: column; }
+  .measure-sidebar { 
+    width: 100% !important; min-width: 100% !important; 
+    max-height: 40vh; border-right: none; border-bottom: 1px solid rgba(255,255,255,.1);
+  }
+  .measure-sidebar.hidden { max-height: 0 !important; height: 0 !important; }
+  .measure-map-wrap { flex: 1; min-height: 50vh; }
+  .mpt-input { padding: 8px 34px 8px 10px; font-size: 12px; min-height: 36px; }
+  .mpt-card { padding: 10px 12px; }
+  .msb-body { padding: 8px 10px; gap: 6px; }
+  .mmap-topbar { top: 8px; left: 8px; gap: 5px; flex-wrap: wrap; }
+  .mmap-btn, .mmap-close, .mmap-osm-toggle { padding: 6px 10px; font-size: 11px; border-radius: 6px; }
+
+  /* ── AVM / ANALYTICS MODAL ── */
+  .avm-tabs { gap: 4px; flex-wrap: wrap; }
+  .avm-tab-btn { padding: 6px 10px; font-size: 12px; }
+  .sbm-grid { gap: 8px; }
+  .sbm-card { padding: 10px; }
+  .sbm-card input { font-size: 14px; padding: 8px; min-height: 38px; }
+  .ev-box { padding: 12px; }
+  #sbmExpectedValue { font-size: 24px; }
+
+  /* ── FOTO UPLOAD: easier tap ── */
+  .foto-upload-area { padding: 20px; }
+  .foto-upload-label { font-size: 13px; }
+
+  /* ── LOGIN OVERLAY ── */
+  #loginOverlay .modal { border-radius: 12px; width: 92% !important; max-width: 340px !important; }
+
+  /* ── GENERAL TOUCH: minimum 44px tap target ── */
+  button, .cb-item, .rb-item, a.btn-gmaps { min-height: 36px; }
+  input[type="number"], input[type="text"], select { min-height: 40px; }
+}
+
+/* Extra small phones (≤ 390px) */
+@media (max-width: 390px) {
+  .topbar-actions { gap: 3px; }
+  .btn-top { padding: 6px 6px; font-size: 10px; gap: 3px; }
+  .btn-top span, .btn-measurement span:not(svg) { display: none; }
+  .view-toggle { grid-template-columns: 1fr 1fr; }
+  .iw-wrap { width: 260px !important; }
+  .modal-body { padding: 12px; }
+  .avm-tab-btn { font-size: 11px; padding: 5px 8px; }
+  #sbmExpectedValue { font-size: 20px; }
 }
 
 /* --- FITUR MEASUREMENT CSS --- */
