@@ -584,6 +584,571 @@ body.mmode-picking .mpick-hint { display: flex; }
 
 /* Garis lurus OSM measurement — fallback warna kontras (jika tanpa inline) */
 .measure-osm-line { stroke: #e60023; stroke-width: 6; stroke-dasharray: 14 8; }
+
+/* =========================================================================
+   ===  MOBILE-FIRST RESPONSIVE REVAMP (PHASES 1–5)                    ===
+   ===  - Tap targets, font-zoom prevention, safe-area, FABs, sheets   ===
+   ===  - Card list view, full-screen modals, kebab menu, etc.         ===
+   ========================================================================= */
+
+/* ---------- VISIBILITY HELPERS ---------- */
+.btn-mob-only { display: none !important; }
+.btn-mob-hide { /* visible by default */ }
+
+/* ---------- TOPBAR KEBAB "MORE" MENU ---------- */
+.topbar-more { position: relative; }
+.topbar-more-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(30,58,95,.18);
+  min-width: 200px; z-index: 1100;
+  padding: 6px; opacity: 0; pointer-events: none;
+  transform: translateY(-6px) scale(.98);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.topbar-more.open .topbar-more-menu {
+  opacity: 1; pointer-events: auto; transform: translateY(0) scale(1);
+}
+.topbar-more-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: transparent; border: none; padding: 11px 12px;
+  font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--text);
+  cursor: pointer; border-radius: 7px; text-align: left;
+  transition: background .15s;
+}
+.topbar-more-item:hover, .topbar-more-item:focus-visible { background: var(--sky); outline: none; }
+.topbar-more-item:active { background: #d4e4f5; }
+
+/* ---------- FILTER BACKDROP & DRAG HANDLE (mobile only by default) ---------- */
+.filter-backdrop {
+  display: none;
+  position: fixed; inset: 50px 0 0 0;
+  background: rgba(10,20,40,.45);
+  z-index: 49; opacity: 0;
+  transition: opacity .25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.filter-drag-handle { display: none; }
+
+/* ---------- LEGEND POPUP (mobile only) ---------- */
+.btn-legend-mob {
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; font-size: 12px; font-family: var(--font); font-weight: 600;
+  color: var(--text-sub); cursor: pointer;
+  display: none; align-items: center; gap: 6px;
+}
+.legend-popup {
+  display: none; position: absolute; top: calc(100% + 4px); right: 12px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(30,58,95,.18);
+  padding: 12px 14px; z-index: 200; min-width: 180px;
+}
+.legend-popup.open { display: block; }
+.legend-popup-title {
+  font-size: 11px; font-weight: 700; color: var(--navy);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 8px;
+}
+.legend-popup-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text); padding: 4px 0;
+}
+
+/* ---------- FILTER ACTIONS WRAPPER ---------- */
+.filter-actions { display: contents; }
+
+/* =========================================================================
+   ===  TABLET BREAKPOINT (≤ 1024px)                                    ===
+   ========================================================================= */
+@media (max-width: 1024px) {
+  .panel-filter { width: 280px; min-width: 260px; }
+  .legend-wrap .legend-item:nth-child(n+4) { display: none; }
+}
+
+/* =========================================================================
+   ===  MOBILE BREAKPOINT (≤ 768px) — PHASE 1: FOUNDATION              ===
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* Disable iOS auto-zoom on input focus by ensuring 16px font on inputs */
+  body { font-size: 14px; -webkit-text-size-adjust: 100%; }
+  input, select, textarea, .form-input, .form-select { font-size: 16px !important; }
+
+  /* Smooth momentum scrolling everywhere */
+  .panel-filter, .modal, .modal-body, .table-view, .content-area, .measure-sidebar {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Visibility helpers */
+  .btn-mob-only { display: inline-flex !important; }
+  .btn-mob-hide { display: none !important; }
+
+  /* ---------- TOPBAR (Phase 1) ---------- */
+  .topbar {
+    height: 56px; padding: 0 12px;
+    padding-top: env(safe-area-inset-top, 0);
+    padding-left: max(12px, env(safe-area-inset-left, 0));
+    padding-right: max(12px, env(safe-area-inset-right, 0));
+  }
+  .topbar-brand { font-size: 14px; gap: 8px; }
+  .topbar-brand .icon { width: 32px; height: 32px; font-size: 17px; }
+  .topbar-brand-text {
+    display: inline; font-weight: 700;
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .topbar-actions { gap: 6px; }
+
+  /* Min 44px tap targets */
+  .topbar-actions .btn-top, .topbar-actions .btn-measurement {
+    min-height: 40px; min-width: 40px;
+    padding: 8px 12px; font-size: 13px; border-radius: 8px;
+  }
+  .topbar-more-menu { min-width: 220px; padding: 8px; }
+  .topbar-more-item { padding: 13px 14px; font-size: 14px; min-height: 48px; }
+
+  /* Layout container — reset for mobile */
+  .layout { height: calc(100vh - 56px); position: relative; }
+
+  /* ---------- PHASE 2: FILTER PANEL AS BOTTOM SHEET ---------- */
+  .panel-filter {
+    position: fixed !important;
+    left: 0; right: 0; bottom: 0; top: auto !important;
+    width: 100% !important; max-width: 100% !important; min-width: 0 !important;
+    height: 88vh; max-height: 88vh;
+    border-radius: 18px 18px 0 0;
+    border-right: none;
+    box-shadow: 0 -10px 40px rgba(10,20,40,.25);
+    z-index: 100;
+    transform: translateY(0);
+    transition: transform .32s cubic-bezier(.32,.72,.4,1), opacity .25s ease;
+    display: flex; flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    overflow: hidden;
+  }
+  .panel-filter.collapsed {
+    display: flex !important;
+    transform: translateY(101%) !important;
+    opacity: 1 !important;
+    width: 100% !important; min-width: 0 !important;
+    border: none;
+    pointer-events: none;
+  }
+
+  /* Drag handle */
+  .filter-drag-handle {
+    display: block; flex-shrink: 0;
+    width: 40px; height: 4px; border-radius: 2px;
+    background: #cbd5e1; margin: 8px auto 4px;
+  }
+  .filter-drag-handle::before {
+    content: ''; display: block;
+    position: absolute; left: 0; right: 0;
+    height: 28px; margin-top: -12px; cursor: grab;
+  }
+
+  /* Header sticky */
+  .filter-header {
+    border-radius: 18px 18px 0 0;
+    padding: 10px 16px 12px;
+    flex-shrink: 0;
+  }
+  .close-mobile-filter {
+    width: 36px !important; height: 36px;
+    display: flex !important; align-items: center; justify-content: center;
+    border-radius: 50% !important; background: rgba(255,255,255,.6) !important;
+    font-size: 20px !important;
+  }
+
+  /* Body scrollable */
+  .filter-body {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 14px 16px 8px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* Sticky CTA at bottom */
+  .filter-actions {
+    display: flex !important; flex-direction: column; gap: 6px;
+    position: sticky; bottom: 0;
+    background: linear-gradient(180deg, rgba(226,239,218,0) 0%, #E2EFDA 25%, #E2EFDA 100%);
+    margin: 0 -16px -8px;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0));
+    border-top: 1px solid rgba(30,58,95,.1);
+    z-index: 5;
+  }
+  .filter-actions .btn-search { padding: 13px 0; font-size: 15px; min-height: 48px; }
+  .filter-actions .btn-reset { padding: 11px 0; font-size: 13px; min-height: 44px; margin-top: 0; }
+
+  /* Filter group spacing */
+  .filter-group { padding: 0; }
+  .filter-group-label { font-size: 11px; margin-bottom: 8px; padding-bottom: 6px; }
+  .cb-grid { gap: 6px; }
+  .cb-item { padding: 8px 12px; font-size: 13px; min-height: 38px; border-radius: 8px; }
+  .rb-item { padding: 8px 4px; font-size: 13px; min-height: 38px; }
+  .form-input, .form-select { padding: 10px 12px; min-height: 44px; border-radius: 9px; }
+  .form-select { padding-right: 32px; }
+  .form-label { font-size: 12px; margin-bottom: 6px; }
+
+  /* Backdrop */
+  .filter-backdrop {
+    display: block; pointer-events: none;
+  }
+  .panel-filter:not(.collapsed) ~ * .filter-backdrop,
+  body:has(.panel-filter:not(.collapsed)) .filter-backdrop {
+    opacity: 1; pointer-events: auto;
+  }
+  /* Fallback for browsers without :has() */
+  .filter-backdrop.show { opacity: 1; pointer-events: auto; }
+
+  /* ---------- PHASE 3: MAP TOOLBAR AS FLOATING CONTROLS ---------- */
+  .panel-right { width: 100%; }
+  .map-toolbar {
+    flex-direction: row; align-items: center;
+    padding: 10px 12px; gap: 8px;
+    position: relative; z-index: 30;
+    border-bottom: 1px solid var(--border);
+  }
+  .map-search-wrap { flex: 1; min-width: 0; }
+  .map-search-input { padding: 10px 12px 10px 36px; font-size: 14px !important; min-height: 42px; }
+  .map-search-icon { left: 12px; }
+  .legend-wrap { display: none !important; }
+  .btn-legend-mob { display: inline-flex !important; min-height: 42px; }
+
+  /* Hide built-in view-toggle row & btn-add (we'll show as FAB instead) */
+  .view-toggle {
+    position: absolute; top: 64px; right: 12px;
+    display: flex !important; flex-direction: column; gap: 8px;
+    width: auto !important; z-index: 40;
+    background: transparent;
+  }
+  .view-toggle .btn-view {
+    width: 44px !important; height: 44px;
+    padding: 0 !important; border-radius: 50%;
+    background: #fff !important;
+    box-shadow: 0 4px 12px rgba(30,58,95,.18);
+    border: 1px solid var(--border);
+    display: flex !important; align-items: center; justify-content: center;
+    overflow: visible;
+    font-size: 18px !important; line-height: 1;
+    gap: 0;
+  }
+  .view-toggle .btn-view.active {
+    background: var(--navy) !important; color: #fff !important;
+  }
+  .view-toggle #btnGPS { color: #ea4335 !important; }
+  .view-toggle .btn-view svg { display: none; }
+
+  /* Mode dropdown — collapse to single icon FAB */
+  .view-toggle .mode-dropdown-wrap { width: 44px !important; height: 44px; }
+  .view-toggle .mode-dropdown-wrap .btn-view {
+    width: 44px !important; height: 44px; padding: 0 !important;
+    font-size: 0 !important;
+  }
+  .view-toggle .mode-dropdown-wrap .btn-view #btnModeLabel,
+  .view-toggle .mode-dropdown-wrap .btn-view svg {
+    display: none !important;
+  }
+  .view-toggle .mode-dropdown-wrap .btn-view::before {
+    content: '🌐'; font-size: 18px; line-height: 1;
+  }
+  .mode-dropdown-menu {
+    right: 0 !important; left: auto !important;
+    min-width: 180px !important;
+    box-shadow: 0 8px 24px rgba(30,58,95,.18) !important;
+    border-radius: 10px !important;
+  }
+
+  /* Bottom-right segmented control: Peta / Tabel — moved into FAB stack above */
+
+  /* btn-add as FAB (bottom right) */
+  .btn-add {
+    position: fixed !important;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0));
+    right: 16px;
+    width: 56px !important; height: 56px;
+    padding: 0 !important; border-radius: 50% !important;
+    box-shadow: 0 6px 18px rgba(45,107,228,.45);
+    font-size: 0 !important;
+    display: flex !important; align-items: center; justify-content: center;
+    z-index: 60; margin: 0 !important;
+  }
+  .btn-add::before { content: '+'; font-size: 32px; line-height: 1; font-weight: 300; }
+
+  /* ---------- PHASE 4: TABLE → CARD LIST VIEW ---------- */
+  .table-view { padding: 12px; background: var(--bg); }
+  .data-table { display: block; background: transparent; }
+  .data-table thead { display: none; }
+  .data-table tbody { display: flex; flex-direction: column; gap: 10px; }
+  .data-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 2px 6px rgba(30,58,95,.06);
+    border-bottom: 1px solid var(--border);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .data-table tr:active { transform: scale(.99); }
+  .data-table tr:hover { background: #fff; }
+  .data-table td {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; max-width: none; white-space: normal;
+    border: none; font-size: 13px;
+    grid-column: 1 / -1;
+  }
+  .data-table td::before {
+    content: attr(data-label);
+    font-size: 11px; font-weight: 600; color: var(--text-sub);
+    text-transform: uppercase; letter-spacing: .4px;
+    flex-shrink: 0; padding-right: 12px;
+  }
+  /* Hide redundant or low-priority cells on mobile cards */
+  .data-table td[data-label="ID"] {
+    grid-column: 1 / 2; padding: 0 0 4px 0;
+    border-bottom: 1px dashed #e2e8f0; margin-bottom: 4px;
+    font-family: var(--mono); font-size: 11px; color: var(--text-sub);
+    justify-content: flex-start;
+  }
+  .data-table td[data-label="ID"]::before { display: none; }
+  .data-table td[data-label="Aksi"] {
+    grid-column: 2 / 3; grid-row: 1;
+    padding: 0 0 4px 0; border-bottom: 1px dashed #e2e8f0; margin-bottom: 4px;
+    justify-content: flex-end; gap: 4px;
+  }
+  .data-table td[data-label="Aksi"]::before { display: none; }
+  .data-table td[data-label="Aksi"] button {
+    min-width: 36px; min-height: 36px;
+    padding: 6px 10px !important; font-size: 14px !important;
+  }
+  .data-table td[data-label="Tipe Bangunan"] { padding-top: 6px; }
+  .data-table td[data-label="Tipe Bangunan"]::before { content: 'Tipe'; }
+  .data-table td[data-label="Tipe Bangunan"] .badge { font-size: 11px; padding: 3px 9px; }
+  .data-table td[data-label="Alamat"] {
+    flex-direction: column; align-items: flex-start; gap: 2px;
+  }
+  .data-table td[data-label="Alamat"] { font-weight: 600; color: var(--navy); }
+  .data-table td[data-label="Harga"] { font-size: 15px; font-weight: 700; }
+  .data-table td[data-label="Harga"] .harga-cell,
+  .data-table td.harga-cell { font-size: 14px; font-weight: 700; }
+  .data-table td[data-label="Ind. Nilai/m²"]::before { content: 'Ind. /m²'; }
+  .data-table td[data-label="LT (m²)"]::before { content: 'LT'; }
+  .data-table td[data-label="LB (m²)"]::before { content: 'LB'; }
+  .data-table td[data-label="ROW Jalan (m)"]::before { content: 'ROW'; }
+  .data-table td[data-label="Status Harga"]::before { content: 'Status'; }
+  .data-table td[data-label="Waktu Data"]::before { content: 'Waktu'; }
+  .data-table td[data-label="Sumber"] {
+    border-top: 1px dashed #e2e8f0; padding-top: 8px; margin-top: 4px;
+    font-size: 11px; color: var(--text-sub);
+  }
+  .data-table td[data-label="Sumber"]::before { content: 'Sumber'; }
+
+  /* Empty state still spans full */
+  .data-table tr:has(.empty-state) { grid-template-columns: 1fr; padding: 32px 16px; }
+  .data-table td.empty-state { grid-column: 1 / -1; justify-content: center; }
+  .data-table td.empty-state::before { display: none; }
+
+  /* ---------- PHASE 5: MODALS FULL-SCREEN ON MOBILE ---------- */
+  .modal-overlay { padding: 0; align-items: stretch; }
+  .modal {
+    width: 100% !important; max-width: 100% !important;
+    min-height: 100vh; max-height: 100vh; height: 100vh;
+    border-radius: 16px 16px 0 0;
+    margin: 0;
+    display: flex; flex-direction: column;
+    animation: slideUpFull .3s cubic-bezier(.32,.72,.4,1);
+  }
+  @keyframes slideUpFull { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-header {
+    padding: 14px 16px;
+    padding-top: max(14px, env(safe-area-inset-top, 0));
+    flex-shrink: 0;
+  }
+  .modal-header::before {
+    content: ''; display: block;
+    position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 4px; border-radius: 2px; background: #cbd5e1;
+  }
+  .modal-title { font-size: 15px; padding-top: 6px; }
+  .btn-close {
+    width: 40px !important; height: 40px;
+    font-size: 20px !important; border-radius: 50% !important;
+  }
+  .modal-body { flex: 1; overflow-y: auto; padding: 16px !important; }
+  .modal-footer {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0));
+    flex-shrink: 0; gap: 10px;
+  }
+  .modal-footer .btn-submit, .modal-footer .btn-reset {
+    flex: 1; min-height: 48px; font-size: 14px; padding: 12px 16px !important;
+  }
+  .modal-grid { grid-template-columns: 1fr; gap: 10px; }
+  .modal-grid .span-2 { grid-column: span 1; }
+
+  /* AVM Tabs — swipeable scroll */
+  .avm-tabs {
+    overflow-x: auto; flex-wrap: nowrap; gap: 4px;
+    padding-bottom: 6px; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .avm-tabs::-webkit-scrollbar { display: none; }
+  .avm-tab-btn {
+    flex-shrink: 0; padding: 10px 14px;
+    font-size: 13px; min-height: 44px; white-space: nowrap;
+  }
+
+  /* Compare bar — safer position */
+  .compare-bar {
+    bottom: calc(85px + env(safe-area-inset-bottom, 0));
+    left: 12px; right: 12px;
+    transform: none; width: auto;
+    padding: 10px 14px; font-size: 12px;
+    border-radius: 16px;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .compare-bar button { min-height: 36px; padding: 7px 14px; }
+
+  /* Login overlay — full screen */
+  #loginOverlay .modal {
+    max-width: 100% !important; min-height: 100vh; height: 100vh;
+    border-radius: 0; padding: 24px 20px !important;
+    justify-content: center;
+  }
+  #loginOverlay .modal-header::before { display: none; }
+  #loginOverlay .form-input { min-height: 48px; padding: 12px 14px; }
+  #loginOverlay .btn-search { min-height: 50px; font-size: 15px; }
+
+  /* Photo upload area — bigger */
+  .foto-upload-area { padding: 24px 16px; min-height: 110px; }
+  .foto-upload-label { font-size: 14px; }
+
+  /* Toast — better positioning */
+  .toast-container {
+    bottom: calc(85px + env(safe-area-inset-bottom, 0));
+    right: 12px; left: 12px;
+  }
+  .toast { max-width: 100%; font-size: 13px; padding: 12px 16px; }
+
+  /* Detail modal table — better mobile layout */
+  .detail-table { font-size: 13px; }
+  .detail-table th { width: 38%; padding: 10px 12px; font-size: 11.5px; }
+  .detail-table td { padding: 10px 12px; }
+
+  /* Compare table inside compare modal */
+  .compare-table { font-size: 11px; }
+  .compare-table th, .compare-table td { padding: 8px 6px; }
+  .compare-table img { height: 80px; }
+
+  /* SBM cards (AVM) stack vertically */
+  .sbm-grid { grid-template-columns: 1fr !important; gap: 10px; }
+  .sbm-card { padding: 14px; }
+
+  /* Audit table horizontally scrollable */
+  .audit-table { font-size: 11px; }
+  .audit-table th, .audit-table td { padding: 8px 6px; }
+
+  /* Map loading bigger spinner */
+  .spinner { width: 48px; height: 48px; border-width: 4px; }
+
+  /* ---------- MEASUREMENT OVERLAY → BOTTOM SHEET ---------- */
+  .measure-overlay { flex-direction: column; }
+  .measure-sidebar {
+    position: fixed !important;
+    left: 0; right: 0; bottom: 0; top: auto;
+    width: 100% !important; min-width: 0 !important;
+    height: 60vh; max-height: 60vh;
+    border-radius: 18px 18px 0 0;
+    border-right: none;
+    box-shadow: 0 -10px 40px rgba(0,0,0,.4);
+    transform: translateY(0);
+    transition: transform .3s cubic-bezier(.32,.72,.4,1);
+    z-index: 30; padding: 0;
+  }
+  .measure-sidebar.collapsed,
+  .measure-sidebar[style*="display: none"] {
+    display: flex !important;
+    transform: translateY(calc(100% - 56px));
+  }
+  .measure-sidebar::before {
+    content: ''; display: block;
+    width: 44px; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,.4);
+    margin: 8px auto 4px; flex-shrink: 0;
+  }
+  .measure-map-wrap { flex: 1; min-height: 40vh; }
+  .mmap-topbar {
+    flex-wrap: wrap; gap: 6px;
+    padding: 8px;
+    padding-top: max(8px, env(safe-area-inset-top, 0));
+  }
+  .mmap-btn, .mmap-close, .mmap-osm-toggle {
+    min-height: 40px; padding: 8px 12px; font-size: 12px;
+  }
+
+  /* ---------- AVM RaLAT panel grid ---------- */
+  #ralatAsetBody { grid-template-columns: 1fr !important; }
+  #ralatAsetBody .span-2 { grid-column: span 1 !important; }
+
+  /* Buttons inside detail modal & analytics modal */
+  .btn-gmaps { padding: 8px 12px; font-size: 11px; min-height: 36px; }
+
+  /* Topbar topbar-actions wrap if many */
+  .topbar-actions { flex-wrap: nowrap; }
+}
+
+/* =========================================================================
+   ===  SMALL MOBILE BREAKPOINT (≤ 380px) — extra compact              ===
+   ========================================================================= */
+@media (max-width: 380px) {
+  .topbar-brand-text { display: none; }
+  .topbar { padding: 0 8px; }
+  .map-toolbar { padding: 8px 10px; gap: 6px; }
+  .btn-legend-mob { padding: 6px 10px; font-size: 11px; }
+  .map-search-input { padding: 8px 10px 8px 32px; font-size: 14px !important; }
+  .view-toggle { top: 60px; right: 8px; gap: 6px; }
+  .view-toggle .btn-view { width: 40px !important; height: 40px; }
+  .btn-add { width: 52px !important; height: 52px; right: 12px; bottom: 16px; }
+  .filter-actions .btn-search { font-size: 14px; }
+  .modal-header { padding: 12px 14px; }
+  .modal-body { padding: 14px !important; }
+  .topbar-more-menu { right: -4px; min-width: 200px; }
+}
+
+/* =========================================================================
+   ===  HOVER-CAPABLE DEVICES ONLY                                      ===
+   ===  Disable hover effects on touch devices to prevent sticky hover  ===
+   ========================================================================= */
+@media (hover: none) {
+  .btn-top:hover, .btn-search:hover, .btn-add:hover, .cb-item:hover,
+  .btn-view:hover, .btn-reset:hover, .btn-close:hover, .topbar-more-item:hover {
+    transform: none !important;
+    box-shadow: inherit;
+  }
+  .data-table tbody tr:hover { background: #fff; }
+  .foto-upload-area:hover { border-color: var(--border); background: transparent; }
+  .modal { animation-duration: .25s; }
+}
+
+/* Active states for touch feedback */
+@media (hover: none) {
+  .btn-top:active, .btn-search:active, .btn-add:active, .cb-item:active,
+  .btn-view:active, .topbar-more-item:active, .filter-actions .btn-search:active {
+    transform: scale(.97);
+    transition: transform .08s ease;
+  }
+}
+
+/* =========================================================================
+   ===  REDUCE MOTION ACCESSIBILITY                                     ===
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -604,20 +1169,36 @@ body.mmode-picking .mpick-hint { display: flex; }
 </div>
 
 <header class="topbar">
-  <div class="topbar-brand"><div class="icon">🏠</div><span>Database Pembanding</span></div>
+  <div class="topbar-brand"><div class="icon">🏠</div><span class="topbar-brand-text">Database Pembanding</span></div>
   <div class="topbar-actions">
-    <button class="btn-top" onclick="toggleSidebar()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg> Filter</button>
-    <button class="btn-measurement" onclick="openMeasurement()">
+    <button class="btn-top" onclick="toggleSidebar()" aria-label="Buka filter"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg> <span class="btn-label">Filter</span></button>
+    <button class="btn-measurement btn-mob-hide" onclick="openMeasurement()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17l4-8 4 4 4-6 4 10"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
       Measurement
     </button>
-    <button class="btn-top" id="btnAddTop" onclick="openModalNew()">+ Tambah Data</button>
-    <button class="btn-top primary" id="btnExport" onclick="exportData()">⬇ Export</button>
+    <button class="btn-top btn-mob-hide" id="btnAddTop" onclick="openModalNew()">+ Tambah Data</button>
+    <button class="btn-top primary btn-mob-hide" id="btnExport" onclick="exportData()">⬇ Export</button>
+
+    <!-- Mobile-only kebab "More" menu -->
+    <div class="topbar-more btn-mob-only">
+      <button class="btn-top" id="btnTopMore" type="button" onclick="toggleTopbarMore(event)" aria-label="Aksi lainnya" aria-haspopup="true" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
+      <div class="topbar-more-menu" id="topbarMoreMenu" role="menu" aria-hidden="true">
+        <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); openModalNew();">➕ <span>Tambah Data</span></button>
+        <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); openMeasurement();">📐 <span>Measurement</span></button>
+        <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); exportData();">⬇️ <span>Export</span></button>
+      </div>
+    </div>
   </div>
 </header>
 
 <div class="layout">
+  <!-- Backdrop khusus mobile saat panel filter terbuka -->
+  <div class="filter-backdrop" id="filterBackdrop" onclick="toggleSidebar()" aria-hidden="true"></div>
+
   <aside class="panel-filter">
+    <div class="filter-drag-handle" aria-hidden="true"></div>
     <div class="filter-header" style="display:flex; justify-content:space-between; align-items:center;">
       <div>
         <div class="filter-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Cari Data Pembanding</div>
@@ -699,11 +1280,13 @@ body.mmode-picking .mpick-hint { display: flex; }
         <button id="btnDrawPoly" class="btn-reset" style="display:none; background:#e8f0fe; color:#2d6be4; border-color:#2d6be4; margin-top:5px; width:100%; font-weight:bold;" onclick="startDrawingPolygon()">✏️ Mulai Gambar Area</button>
       </div>
 
-      <div style="display: flex; gap: 8px;">
-        <button class="btn-search" id="btnCari" onclick="doSearch()" style="flex: 2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari</button>
-        <button class="btn-search" id="btnAnalisa" onclick="initAVMAnalysis()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
+      <div class="filter-actions">
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-search" id="btnCari" onclick="doSearch()" style="flex: 2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari</button>
+          <button class="btn-search" id="btnAnalisa" onclick="initAVMAnalysis()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
+        </div>
+        <button class="btn-reset" onclick="resetFilter()">↺ Reset Filter</button>
       </div>
-      <button class="btn-reset" onclick="resetFilter()">↺ Reset Filter</button>
 
       <div class="analitik-box" style="margin-top: 15px;">
         <div class="result-label">Rata-rata Indikasi Nilai /m²</div>
@@ -736,6 +1319,20 @@ body.mmode-picking .mpick-hint { display: flex; }
         <div class="legend-item"><div class="legend-pin" style="background:#ab47bc;"></div>Ruko</div>
         <div class="legend-item"><div class="legend-pin" style="background:#f4b400;"></div>Office/Retail/Apt</div>
         <div class="legend-item"><div class="legend-pin" style="background:#db4437; border:2px solid #fff; width:12px; height:12px; border-radius:50%;"></div>Lokasi Aset</div>
+      </div>
+
+      <!-- Mobile-only: Legend popup trigger -->
+      <button class="btn-legend-mob btn-mob-only" type="button" onclick="toggleLegendPopup(event)" aria-label="Tampilkan legenda peta">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Legenda
+      </button>
+      <div class="legend-popup" id="legendPopup" role="dialog" aria-label="Legenda peta">
+        <div class="legend-popup-title">Legenda Peta</div>
+        <div class="legend-popup-item"><div class="legend-pin" style="background:#4285f4;"></div>Tanah Kosong</div>
+        <div class="legend-popup-item"><div class="legend-pin" style="background:#0f9d58;"></div>Tanah Bangunan</div>
+        <div class="legend-popup-item"><div class="legend-pin" style="background:#ab47bc;"></div>Ruko</div>
+        <div class="legend-popup-item"><div class="legend-pin" style="background:#f4b400;"></div>Office/Retail/Apt</div>
+        <div class="legend-popup-item"><div class="legend-pin" style="background:#db4437; border:2px solid #fff; width:12px; height:12px; border-radius:50%;"></div>Lokasi Aset</div>
       </div>
       <div class="view-toggle">
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
@@ -5499,6 +6096,227 @@ function safeInitMap() {
   }
 }
   
+// =========================================================================
+// =====   MOBILE UI HELPERS — kebab menu, backdrop, card view         =====
+// =========================================================================
+(function () {
+  'use strict';
+
+  var MOBILE_BP = 768;
+  function isMobile() { return window.innerWidth <= MOBILE_BP; }
+
+  // ----------- Topbar "More" kebab menu -----------
+  window.toggleTopbarMore = function (ev) {
+    if (ev) { ev.stopPropagation(); }
+    var wrap = document.querySelector('.topbar-more');
+    if (!wrap) return;
+    var open = wrap.classList.toggle('open');
+    var btn = document.getElementById('btnTopMore');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var menu = document.getElementById('topbarMoreMenu');
+    if (menu) menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  };
+  window.closeTopbarMore = function () {
+    var wrap = document.querySelector('.topbar-more');
+    if (wrap) wrap.classList.remove('open');
+    var btn = document.getElementById('btnTopMore');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    var menu = document.getElementById('topbarMoreMenu');
+    if (menu) menu.setAttribute('aria-hidden', 'true');
+  };
+  document.addEventListener('click', function (e) {
+    var wrap = document.querySelector('.topbar-more.open');
+    if (wrap && !wrap.contains(e.target)) window.closeTopbarMore();
+    var pop = document.getElementById('legendPopup');
+    if (pop && pop.classList.contains('open')) {
+      var trigger = e.target.closest('.btn-legend-mob');
+      if (!trigger && !pop.contains(e.target)) pop.classList.remove('open');
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      window.closeTopbarMore();
+      var pop = document.getElementById('legendPopup');
+      if (pop) pop.classList.remove('open');
+    }
+  });
+
+  // ----------- Legend popup toggle (mobile) -----------
+  window.toggleLegendPopup = function (ev) {
+    if (ev) ev.stopPropagation();
+    var pop = document.getElementById('legendPopup');
+    if (pop) pop.classList.toggle('open');
+  };
+
+  // ----------- Filter backdrop sync -----------
+  function syncFilterBackdrop() {
+    var panel = document.querySelector('.panel-filter');
+    var bd = document.getElementById('filterBackdrop');
+    if (!panel || !bd) return;
+    if (isMobile() && !panel.classList.contains('collapsed')) {
+      bd.classList.add('show');
+    } else {
+      bd.classList.remove('show');
+    }
+  }
+  // Observe panel-filter class changes
+  var panelEl = document.querySelector('.panel-filter');
+  if (panelEl && 'MutationObserver' in window) {
+    new MutationObserver(syncFilterBackdrop).observe(panelEl, { attributes: true, attributeFilter: ['class'] });
+  }
+  window.addEventListener('resize', syncFilterBackdrop);
+
+  // ----------- Auto-collapse filter on initial mobile load -----------
+  function initialMobileFilterState() {
+    if (!isMobile()) return;
+    var panel = document.querySelector('.panel-filter');
+    if (panel && !panel.classList.contains('collapsed')) {
+      panel.classList.add('collapsed');
+    }
+    syncFilterBackdrop();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialMobileFilterState);
+  } else {
+    initialMobileFilterState();
+  }
+
+  // ----------- Drag-to-close filter bottom sheet -----------
+  function setupFilterDrag() {
+    var panel = document.querySelector('.panel-filter');
+    var handle = document.querySelector('.filter-drag-handle');
+    var header = document.querySelector('.filter-header');
+    if (!panel || !handle) return;
+
+    var startY = 0, currentY = 0, dragging = false;
+    function onStart(e) {
+      if (!isMobile()) return;
+      dragging = true;
+      startY = (e.touches ? e.touches[0].clientY : e.clientY);
+      panel.style.transition = 'none';
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      var y = (e.touches ? e.touches[0].clientY : e.clientY);
+      currentY = y - startY;
+      if (currentY < 0) currentY = 0;
+      panel.style.transform = 'translateY(' + currentY + 'px)';
+    }
+    function onEnd() {
+      if (!dragging) return;
+      dragging = false;
+      panel.style.transition = '';
+      panel.style.transform = '';
+      if (currentY > 100) {
+        panel.classList.add('collapsed');
+        syncFilterBackdrop();
+      }
+      currentY = 0;
+    }
+    [handle, header].forEach(function (el) {
+      if (!el) return;
+      el.addEventListener('touchstart', onStart, { passive: true });
+      el.addEventListener('touchmove', onMove, { passive: true });
+      el.addEventListener('touchend', onEnd);
+      el.addEventListener('touchcancel', onEnd);
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFilterDrag);
+  } else {
+    setupFilterDrag();
+  }
+
+  // ----------- Patch renderTable to add data-label for mobile card view -----------
+  var COL_LABELS = [
+    'ID', 'Aksi', 'Tipe Bangunan', 'Alamat', 'Kota',
+    'Legalitas', 'LT (m²)', 'LB (m²)',
+    'Harga', 'Ind. Nilai/m²', 'ROW Jalan (m)', 'Status Harga',
+    'Waktu Data', 'Sumber'
+  ];
+  function applyDataLabels() {
+    var rows = document.querySelectorAll('#tableBody tr');
+    rows.forEach(function (tr) {
+      var tds = tr.children;
+      for (var i = 0; i < tds.length; i++) {
+        if (!tds[i].hasAttribute('data-label')) {
+          tds[i].setAttribute('data-label', COL_LABELS[i] || '');
+        }
+      }
+    });
+  }
+  // Patch after main renderTable is defined
+  function patchRenderTable() {
+    if (typeof window.renderTable !== 'function' || window.renderTable.__mobilePatched) return;
+    var orig = window.renderTable;
+    window.renderTable = function (data) {
+      var r = orig.apply(this, arguments);
+      try { applyDataLabels(); } catch (e) {}
+      return r;
+    };
+    window.renderTable.__mobilePatched = true;
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', patchRenderTable);
+  } else {
+    patchRenderTable();
+  }
+  // Also observe tableBody mutations as defensive layer
+  var tbody = document.getElementById('tableBody');
+  if (tbody && 'MutationObserver' in window) {
+    new MutationObserver(function () { applyDataLabels(); }).observe(tbody, { childList: true });
+  }
+
+  // ----------- View toggle FAB icon adjustments -----------
+  // Replace text content with icons via dataset to keep desktop labels
+  function adjustViewToggleForMobile() {
+    if (!isMobile()) return;
+    var map = { 'btnViewMap': '🗺', 'btnViewTable': '☰', 'btnHeatmap': '🔥', 'btnGPS': '📍' };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (!el.dataset.origLabel) el.dataset.origLabel = el.innerHTML;
+      el.innerHTML = map[id];
+      el.setAttribute('title', el.dataset.origLabel.replace(/<[^>]+>/g, '').trim());
+    });
+  }
+  function restoreViewToggleForDesktop() {
+    if (isMobile()) return;
+    ['btnViewMap', 'btnViewTable', 'btnHeatmap', 'btnGPS'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && el.dataset.origLabel) {
+        el.innerHTML = el.dataset.origLabel;
+      }
+    });
+  }
+  function syncViewToggleLabels() {
+    if (isMobile()) adjustViewToggleForMobile();
+    else restoreViewToggleForDesktop();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', syncViewToggleLabels);
+  } else {
+    syncViewToggleLabels();
+  }
+  window.addEventListener('resize', (function () {
+    var t;
+    return function () { clearTimeout(t); t = setTimeout(syncViewToggleLabels, 150); };
+  })());
+
+  // ----------- Prevent body scroll when bottom-sheet/modal is open on mobile -----------
+  function lockBodyScrollIfNeeded() {
+    if (!isMobile()) { document.body.style.overflow = ''; return; }
+    var anyOpen = document.querySelector('.modal-overlay.open') ||
+      document.querySelector('.measure-overlay.open') ||
+      (document.querySelector('.panel-filter:not(.collapsed)'));
+    document.body.style.overflow = anyOpen ? 'hidden' : '';
+  }
+  document.addEventListener('click', function () { setTimeout(lockBodyScrollIfNeeded, 50); });
+  window.addEventListener('resize', lockBodyScrollIfNeeded);
+
+})();
+// =========================================================================
+// =====   END MOBILE UI HELPERS                                       =====
 // =========================================================================
 </script>
 </body>
