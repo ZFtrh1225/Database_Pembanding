@@ -1435,6 +1435,7 @@ body.mmode-picking .mpick-hint { display: flex; }
             <div>
               <label class="form-label" style="font-size:10px;">Bentuk Tapak</label>
               <select id="rlAsetBentuk" class="form-select" style="padding:5px 8px; font-size:12px;" onchange="updateAsetTargetMeta()">
+                <option value="">— Belum diketahui —</option>
                 <option value="Beraturan">Beraturan</option>
                 <option value="Tidak Beraturan">Tidak Beraturan</option>
               </select>
@@ -1442,6 +1443,7 @@ body.mmode-picking .mpick-hint { display: flex; }
             <div>
               <label class="form-label" style="font-size:10px;">Posisi Tapak</label>
               <select id="rlAsetPosisi" class="form-select" style="padding:5px 8px; font-size:12px;" onchange="updateAsetTargetMeta()">
+                <option value="">— Belum diketahui —</option>
                 <option value="Tengah">Tengah</option>
                 <option value="Hoek">Hoek (sudut)</option>
                 <option value="Tusuk Sate">Tusuk Sate</option>
@@ -1463,8 +1465,9 @@ body.mmode-picking .mpick-hint { display: flex; }
             </div>
           </div>
           <div id="ralatAsetHint" style="font-size:10px; color:#5a6a7e; margin-top:6px;">
-            Isi karakter aset yang diketahui. Variabel dengan input kosong akan tercatat sebagai belum terhitung.
+            Isi karakter aset yang diketahui, lalu tekan Hitung Ulang. Variabel dengan input kosong akan tercatat sebagai belum terhitung.
           </div>
+          <button type="button" id="btnRecalculateAVM" class="btn-search" onclick="initAVMAnalysis()" disabled style="width:100%; min-height:44px; margin-top:10px; background:var(--blue); color:white; border:0;">↻ Hitung Ulang Analisa &amp; RaLAT</button>
         </div>
         <!-- ============ /Karakter Aset Target ============ -->
         <div style="display: flex; justify-content: space-between; align-items:flex-end;">
@@ -2073,8 +2076,8 @@ var _analysisReady = false;
 var _asetTargetMeta = {
   luasTanah:   null,   // angka (m²)
   lebarJalan:  null,   // angka (m)
-  bentuk:      'Beraturan',
-  posisi:      'Tengah',
+  bentuk:      '',
+  posisi:      '',
   peruntukan:  ''      // kosong berarti kategori penggunaan tidak diketahui
 };
 
@@ -2397,6 +2400,7 @@ function initAVMAnalysis() {
   _analysisReady = false;
   document.getElementById('btnDownloadAVMPDF').disabled = true;
   document.getElementById('btnRunMC').disabled = true;
+  document.getElementById('btnRecalculateAVM').disabled = true;
   invalidateMonteCarlo();
   var modelRegion = null, modelVersion = null, activeModel = null;
   var usedFallback = false;
@@ -2472,6 +2476,7 @@ function initAVMAnalysis() {
     toast('Tidak ada data valid untuk dianalisa.', 'error');
     if (modalAuditBody) modalAuditBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--red);">Tidak ada data valid.</td></tr>';
     document.getElementById('modalDataCount').textContent = '0 data valid';
+    document.getElementById('btnRecalculateAVM').disabled = false;
     return;
   }
 
@@ -2493,6 +2498,7 @@ function initAVMAnalysis() {
     });
     _ralatLastRun = { region: modelRegion, version: modelVersion, status: reason, asetFeats: null, geocodeRes: null };
     recalcAVM();
+    document.getElementById('btnRecalculateAVM').disabled = false;
     switchAVMTab('sbm');
     toast(reason, 'error');
   }
@@ -2598,6 +2604,7 @@ function initAVMAnalysis() {
     }
     console.log('[RaLAT v2] Pipeline selesai dalam ' + elapsed + 's untuk ' + _avmRawData.length + ' pembanding');
     recalcAVM();
+    document.getElementById('btnRecalculateAVM').disabled = false;
     switchAVMTab('sbm');
     toast('RaLAT v2 selesai · model ' + modelRegion + ' (' + modelVersion + ') · ' + _avmRawData.length + ' pembanding', 'success');
   }).catch(function(err) {
@@ -4883,7 +4890,7 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
       if (token === 'perumahan')  { feats[varName] = _ralatIsPerumahan(meta) ? 1 : 0; return; }
       if (token === 'industrial' || token === 'industri') { feats[varName] = _ralatIsIndustrial(meta) ? 1 : 0; return; }
       if (token === 'kebun' || token === 'perkebunan')    { feats[varName] = _ralatIsKebun(meta) ? 1 : 0; return; }
-      if (token === 'hook' || token === 'hoek')           { feats[varName] = _ralatIsHook(meta) ? 1 : 0; return; }
+      if (token === 'hook' || token === 'hoek')           { if (!meta.posisi) return; feats[varName] = _ralatIsHook(meta) ? 1 : 0; return; }
       // City marker — match dengan reverse-geocode bestCity
       if (!cityKey) return;
       var tokenNorm = token.replace(/[_\s]/g, '').toUpperCase();
@@ -4900,6 +4907,7 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
     // --- tapak_beraturan ---
     if (varName === 'tapak_beraturan') {
       var b = String(meta.bentuk || '').toLowerCase();
+      if (!b) return;
       var beraturan = (b.indexOf('beraturan') !== -1 && b.indexOf('tidak') === -1) ||
                       b.indexOf('bujur') !== -1 ||
                       b.indexOf('persegi') !== -1 ||
@@ -5048,6 +5056,8 @@ function markAnalysisStale() {
   var mc = document.getElementById('btnRunMC');
   if (pdf) pdf.disabled = true;
   if (mc) mc.disabled = true;
+  var recalculate = document.getElementById('btnRecalculateAVM');
+  if (recalculate) recalculate.disabled = !currentData || currentData.length === 0;
   var median = document.getElementById('modalMedianPrice');
   var count = document.getElementById('modalDataCount');
   var sbm = document.getElementById('sbmExpectedValue');
@@ -5076,8 +5086,8 @@ function updateAsetTargetMeta(silent) {
   _asetTargetMeta = {
     luasTanah:  num('rlAsetLuas'),
     lebarJalan: num('rlAsetROW'),
-    bentuk:     val('rlAsetBentuk') || 'Beraturan',
-    posisi:     val('rlAsetPosisi') || 'Tengah',
+    bentuk:     val('rlAsetBentuk') || '',
+    posisi:     val('rlAsetPosisi') || '',
     peruntukan: val('rlAsetPeruntukan') || ''
   };
   if (!silent) markAnalysisStale();
