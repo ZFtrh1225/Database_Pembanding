@@ -177,6 +177,8 @@ function _groupRegressionRows(data) {
     }
     models[modelName][version][variable] = {
       tipe: String(row[3] || '').trim(),
+      label: String(row[4] || '').trim(),
+      sheetRow: sheetRow,
       koefisien: coefficient
     };
   });

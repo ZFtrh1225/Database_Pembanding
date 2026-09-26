@@ -60,7 +60,7 @@ for (const name of [
   'ralatNormalizeModels', '_ralatFixVarTypes', 'ralatPickLatestVersion',
   'ralatClassifyVar', '_ralatNorm', '_ralatHaversine', '_ralatElCoord', '_ralatMinDistance',
   'ralatFeatureIssue', 'ralatBuildFeatures', 'ralatEngineV2', '_ralatEscapeHtml',
-  '_ralatTraceSource', '_ralatRenderVariableTrace', 'invalidateMonteCarlo', 'markAnalysisStale'
+  '_ralatTraceSource', '_ralatRenderMissing', '_ralatRenderVariableTrace', 'invalidateMonteCarlo', 'markAnalysisStale'
 ]) {
   // The HTML escaping helper contains quote characters inside regular expressions;
   // the lightweight brace scanner above treats those as string delimiters.
@@ -71,18 +71,20 @@ for (const name of [
   catch (error) { throw new Error('Gagal memuat ' + name + ': ' + error.message, { cause: error }); }
 }
 
-function row(id, name, variable, coefficient, type = 'ln') {
-  return [0, id, name, type, variable, variable, coefficient];
+function row(id, name, variable, coefficient, type = 'ln', label = variable) {
+  return [0, id, name, type, label, variable, coefficient];
 }
 
 const result = context._groupRegressionRows([
   row('2Jawa Timur20241120', 'Jawa Timur', 'ln_distance_to_mall', -0.212638988),
-  row('3Jawa Timur20241120', 'Jawa Timur', 'POI_retail_1000m', 0.006712297162, 'poi'),
+  row('3Jawa Timur20241120', 'Jawa Timur', 'POI_retail_1000m', 0.006712297162, 'poi', 'jumlah toko retail dalam radius 1 km'),
   row('2Jawa Timur20241213', 'Jawa Timur', 'ln_distance_to_mall', -0.1417004),
   row('0Jawa Timur', 'Jawa Timur', 'const', 20.60380889, 'konstanta'),
   row('4Jawa Timur20241213', 'Jawa Timur', 'ln_distance_to_mall', -0.2)
 ]);
 assert.equal(result.models['Jawa Timur']['20241120'].POI_retail_1000m.koefisien, 0.006712297162);
+assert.equal(result.models['Jawa Timur']['20241120'].POI_retail_1000m.label, 'jumlah toko retail dalam radius 1 km');
+assert.equal(result.models['Jawa Timur']['20241120'].POI_retail_1000m.sheetRow, 3);
 assert.equal(result.models['Jawa Timur']['20241213'].ln_distance_to_mall.koefisien, -0.1417004);
 assert.equal(result.models['Jawa Timur']['20241213'].POI_retail_1000m, undefined);
 assert.equal(result.diagnostics.unversionedRows.length, 1);
@@ -128,6 +130,15 @@ const coverage = context.ralatEngineV2(
 assert.equal(coverage.used, 1);
 assert.equal(coverage.total, 2);
 assert.equal(coverage.skipped[0].name, 'POI_retail_1000m');
+const retailModel = { POI_retail_1000m: result.models['Jawa Timur']['20241120'].POI_retail_1000m };
+const retailCoverage = context.ralatEngineV2(retailModel, {}, {}).coverage;
+assert.equal(retailCoverage.skipped[0].label, 'jumlah toko retail dalam radius 1 km');
+assert.equal(retailCoverage.skipped[0].sheetRow, 3);
+assert.match(context._ralatRenderMissing({ coverage: retailCoverage }), /Model_Regresi!3/);
+assert.match(context._ralatRenderMissing({ coverage: retailCoverage }), /belum dipetakan/);
+assert.match(context._ralatRenderMissing({ coverage: { used: 0, total: 1, skipped: [
+  { name: 'POI_retail_1000m', label: '<img src=x onerror="x">', reason: 'Definisi belum tersedia' }
+] } }), /&lt;img src=x onerror=&quot;x&quot;&gt;/);
 
 // Hitungan manual Sumatra 20241213: 100 m vs 200 m ke jalan utama dan ROW 8 vs 6 m.
 const betaRoad = -0.04100143518, betaRow = 0.04002363823;
@@ -139,6 +150,10 @@ const audit = context.ralatEngineV2({
 }, aset, comp);
 const expected = betaRoad * Math.log(100 / 200) + betaRow * (8 - 6);
 assert.ok(Math.abs(audit.adjPct - expected) < 1e-12);
+assert.ok(Math.abs(audit.adjPct - 0.10846730565392834) < 1e-12);
+assert.ok(Math.abs(audit.breakdown.find(b => b.var === 'ln_distance_to_road').kontribPct - 0.028420029193928352) < 1e-12);
+assert.ok(Math.abs(audit.breakdown.find(b => b.var === 'lebar_jalan_di_depan_adj').kontribPct - 0.08004727646) < 1e-12);
+assert.ok(Math.abs(Math.expm1(expected) - expected) > 0.006, 'Konversi exp(Δ)−1 berbeda dari implementasi saat ini; perlu spesifikasi model');
 assert.ok(Math.abs(1000000 * (1 + audit.adjPct) - 1108467.3) < 1);
 assert.ok(Math.abs(audit.breakdown.find(b => b.var === 'ln_distance_to_road').delta - Math.log(0.5)) < 1e-12);
 const floor = context.ralatEngineV2({ ln_distance_to_road: { tipe: 'ln', koefisien: betaRoad } },
@@ -149,6 +164,11 @@ const capped = context.ralatEngineV2({ width: { tipe: 'numerik', koefisien: 1 } 
 assert.equal(capped.rawAdjPct, 2);
 assert.equal(capped.adjPct, 0.5);
 assert.equal(capped.capped, true);
+const inverse = context.ralatEngineV2({
+  ln_distance_to_road: { tipe: 'ln', koefisien: betaRoad },
+  lebar_jalan_di_depan_adj: { tipe: 'numerik', koefisien: betaRow }
+}, comp, aset);
+assert.ok(Math.abs(inverse.adjPct + audit.adjPct) < 1e-12);
 
 // Jarak jalan yang diaudit harus menunjuk ke fitur OSM yang benar-benar dipakai.
 context.RALAT_TAG_MATCHERS.ln_distance_to_road = t => ['primary', 'trunk', 'motorway'].includes(t.highway);
@@ -176,11 +196,13 @@ context.ralatBuildFeatures({ lat: -6.2, lng: 106.8 }, {},
   { ln_distance_to_road: { tipe: 'ln', koefisien: betaRoad } }, emptyTrace, 'aset');
 assert.match(emptyTrace.ln_distance_to_road.missingReason, /tidak ditemukan/);
 const markup = context._ralatRenderVariableTrace({ breakdown: [Object.assign({}, audit.breakdown[0], {
+  label: 'jarak ke jalan utama', sheetRow: 597,
   asetTrace: trace.ln_distance_to_road,
   compTrace: trace.ln_distance_to_road
 })] });
 assert.match(markup, /Rincian rumus/);
 assert.match(markup, /OSM way\/423/);
+assert.match(markup, /Model_Regresi!597/);
 
 context.invalidateMonteCarlo();
 assert.equal(context._mcLastResult, null);
@@ -192,4 +214,4 @@ assert.equal(context._avmCurrentMedian, 0);
 assert.equal(context._mcLastResult, null);
 assert.equal(context._analysisRunToken, 1);
 assert.equal(context.recalculateButton.disabled, false, 'Editing target must enable a re-run inside modal');
-console.log('Model versioning, feature coverage, and simulation invalidation: OK');
+console.log('Model versioning, provenance, manual RaLAT arithmetic, and simulation invalidation: OK');
