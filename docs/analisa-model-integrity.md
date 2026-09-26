@@ -21,6 +21,30 @@ Jika versi/wilayah tidak dapat diverifikasi atau proses RaLAT gagal, aplikasi me
 
 Sheet ini tidak menyediakan definisi lengkap setiap variabel, koordinat acuan sejumlah fitur jarak, ambang kelas luas, transformasi variabel dependen, maupun diagnostik dan validasi model. Variabel yang tidak dapat dibangun sesuai definisi aslinya dilewati dan dicatat; khususnya kategori retail POI, persentase kawasan industri, kelas luas, dan sejumlah titik acuan yang belum dikonfirmasi. Rumus yang mengubah selisih koefisien menjadi persen penyesuaian masih perlu dicocokkan dengan dokumentasi estimasi model asli sebelum hasil dipakai sebagai kesimpulan penilaian. Hasil SBM dan Monte Carlo juga bergantung pada asumsi pengguna dan tidak memvalidasi RaLAT.
 
+## Jejak per variabel dan rumus implementasi
+
+Di tab Audit, setiap pembanding memiliki **Rincian rumus & sumber**. Daftar ini memuat nilai aset, nilai pembanding, koefisien β, selisih Δ, kontribusi, serta asal kedua nilai. PDF Audit mencantumkan sumber dan Δ pada tabel per pembanding. Jika data peta gagal dimuat, alasannya dibedakan dari keadaan peta tersedia tetapi fiturnya tidak ditemukan. Sumber diambil saat analisis dijalankan; elemen peta yang tercatat pada jejak memuat jenis dan ID OSM, tag, radius pencarian, koordinat titik pencarian dan titik fitur, bila tersedia.
+
+Perhitungan yang **saat ini diterapkan aplikasi** untuk setiap variabel yang tersedia pada kedua sisi:
+
+- Variabel jarak `ln_distance_to_*`: `β × [ln(max(jarak aset, 50 m)) − ln(max(jarak pembanding, 50 m))]`.
+- `ln_luas_tanah`: `β × [ln(luas tanah aset dalam m²) − ln(luas tanah pembanding dalam m²)]`.
+- Variabel numerik, POI, dan penanda kategori: `β × (nilai aset − nilai pembanding)`.
+
+Kontribusi dijumlahkan sebagai perubahan proporsional harga, dibatasi ke rentang −50% sampai +50%, lalu dikalikan ke harga pembanding setelah koreksi waktu: `harga terkoreksi = harga setelah waktu × (1 + penyesuaian RaLAT)`. Pembatas 50 m dan ±50% merupakan aturan aplikasi, belum terbukti berasal dari spesifikasi estimasi regresi. Konstanta tidak digunakan karena selisih pada pasangan aset–pembanding saling meniadakannya. Jika nilai salah satu sisi tidak ada atau hasilnya tidak hingga, kontribusi dilewati dan dicatat.
+
+Contoh uji aritmetika dengan koefisien Sumatra versi `20241213`: jarak ke jalan utama 100 m (aset) dan 200 m (pembanding), lebar jalan 8 m dan 6 m. Dengan β jarak `−0,04100143518` dan β lebar `0,04002363823`, kontribusi total = `β jarak × ln(100/200) + β lebar × (8−6)` ≈ `0,1084673`. Harga pembanding Rp1.000.000/m² setelah koreksi waktu menjadi sekitar Rp1.108.467/m². Ini contoh verifikasi aritmetika implementasi; belum merupakan bukti kelayakan statistik maupun kesesuaian model aslinya.
+
+Untuk `ln_distance_to_road`, aplikasi saat ini memilih fitur OSM terdekat dengan tag `highway=primary`, `trunk`, atau `motorway` pada hasil Overpass. Jarak diukur sebagai **garis lurus ke titik tengah way** yang dikembalikan OSM, bukan jarak ke sisi jalan atau jarak tempuh. Jejak menampilkan way, tag, koordinat, dan radius yang dipakai. Definisi “jalan utama”, geometri jarak, dan cakupan radius harus dibandingkan dengan definisi variabel yang dipakai saat pelatihan model.
+
+### Dokumen yang diperlukan untuk menuntaskan validasi
+
+1. Spesifikasi model tiap wilayah/versi: variabel dependen, transformasi (`harga`, `ln(harga)`, atau bentuk lain), satuan harga dan luas, serta cara mengubah selisih prediksi menjadi koreksi harga. Jika target model log harga, penjumlahan koefisien sebagai persen langsung kemungkinan perlu diganti setelah spesifikasi terbukti.
+2. Kamus variabel dan kode pembentukan fitur saat pelatihan, termasuk tipe POI, geometri dan koordinat acuan jarak, kategori peruntukan, radius pencarian, penanganan nilai kosong, dan asal batas 50 m serta ±50%.
+3. Data uji berpasangan dengan keluaran yang diharapkan, periode dan cakupan data pelatihan, pengujian di luar sampel dan residual; gunakan ini untuk mencocokkan hasil manual dan mengukur ketidakpastian. Angka σ RaLAT 8% di Monte Carlo tetap asumsi pengguna sampai ada pengujian residual.
+
+Sampai dokumen ini tersedia dan dicocokkan, Audit, SBM, dan laporan PDF menandai rumus RaLAT sebagai **belum tervalidasi terhadap model asli**. Perhitungan SBM dan Monte Carlo tetap menggunakan keluaran Analisa dengan label asumsi yang jelas.
+
 ## Aktivasi
 
 Perubahan `Backend/Code.gs` harus dipasang pada deployment Google Apps Script yang melayani aplikasi. Setelah frontend dan backend diperbarui, jalankan pencarian baru lalu buka Analisa untuk memuat model per versi. Jika hanya frontend yang diperbarui, aplikasi menampilkan alasan dan menggunakan penyesuaian waktu saja.
