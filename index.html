@@ -250,6 +250,16 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .poi-btn:disabled { opacity: 0.6; cursor: not-wait; border-style: solid; }
 .poi-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #2d6be4; border-radius: 6px; font-family: var(--font); font-size: 11px; color: var(--navy); box-shadow: 0 4px 8px rgba(0,0,0,0.25); padding: 5px 8px; }
 .poi-tooltip::before { border-top-color: #2d6be4 !important; }
+.poi-controls { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0; color:var(--navy); font-weight:700; }
+.poi-controls select { min-height:38px; min-width:110px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--navy); padding:6px; font:inherit; }
+.poi-group { border:1px solid var(--border); border-radius:9px; margin:8px 0; padding:8px 10px; background:#fff; }
+.poi-group summary { cursor:pointer; font-weight:800; color:var(--navy); min-height:30px; }
+.poi-subtype { margin:10px 0 4px; color:var(--navy); font-weight:700; }
+.poi-entry { display:flex; align-items:start; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid #edf1f5; }
+.poi-entry a { overflow-wrap:anywhere; color:var(--blue); font-weight:600; }
+.poi-entry small { display:block; color:#5a6a7e; line-height:1.4; }
+.poi-entry .poi-dist { flex:none; }
+.poi-note { line-height:1.45; color:#5a6a7e; margin:8px 0; }
 
 /* CSS KHUSUS MODAL AVM LEVEL DEWA (SBM & AUDIT) */
 .avm-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
@@ -2072,7 +2082,6 @@ function setValuationDateFromInput(val) {
 var _avmOverrideState = {}; 
 var _avmRawData = []; 
 var _avmCurrentMedian = 0;
-var _asetPOIData = null; 
 window.regressionModels = {}; // Global var untuk menyimpan koefisien Ekonometrika
 var _modelDiagnostics = { unversionedRows: [], duplicateRows: [] };
 var _analysisRunToken = 0;
@@ -2518,14 +2527,9 @@ function initAVMAnalysis() {
   // Path B: karakter aset harus berasal dari input aset, bukan ditebak dari pembanding.
   var asetMeta = Object.assign({}, _asetTargetMeta);
 
-  // Promise: reverse-geocode + Overpass aset
-  var geocodePromise = ralatReverseGeocode(asetCoord.lat, asetCoord.lng);
-  var overpassAsetPromise = _ralatV2Fetch(asetCoord.lat, asetCoord.lng);
-
-  Promise.all([geocodePromise, overpassAsetPromise]).then(function(arr) {
+  // Tentukan wilayah/versi sebelum memilih tag OSM yang perlu diminta.
+  ralatReverseGeocode(asetCoord.lat, asetCoord.lng).then(function(geocodeRes) {
     if (runToken !== _analysisRunToken) return null;
-    var geocodeRes = arr[0];
-    var overpassAset = arr[1];
     modelRegion = ralatPickModelRegion(geocodeRes.state, geocodeRes.bestCity);
     var regionMap = modelRegion && window.regressionModels ? window.regressionModels[modelRegion] : null;
     modelVersion = ralatPickLatestVersion(regionMap);
@@ -2538,6 +2542,8 @@ function initAVMAnalysis() {
       finishTimeOnly('Wilayah aset tidak memiliki model regresi yang dapat dipastikan. RaLAT tidak dijalankan.');
       return null;
     }
+    document.getElementById('ralatAuditSummary').textContent = 'Mengambil fitur peta untuk model ' + modelRegion + ' · versi ' + modelVersion + '…';
+    return _ralatV2Fetch(asetCoord.lat, asetCoord.lng, activeModel, modelRegion + ':' + modelVersion).then(function(overpassAset) {
     var asetTrace = {};
     var asetFeats = ralatBuildFeatures(asetCoord, asetMeta, overpassAset, geocodeRes, activeModel, asetTrace, 'aset');
 
@@ -2555,7 +2561,7 @@ function initAVMAnalysis() {
     // Kita tidak reverse-geocode pembanding (pakai field row.kota langsung).
     var compPromises = rowsForRalat.map(function(item) {
       if (!item.coordComp) return Promise.resolve(null);
-      return _ralatV2Fetch(item.coordComp.lat, item.coordComp.lng)
+      return _ralatV2Fetch(item.coordComp.lat, item.coordComp.lng, activeModel, modelRegion + ':' + modelVersion)
         .then(function(opRes) { return { item: item, opRes: opRes }; })
         .catch(function() { return { item: item, opRes: { near:[], far:[], nearAvailable:false, farAvailable:false } }; });
     });
@@ -2607,6 +2613,7 @@ function initAVMAnalysis() {
           coverage: engineRes.coverage
         });
       });
+    });
     });
   }).then(function() {
     if (runToken !== _analysisRunToken || usedFallback) return;
@@ -2733,24 +2740,6 @@ function recalcAVM() {
 
   var insightMsg = "Median pembanding yang dipilih setelah uji IQR adalah " + formatRupiah(Math.round(_avmCurrentMedian)) + ". Periksa cakupan variabel pada Audit dan masukkan asumsi skenario SBM untuk menghitung nilai harapan.";
   
-  // --- LOGIKA AI AGENT EDGE NARRATIVE ---
-  if (_asetPOIData) {
-      var edgeNarrative = "<br><br><span style='color:#2d6be4;'><strong>🤖 AI Agent Edge Insight:</strong></span> Berdasarkan analisis spasial otomatis, aset berada di kawasan strategis yang didukung oleh ";
-      var facs = [];
-      
-      if (_asetPOIData['Gerbang Tol'] && _asetPOIData['Gerbang Tol'].best && _asetPOIData['Gerbang Tol'].best.dist < 3000) {
-          facs.push("akses transportasi (" + (_asetPOIData['Gerbang Tol'].best.dist/1000).toFixed(2) + " KM dari " + _asetPOIData['Gerbang Tol'].best.name + ")");
-      }
-      if (_asetPOIData['Pusat Belanja'] && _asetPOIData['Pusat Belanja'].best && _asetPOIData['Pusat Belanja'].best.dist < 3000) {
-          facs.push("pusat komersial (" + (_asetPOIData['Pusat Belanja'].best.dist/1000).toFixed(2) + " KM dari " + _asetPOIData['Pusat Belanja'].best.name + ")");
-      }
-      
-      if(facs.length > 0) {
-          edgeNarrative += facs.join(" dan ") + ". Hal ini sangat mendukung <em>Highest and Best Use (HBU)</em> dengan tingkat likuiditas pasar yang menjanjikan.";
-          insightMsg += edgeNarrative;
-      }
-  }
-
   document.getElementById('modalSmartInsight').innerHTML = insightMsg + _ralatRenderModelMeta();
   document.getElementById('modalSmartInsight').style.borderLeftColor = "#16a34a";
 
@@ -4041,6 +4030,7 @@ function renderMarkers(data, params) {
     });
     
     var asetPoiHtml = '<div id="poi_wrap_aset" class="poi-container" style="margin-top:8px; border-top:1px dashed #d1dbe8; padding-top:10px;">' +
+                      '<label class="poi-controls" for="poi_radius_aset">Radius pencarian <select id="poi_radius_aset"><option value="2500">2,5 km</option><option value="5000" selected>5 km</option><option value="10000">10 km</option></select></label>' +
                       '<button class="poi-btn" id="btn_poi_aset" onclick="analyzePOI(' + params.centerLat + ', ' + params.centerLng + ', \'aset\')">📡 Analisis Jarak POI (Overpass)</button>' +
                       '<div id="poi_res_aset"></div></div>';
                       
@@ -4100,6 +4090,7 @@ function buildPopup(row) {
   var poiHtml = '';
   if (coordJS) {
       poiHtml = '<div id="poi_wrap_' + row._uid + '" class="poi-container">' +
+                '<label class="poi-controls" for="poi_radius_' + row._uid + '">Radius pencarian <select id="poi_radius_' + row._uid + '"><option value="2500">2,5 km</option><option value="5000" selected>5 km</option><option value="10000">10 km</option></select></label>' +
                 '<button class="poi-btn" id="btn_poi_' + row._uid + '" onclick="analyzePOI(' + coordJS.lat + ', ' + coordJS.lng + ', \'' + row._uid + '\')">📡 Analisis Jarak POI (Overpass)</button>' +
                 '<div id="poi_res_' + row._uid + '"></div></div>';
   }
@@ -4131,11 +4122,11 @@ var OVERPASS_MIRRORS = [
     'https://overpass.openstreetmap.fr/api/interpreter'
 ];
 var OVERPASS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 hari
-var OVERPASS_RADII_M = [2500, 5000, 10000];          // radius adaptif
+var POI_QUERY_SCHEMA = 'facilities-v2';
 
 function _poiCacheKey(lat, lng, radius) {
-    // Presisi 3 desimal ≈ ~110 m; cukup untuk POI yang dipakai sebagai konteks lokasi
-    return 'poi:' + Number(lat).toFixed(3) + ',' + Number(lng).toFixed(3) + ':' + radius;
+    // Kunci cache menyertakan versi aturan pencarian dan koordinat sekitar 1 m.
+    return 'poi:' + POI_QUERY_SCHEMA + ':' + Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5) + ':' + radius;
 }
 
 function _poiCacheGet(lat, lng, radius) {
@@ -4165,14 +4156,18 @@ function _poiCacheSet(lat, lng, radius, data) {
 }
 
 function _overpassQuery(lat, lng, radius) {
-    return '[out:json][timeout:20];(' +
-        'node["highway"="motorway_junction"](around:' + radius + ',' + lat + ',' + lng + ');' +
-        'node["amenity"="hospital"](around:' + radius + ',' + lat + ',' + lng + ');' +
-        'node["amenity"="school"](around:' + radius + ',' + lat + ',' + lng + ');' +
-        'node["shop"="mall"](around:' + radius + ',' + lat + ',' + lng + ');' +
-        'node["shop"="supermarket"](around:' + radius + ',' + lat + ',' + lng + ');' +
-        'node["railway"="station"](around:' + radius + ',' + lat + ',' + lng + ');' +
-        ');out body;>;out skel qt;';
+    var around = '(around:' + radius + ',' + lat + ',' + lng + ');';
+    var filters = [
+      '["highway"="bus_stop"]', '["amenity"="bus_station"]',
+      '["public_transport"="platform"]', '["public_transport"="station"]',
+      '["railway"="station"]', '["highway"="motorway_junction"]',
+      '["amenity"="hospital"]', '["amenity"="clinic"]', '["amenity"="pharmacy"]',
+      '["healthcare"="hospital"]', '["healthcare"="clinic"]', '["healthcare"="centre"]', '["healthcare"="pharmacy"]',
+      '["amenity"="kindergarten"]', '["amenity"="school"]',
+      '["amenity"="place_of_worship"]', '["amenity"="marketplace"]',
+      '["shop"="supermarket"]', '["shop"="mall"]', '["building"="retail"]'
+    ];
+    return '[out:json][timeout:30];(' + filters.map(function(f) { return 'nwr' + f + around; }).join('') + ');out tags center;';
 }
 
 // Coba mirror satu per satu sampai dapat respons valid
@@ -4210,107 +4205,125 @@ function _fetchOverpassForRadius(lat, lng, radius) {
         });
 }
 
-// Coba radius bertingkat: 2.5 → 5 → 10 km, berhenti saat dapat hasil yang berarti.
-// "Berarti" = setidaknya ada 1 node bertag (bukan helper node tanpa tag).
-function _fetchOverpassAdaptive(lat, lng, idx) {
-    idx = idx || 0;
-    if (idx >= OVERPASS_RADII_M.length) {
-        return Promise.resolve({ elements: [], radius: OVERPASS_RADII_M[OVERPASS_RADII_M.length - 1], fromCache: false });
+// Klasifikasi POI hanya untuk informasi lingkungan; tidak dipakai membangun fitur RaLAT.
+function _poiKind(tags) {
+    var t = tags || {}, n = String(t.name || '').toLowerCase();
+    if (t.highway === 'bus_stop' || t.public_transport === 'platform' && (t.bus === 'yes' || t.highway === 'bus_stop')) return ['Transportasi', 'Halte'];
+    if (t.amenity === 'bus_station') return ['Transportasi', 'Terminal bus'];
+    if (t.railway === 'station') return ['Transportasi', 'Stasiun'];
+    if (t.public_transport === 'station') return ['Transportasi', 'Simpul transportasi · jenis belum tercatat'];
+    if (t.public_transport === 'platform') return ['Transportasi', 'Peron transportasi'];
+    if (t.highway === 'motorway_junction') return ['Transportasi', 'Gerbang tol / simpang tol'];
+    if (t.amenity === 'hospital' || t.healthcare === 'hospital') return ['Kesehatan', 'Rumah sakit'];
+    if (t.amenity === 'pharmacy' || t.healthcare === 'pharmacy') return ['Kesehatan', 'Apotek'];
+    if (t.amenity === 'clinic' || t.healthcare === 'clinic' || t.healthcare === 'centre') {
+      if (/posyandu/.test(n)) return ['Kesehatan', 'Posyandu (berdasarkan nama)'];
+      if (/puskesmas/.test(n)) return ['Kesehatan', 'Puskesmas (berdasarkan nama)'];
+      return ['Kesehatan', 'Klinik / fasilitas kesehatan'];
     }
-    var radius = OVERPASS_RADII_M[idx];
-    return _fetchOverpassForRadius(lat, lng, radius).then(function(res) {
-        var hasUseful = (res.elements || []).some(function(el) { return el && el.tags; });
-        if (hasUseful || idx === OVERPASS_RADII_M.length - 1) return res;
-        return _fetchOverpassAdaptive(lat, lng, idx + 1);
+    if (t.amenity === 'kindergarten') return ['Pendidikan', 'PAUD / TK'];
+    if (t.amenity === 'school') {
+      var level = String(t['school:type_idn'] || '').toLowerCase();
+      if (!level && t['isced:level']) {
+        var educationLevels = { '0':'PAUD / TK', '1':'SD', '2':'SMP', '3':'SMA / SMK' };
+        level = educationLevels[String(t['isced:level'])] || String(t['isced:level']);
+      }
+      if (!level) {
+        var found = n.match(/\b(paud|tk|sd|mi|smp|mts|sma|smk|ma)(?:n|s)?\b/);
+        level = found ? found[1].toUpperCase() + ' (berdasarkan nama)' : '';
+      }
+      return ['Pendidikan', level ? 'Sekolah · ' + level.toUpperCase() : 'Sekolah · jenjang belum tercatat'];
+    }
+    if (t.amenity === 'place_of_worship') {
+      var worship = { muslim:'Masjid / musala', christian:'Gereja', hindu:'Pura', buddhist:'Vihara', taoist:'Kelenteng', confucian:'Kelenteng' };
+      if (/kelenteng|klenteng/.test(n)) return ['Peribadatan', 'Kelenteng (berdasarkan nama)'];
+      return ['Peribadatan', worship[t.religion] || 'Tempat ibadah · jenis belum tercatat'];
+    }
+    if (t.amenity === 'marketplace') return ['Niaga & belanja', 'Pasar'];
+    if (t.shop === 'mall') return ['Niaga & belanja', 'Pusat perbelanjaan'];
+    if (t.shop === 'supermarket') return ['Niaga & belanja', 'Swalayan'];
+    if (t.building === 'retail') return ['Niaga & belanja', 'Bangunan niaga (jenis perlu verifikasi)'];
+    return null;
+}
+
+function _poiResults(elements, lat, lng, radius) {
+    var groups = {}, seen = {};
+    (elements || []).forEach(function(el) {
+      if (!el || !el.tags || !/^(node|way|relation)$/.test(el.type)) return;
+      var kind = _poiKind(el.tags);
+      var c = _ralatElCoord(el);
+      if (!kind || !c) return;
+      var name = String(el.tags.name || el.tags['name:id'] || 'Nama belum tercatat');
+      var dist = _ralatHaversine(lat, lng, c.lat, c.lng);
+      if (dist > radius) return;
+      var typeKey = kind[0] + '/' + kind[1];
+      var key = name !== 'Nama belum tercatat' ? typeKey + ':' + name.toLowerCase().trim() + ':' + c.lat.toFixed(4) + ':' + c.lng.toFixed(4) : el.type + '/' + el.id;
+      var entry = { name:name, dist:dist, lat:c.lat, lon:c.lng, type:el.type, id:el.id, approximate:!!el.center };
+      if (!groups[kind[0]]) groups[kind[0]] = {};
+      if (!groups[kind[0]][kind[1]]) groups[kind[0]][kind[1]] = [];
+      if (seen[key]) {
+        if (el.type === 'node' || dist < seen[key].dist) Object.assign(seen[key], entry);
+        return;
+      }
+      groups[kind[0]][kind[1]].push(entry);
+      seen[key] = entry;
     });
+    Object.keys(groups).forEach(function(group) {
+      Object.keys(groups[group]).forEach(function(kind) { groups[group][kind].sort(function(a,b) { return a.dist - b.dist; }); });
+    });
+    return groups;
 }
 
 function analyzePOI(lat, lng, uid) {
     var btn = document.getElementById('btn_poi_' + uid);
     var resDiv = document.getElementById('poi_res_' + uid);
     if(!btn || !resDiv) return;
-
+    var radiusEl = document.getElementById('poi_radius_' + uid);
+    var radius = radiusEl ? Number(radiusEl.value) : 5000;
+    if ([2500, 5000, 10000].indexOf(radius) < 0) radius = 5000;
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px;margin:0;border-color:rgba(45,107,228,0.3);border-top-color:#2d6be4;"></div> Menarik Data Satelit...';
+    btn.textContent = 'Mencari fasilitas di OpenStreetMap…';
     resDiv.innerHTML = '';
 
     // Clear old POI layers
     poiLayerGroup.forEach(function(item){ item.setMap(null); });
     poiLayerGroup = [];
 
-    _fetchOverpassAdaptive(lat, lng, 0)
+    _fetchOverpassForRadius(lat, lng, radius)
     .then(function(res) {
-        var elements = res.elements || [];
-        var radius = res.radius;
-        btn.style.display = 'none';
-
-        if (elements.length === 0) {
-            resDiv.innerHTML = '<div style="color:#5a6a7e; text-align:center; padding:10px 0;">Tidak ditemukan fasilitas utama dalam radius ' + (radius/1000) + ' KM.</div>';
-            return;
-        }
-
-        var categories = {
-            'Gerbang Tol': { tags: ['highway', 'motorway_junction'], best: null },
-            'Rumah Sakit': { tags: ['amenity', 'hospital'], best: null },
-            'Pusat Belanja': { tags: [['shop', 'mall'], ['shop', 'supermarket']], best: null },
-            'Stasiun Kereta': { tags: ['railway', 'station'], best: null },
-            'Sekolah': { tags: ['amenity', 'school'], best: null }
-        };
-
+        btn.disabled = false;
+        btn.textContent = '↻ Perbarui analisis jarak POI';
+        var groups = _poiResults(res.elements, lat, lng, radius);
         var propLatLng = new google.maps.LatLng(lat, lng);
-
-        elements.forEach(function(el) {
-            if (el.type === 'node' && el.tags) {
-                var elLatLng = new google.maps.LatLng(el.lat, el.lon);
-                var dist = google.maps.geometry.spherical.computeDistanceBetween(propLatLng, elLatLng);
-                var name = el.tags.name || el.tags.description || 'Tidak Bernama';
-
-                for (var cat in categories) {
-                    var match = false;
-                    var catDef = categories[cat].tags;
-
-                    if (Array.isArray(catDef[0])) {
-                        for(var i=0; i<catDef.length; i++) { if(el.tags[catDef[i][0]] === catDef[i][1]) match = true; }
-                    } else {
-                        if(el.tags[catDef[0]] === catDef[1]) match = true;
-                    }
-
-                    if (match) {
-                        if (!categories[cat].best || dist < categories[cat].best.dist) {
-                            categories[cat].best = { name: name, dist: dist, lat: el.lat, lon: el.lon };
-                        }
-                    }
-                }
-            }
-        });
-
-        if (uid === 'aset') {
-            _asetPOIData = categories;
-        }
-
-        var radiusBadge = (radius/1000).toFixed(radius >= 10000 ? 0 : 1) + ' KM' + (res.fromCache ? ' · cache' : '');
-        var html = '<div style="font-size:10px; color:#8a9ab0; margin-bottom:8px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px; display:flex; justify-content:space-between; align-items:center;">' +
-                   '<span>📍 Fasilitas Terdekat</span>' +
-                   '<span style="background:#e8f0fe; color:#2d6be4; padding:2px 6px; border-radius:10px; font-weight:700; letter-spacing:0;">R ' + radiusBadge + '</span>' +
-                   '</div>';
+        var label = (radius / 1000).toLocaleString('id-ID') + ' km';
+        var html = '<p class="poi-note">Fasilitas dalam radius ' + label + (res.fromCache ? ' · hasil tersimpan maksimal 7 hari' : ' · data OSM baru diambil') + '. Jarak garis lurus; untuk bangunan/area dihitung ke titik perwakilan, bukan pintu masuk.</p>';
         var foundAny = false;
         var poiBounds = new google.maps.LatLngBounds();
         poiBounds.extend(propLatLng);
-
-        for (var cat in categories) {
-            var item = categories[cat].best;
-            if (item) {
+        ['Transportasi', 'Kesehatan', 'Pendidikan', 'Peribadatan', 'Niaga & belanja'].forEach(function(group, groupIdx) {
+          var types = groups[group] || {};
+          var subtypes = Object.keys(types);
+          var total = subtypes.reduce(function(sum, kind) { return sum + types[kind].length; }, 0);
+          html += '<details class="poi-group"' + (!groupIdx ? ' open' : '') + '><summary>' + group + ' · ' + total + ' tercatat</summary>';
+          if (!total) html += '<p class="poi-note">Belum tercatat di OSM dalam radius ' + label + '.</p>';
+          var closest = null;
+          subtypes.forEach(function(kind) {
+            html += '<div class="poi-subtype">' + _ralatEscapeHtml(kind) + ' (' + types[kind].length + ')</div>';
+            types[kind].slice(0, 3).forEach(function(item) {
+              if (!closest || item.dist < closest.dist) closest = item;
+              var distText = item.dist >= 1000 ? (item.dist/1000).toFixed(2) + ' km' : Math.round(item.dist) + ' m';
+              var url = 'https://www.openstreetmap.org/' + item.type + '/' + encodeURIComponent(item.id);
+              html += '<div class="poi-entry"><span><a href="' + url + '" target="_blank" rel="noopener noreferrer">' + _ralatEscapeHtml(item.name) + '</a>' +
+                '<small>OSM ' + item.type + '/' + _ralatEscapeHtml(item.id) + (item.approximate ? ' · titik perwakilan area' : '') + '</small></span>' +
+                '<span class="poi-dist">' + distText + '</span></div>';
+            });
+            if (types[kind].length > 3) html += '<small>' + (types[kind].length - 3) + ' fasilitas lain tercatat pada jenis ini.</small>';
+          });
+          html += '</details>';
+          if (closest) {
                 foundAny = true;
-                var distText = item.dist > 1000 ? (item.dist/1000).toFixed(2) + ' KM' : Math.round(item.dist) + ' M';
-                html += '<div class="poi-item">' +
-                        '<span class="poi-name" title="' + item.name + '">' + cat + ': ' + item.name + '</span>' +
-                        '<span class="poi-dist">' + distText + '</span></div>';
-
-                // FIX: strokeOpacity sebelumnya didefinisikan dua kali (1 lalu 0) sehingga
-                // garis polyline tidak terlihat sama sekali, hanya titik-titik dotted yang muncul.
-                // Sekarang: garis solid semi-transparan + dot overlay untuk memperkuat visual.
                 var line = new google.maps.Polyline({
-                    path: [{lat: lat, lng: lng}, {lat: item.lat, lng: item.lon}],
+                    path: [{lat: lat, lng: lng}, {lat: closest.lat, lng: closest.lon}],
                     strokeColor: '#2d6be4',
                     strokeOpacity: 0.55,
                     strokeWeight: 3,
@@ -4323,9 +4336,8 @@ function analyzePOI(lat, lng, uid) {
                     map: gMap
                 });
                 poiLayerGroup.push(line);
-
                 var poiMarker = new google.maps.Marker({
-                    position: {lat: item.lat, lng: item.lon},
+                    position: {lat: closest.lat, lng: closest.lon},
                     map: gMap,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
@@ -4335,14 +4347,12 @@ function analyzePOI(lat, lng, uid) {
                         strokeColor: '#2d6be4',
                         strokeWeight: 3
                     },
-                    title: cat + ': ' + item.name + ' (' + distText + ')'
+                    title: group + ': ' + closest.name
                 });
                 poiLayerGroup.push(poiMarker);
-                poiBounds.extend(new google.maps.LatLng(item.lat, item.lon));
-            }
-        }
-
-        if(!foundAny) { html += '<div style="color:#5a6a7e; text-align:center;">Fasilitas di luar jangkauan radius.</div>'; }
+                poiBounds.extend(new google.maps.LatLng(closest.lat, closest.lon));
+          }
+        });
         resDiv.innerHTML = html;
 
         if (foundAny) {
@@ -4353,6 +4363,7 @@ function analyzePOI(lat, lng, uid) {
     .catch(function(err) {
         btn.disabled = false;
         btn.innerHTML = '⚠️ Gagal. Coba Lagi';
+        resDiv.textContent = 'Layanan OSM belum dapat dihubungi. Coba lagi nanti; hasil kosong bukan berarti fasilitas tidak ada.';
         toast('Gagal menghubungi Overpass: ' + err.message, 'error');
     });
 }
@@ -4553,64 +4564,80 @@ function ralatClassifyVar(name, declaredTipe) {
 }
 
 /* ------- [E] Extended Overpass query untuk RaLAT v2 ------- */
-// Query gabungan yang menarik SEMUA tag yang dibutuhkan di seluruh region.
-// Beberapa region tidak butuh semua, tapi 1 query lebih murah daripada 20 query.
-// Default radius 5km; untuk variabel jarak ke kota besar/airport/harbour kita
-// pakai radius 20km dengan query terpisah (lihat _overpassQueryRalatV2Far).
-function _overpassQueryRalatV2(lat, lng, radius) {
-  var around = '(around:' + radius + ',' + lat + ',' + lng + ')';
-  return '[out:json][timeout:25];(' +
-    // Existing v1 tags (juga terambil)
-    'node["highway"="motorway_junction"]' + around + ';' +
-    'node["amenity"="hospital"]' + around + ';' +
-    'node["amenity"="school"]' + around + ';' +
-    'node["amenity"="university"]' + around + ';' +
-    'node["amenity"="townhall"]' + around + ';' +
-    'node["amenity"="restaurant"]' + around + ';' +
-    'node["amenity"="theatre"]' + around + ';' +
-    'node["amenity"="cinema"]' + around + ';' +
-    'node["amenity"="nightclub"]' + around + ';' +
-    'node["amenity"="ferry_terminal"]' + around + ';' +
-    'node["amenity"="grave_yard"]' + around + ';' +
-    'node["shop"="mall"]' + around + ';' +
-    'node["shop"="supermarket"]' + around + ';' +
-    'node["railway"="station"]' + around + ';' +
-    'node["highway"="bus_stop"]' + around + ';' +
-    'node["office"="government"]' + around + ';' +
-    'node["tourism"="hotel"]' + around + ';' +
-    'node["historic"]' + around + ';' +
-    // Way features (jalan, sungai, garis pantai) — pakai centroid via center
-    'way["highway"~"^(primary|trunk|motorway)$"]' + around + ';' +
-    'way["waterway"="river"]' + around + ';' +
-    'way["natural"="coastline"]' + around + ';' +
-    'way["landuse"="cemetery"]' + around + ';' +
-    'way["landuse"="retail"]' + around + ';' +
-    'way["landuse"="industrial"]' + around + ';' +
-    'way["landuse"="harbour"]' + around + ';' +
-    ');out tags center;';
+// Kamus query dipisah dari kamus POI lingkungan. Pertahankan tipe objek dan tag
+// yang dipakai RaLAT sebelumnya agar pengurangan trafik tidak mengubah fitur model.
+var RALAT_QUERY_TAGS = {
+  ln_distance_to_mall:           { near: ['node["shop"="mall"]'] },
+  ln_distance_to_hospital:       { near: ['node["amenity"="hospital"]'] },
+  ln_distance_to_school:         { near: ['node["amenity"="school"]'] },
+  ln_distance_to_university:     { near: ['node["amenity"="university"]'] },
+  ln_distance_to_bus_stop:       { near: ['node["highway"="bus_stop"]'] },
+  ln_distance_to_train_station:  { near: ['node["railway"="station"]'] },
+  ln_distance_to_lrt:            { far: ['node["station"="light_rail"]', 'node["railway"="station"]["station"="light_rail"]'] },
+  ln_distance_to_toll_gate:      { near: ['node["highway"="motorway_junction"]'] },
+  ln_distance_to_road:           { near: ['way["highway"~"^(primary|trunk|motorway)$"]'] },
+  ln_distance_to_government:     { near: ['node["office"="government"]', 'node["amenity"="townhall"]'] },
+  ln_distance_to_airport:        { far: ['node["aeroway"="aerodrome"]', 'way["aeroway"="aerodrome"]'] },
+  ln_distance_to_harbour:        { near: ['node["amenity"="ferry_terminal"]', 'way["landuse"="harbour"]'] },
+  ln_distance_to_graveyard:      { near: ['node["amenity"="grave_yard"]', 'way["landuse"="cemetery"]'] },
+  ln_distance_to_hotel:          { near: ['node["tourism"="hotel"]'] },
+  ln_distance_to_retail:         { near: ['node["shop"="mall"]', 'node["shop"="supermarket"]', 'way["landuse"="retail"]'] },
+  ln_distance_to_entertainment:  { near: ['node["amenity"="theatre"]', 'node["amenity"="cinema"]', 'node["amenity"="nightclub"]'] },
+  ln_distance_to_restaurant:     { near: ['node["amenity"="restaurant"]'] },
+  ln_distance_to_historical:     { near: ['node["historic"]'] },
+  ln_distance_to_coastline:      { near: ['way["natural"="coastline"]'] },
+  ln_distance_to_river:          { near: ['way["waterway"="river"]'] },
+  ln_distance_to_big_city:       { far: ['node["place"="city"]'] },
+  ln_distance_to_small_city:     { far: ['node["place"="town"]'] }
+};
+var RALAT_POI_QUERY_TAGS = {
+  mall: ['node["shop"="mall"]', 'node["shop"="supermarket"]'],
+  shop: ['node["shop"="mall"]', 'node["shop"="supermarket"]'],
+  hospital: ['node["amenity"="hospital"]'], school: ['node["amenity"="school"]'],
+  restaurant: ['node["amenity"="restaurant"]'], hotel: ['node["tourism"="hotel"]'],
+  bus_stop: ['node["highway"="bus_stop"]'], bus: ['node["highway"="bus_stop"]'],
+  university: ['node["amenity"="university"]'],
+  historical: ['node["historic"]'], historic: ['node["historic"]'],
+  entertainment: ['node["amenity"="theatre"]', 'node["amenity"="cinema"]', 'node["amenity"="nightclub"]']
+};
+var RALAT_QUERY_SCHEMA = 'model-tags-v1';
+
+function _ralatV2QueryParts(activeModel) {
+  var parts = { near: [], far: [] };
+  Object.keys(activeModel || {}).forEach(function(name) {
+    if (ralatFeatureIssue(name)) return;
+    var key = name.toLowerCase();
+    var spec = RALAT_QUERY_TAGS[key];
+    if (!spec) {
+      var poi = key.match(/^poi_(.+)_(\d+)m$/);
+      if (poi && Number(poi[2]) <= 5000 && RALAT_POI_QUERY_TAGS[poi[1]]) spec = { near: RALAT_POI_QUERY_TAGS[poi[1]] };
+    }
+    if (!spec) return;
+    ['near', 'far'].forEach(function(kind) {
+      (spec[kind] || []).forEach(function(tag) {
+        if (parts[kind].indexOf(tag) < 0) parts[kind].push(tag);
+      });
+    });
+  });
+  parts.near.sort(); parts.far.sort();
+  return parts;
 }
 
-// Far-radius query untuk fitur regional yang biasanya jauh (airport, kota besar)
-function _overpassQueryRalatV2Far(lat, lng, radius) {
-  var around = '(around:' + radius + ',' + lat + ',' + lng + ')';
-  return '[out:json][timeout:30];(' +
-    'node["aeroway"="aerodrome"]' + around + ';' +
-    'way["aeroway"="aerodrome"]' + around + ';' +
-    'node["place"="city"]' + around + ';' +
-    'node["place"="town"]' + around + ';' +
-    'node["station"="light_rail"]' + around + ';' +
-    'node["railway"="station"]["station"="light_rail"]' + around + ';' +
-    ');out tags center;';
+function _ralatV2Query(lat, lng, radius, tags) {
+  var around = '(around:' + radius + ',' + lat + ',' + lng + ');';
+  return '[out:json][timeout:' + (radius > 5000 ? 30 : 25) + '];(' +
+    tags.map(function(tag) { return tag + around; }).join('') + ');out tags center;';
 }
 
 // Cache key terpisah dari v1 (key v1 tetap dipakai untuk fitur POI sidebar).
-function _ralatV2CacheKey(lat, lng, radius, kind) {
-  return 'ralat2:' + (kind || 'near') + ':' + Number(lat).toFixed(3) + ',' + Number(lng).toFixed(3) + ':' + radius;
+function _ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags) {
+  return 'ralat2:' + RALAT_QUERY_SCHEMA + ':' + (modelKey || '') + ':' + (kind || 'near') + ':' +
+    Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5) + ':' + radius + ':' + (tags || []).join('|');
 }
 
-function _ralatV2CacheGet(lat, lng, radius, kind) {
+function _ralatV2CacheGet(lat, lng, radius, kind, modelKey, tags) {
   try {
-    var raw = localStorage.getItem(_ralatV2CacheKey(lat, lng, radius, kind));
+    var raw = localStorage.getItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags));
     if (!raw) return null;
     var obj = JSON.parse(raw);
     if (!obj || !obj.t || !obj.d) return null;
@@ -4619,9 +4646,9 @@ function _ralatV2CacheGet(lat, lng, radius, kind) {
   } catch (e) { return null; }
 }
 
-function _ralatV2CacheSet(lat, lng, radius, kind, data) {
+function _ralatV2CacheSet(lat, lng, radius, kind, modelKey, tags, data) {
   try {
-    localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind), JSON.stringify({ t: Date.now(), d: data }));
+    localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags), JSON.stringify({ t: Date.now(), d: data }));
   } catch (e) {
     // Quota full → bersihkan cache ralat2 lama
     try {
@@ -4629,32 +4656,33 @@ function _ralatV2CacheSet(lat, lng, radius, kind, data) {
         var k = localStorage.key(i);
         if (k && k.indexOf('ralat2:') === 0) localStorage.removeItem(k);
       }
-      localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind), JSON.stringify({ t: Date.now(), d: data }));
+      localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags), JSON.stringify({ t: Date.now(), d: data }));
     } catch (e2) {}
   }
 }
 
 // Fetch v2 — near (5km) + far (20km), parallel, dengan cache.
-function _ralatV2Fetch(lat, lng) {
+function _ralatV2Fetch(lat, lng, activeModel, modelKey) {
   var nearR = 5000, farR = 20000;
-  var nearCached = _ralatV2CacheGet(lat, lng, nearR, 'near');
-  var farCached  = _ralatV2CacheGet(lat, lng, farR, 'far');
+  var parts = _ralatV2QueryParts(activeModel);
+  var nearCached = parts.near.length && _ralatV2CacheGet(lat, lng, nearR, 'near', modelKey, parts.near);
+  var farCached  = parts.far.length && _ralatV2CacheGet(lat, lng, farR, 'far', modelKey, parts.far);
 
-  var nearP = nearCached
+  var nearP = !parts.near.length ? Promise.resolve([]) : nearCached
     ? Promise.resolve(nearCached)
-    : _overpassFetchWithFallback(_overpassQueryRalatV2(lat, lng, nearR))
+    : _overpassFetchWithFallback(_ralatV2Query(lat, lng, nearR, parts.near))
         .then(function(d) {
           var els = (d && d.elements) ? d.elements : [];
-          _ralatV2CacheSet(lat, lng, nearR, 'near', els);
+          _ralatV2CacheSet(lat, lng, nearR, 'near', modelKey, parts.near, els);
           return els;
         }).catch(function(){ return null; });
 
-  var farP = farCached
+  var farP = !parts.far.length ? Promise.resolve([]) : farCached
     ? Promise.resolve(farCached)
-    : _overpassFetchWithFallback(_overpassQueryRalatV2Far(lat, lng, farR))
+    : _overpassFetchWithFallback(_ralatV2Query(lat, lng, farR, parts.far))
         .then(function(d) {
           var els = (d && d.elements) ? d.elements : [];
-          _ralatV2CacheSet(lat, lng, farR, 'far', els);
+          _ralatV2CacheSet(lat, lng, farR, 'far', modelKey, parts.far, els);
           return els;
         }).catch(function(){ return null; });
 
@@ -4779,6 +4807,7 @@ function ralatFeatureIssue(name) {
   if (n.indexOf('poi_') === 0) {
     var match = n.match(/^poi_(.+)_(\d+)m$/);
     if (!match) return 'Format variabel POI belum dikenali';
+    if (Number(match[2]) > 5000) return 'Radius POI melebihi jangkauan query RaLAT 5 km';
     return ['mall','shop','hospital','school','restaurant','hotel','bus_stop','bus','university','historical','historic','entertainment'].indexOf(match[1]) >= 0
       ? null : 'Definisi dan sumber POI belum dipetakan';
   }
@@ -4939,10 +4968,13 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel, t
     // --- Marker kota (is_<city>) ---
     if (/^is_/.test(varName)) {
       var token = varName.replace(/^is_/, '').toLowerCase();
-      var categorySource = { source: inputSource + ': peruntukan', method: 'Penanda 0/1' };
+      var categorySource = { source: inputSource + ': peruntukan', method: 'Penanda 0/1',
+        input: 'peruntukan=' + String(meta.peruntukan || 'kosong') };
       // Special: kategori penggunaan
       if (['komersial', 'perumahan', 'industrial', 'industri', 'kebun', 'perkebunan'].indexOf(token) >= 0 && !meta.peruntukan) return;
-      if (token === 'komersial')  { feats[varName] = _ralatIsKomersial(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
+      if (token === 'komersial')  { feats[varName] = _ralatIsKomersial(meta) ? 1 : 0;
+        traceOut[varName] = { source: inputSource + ': peruntukan / jenis properti', method: 'Penanda 0/1',
+          input: categorySource.input + '; jenis properti=' + String(meta.objek || 'kosong') }; return; }
       if (token === 'perumahan')  { feats[varName] = _ralatIsPerumahan(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
       if (token === 'industrial' || token === 'industri') { feats[varName] = _ralatIsIndustrial(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
       if (token === 'kebun' || token === 'perkebunan')    { feats[varName] = _ralatIsKebun(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
@@ -5060,14 +5092,16 @@ function ralatEngineV2(activeModel, asetFeats, compFeats, asetTrace, compTrace) 
     }
 
     var delta = 0;
+    var aEffective = null, cEffective = null;
     if (tipe === 'ln' || tipe === 'numerik_ln') {
       // Untuk numerik_ln (ln_luas_tanah), nilai sudah dalam ln, jadi langsung
       // selisih nilai. Untuk ln_distance_to_*, nilai dalam meter → ln dulu.
       if (tipe === 'numerik_ln') {
         delta = parseFloat(aVal) - parseFloat(cVal);
       } else {
-        delta = Math.log(Math.max(parseFloat(aVal), RALAT_LN_FLOOR_M)) -
-                Math.log(Math.max(parseFloat(cVal), RALAT_LN_FLOOR_M));
+        aEffective = Math.max(parseFloat(aVal), RALAT_LN_FLOOR_M);
+        cEffective = Math.max(parseFloat(cVal), RALAT_LN_FLOOR_M);
+        delta = Math.log(aEffective) - Math.log(cEffective);
       }
     } else {
       // poi_count, marking, numerik, kategori → selisih linear
@@ -5087,6 +5121,7 @@ function ralatEngineV2(activeModel, asetFeats, compFeats, asetTrace, compTrace) 
       asetVal: aVal, compVal: cVal,
       koef: v.koefisien,
       delta: delta,
+      asetUsed: aEffective, compUsed: cEffective,
       asetTrace: asetTrace[name] || null,
       compTrace: compTrace[name] || null,
       kontribPct: kontrib
@@ -5232,6 +5267,7 @@ function _ralatTraceSource(t) {
   if (t.osmType && t.osmId) info.push('OSM ' + t.osmType + '/' + t.osmId);
   if (t.tag) info.push(t.tag);
   if (t.method) info.push(t.method);
+  if (t.input) info.push(t.input);
   if (t.queryRadiusM) info.push('radius pencarian ' + (t.queryRadiusM / 1000) + ' km');
   if (isFinite(t.queryLat) && isFinite(t.queryLng) && isFinite(t.featureLat) && isFinite(t.featureLng)) {
     info.push('dari ' + Number(t.queryLat).toFixed(6) + ',' + Number(t.queryLng).toFixed(6) +
@@ -5255,6 +5291,11 @@ function _ralatRenderVariableTrace(d) {
       ' · Pembanding ' + _ralatEscapeHtml(Number(b.compVal).toPrecision(8)) +
       ' · Δ ' + _ralatEscapeHtml(delta) + ' · β ' + _ralatEscapeHtml(b.koef) +
       ' · kontribusi ' + (b.kontribPct >= 0 ? '+' : '') + (b.kontribPct * 100).toFixed(3) + '%</div>' +
+      (b.tipe === 'ln' && b.asetUsed != null && b.compUsed != null &&
+        (b.asetUsed !== Number(b.asetVal) || b.compUsed !== Number(b.compVal))
+        ? '<div class="ralat-trace-source">Batas minimum 50 m: jarak yang masuk rumus · Aset ' +
+          _ralatEscapeHtml(Number(b.asetUsed).toPrecision(8)) + ' m · Pembanding ' +
+          _ralatEscapeHtml(Number(b.compUsed).toPrecision(8)) + ' m.</div>' : '') +
       '<div class="ralat-trace-source">Aset: ' + _ralatEscapeHtml(_ralatTraceSource(b.asetTrace)) + '</div>' +
       '<div class="ralat-trace-source">Pembanding: ' + _ralatEscapeHtml(_ralatTraceSource(b.compTrace)) + '</div></div>';
   }).join('');
@@ -5293,6 +5334,12 @@ function renderRalatAuditSummary() {
       '</ul></details>';
   }
   if (nUndated || nDuplicate) html += '<div>Sheet Model_Regresi: ' + nUndated + ' baris tanpa versi dan ' + nDuplicate + ' baris duplikat dilewati.</div>';
+  var loadedModel = info.region && info.version && window.regressionModels &&
+    window.regressionModels[info.region] && window.regressionModels[info.region][info.version];
+  if (loadedModel && !Object.keys(loadedModel).some(function(name) { return !!loadedModel[name].sheetRow; })) {
+    html += '<div><strong>Label dan nomor baris model belum diterima dari backend.</strong> ' +
+      'Perbarui deployment Code.gs, lalu lakukan Cari dan Analisa lagi.</div>';
+  }
   html += '<div>Periksa rincian rumus dan sumber pada masing-masing pembanding.</div>';
   el.innerHTML = html;
 }
@@ -5351,6 +5398,10 @@ function _ralatRenderPDFBreakdown() {
              (b.label ? '<div style="font-family:sans-serif;font-size:8px;">' + _ralatEscapeHtml(b.label) + '</div>' : '') +
              (b.sheetRow ? '<div style="font-family:sans-serif;font-size:8px;">Model_Regresi!' + b.sheetRow + '</div>' : '') +
              '<div style="font-family:sans-serif;font-size:8px;color:#64748b;">Δ ' + _ralatEscapeHtml(Number(b.delta).toPrecision(8)) +
+             (b.tipe === 'ln' && b.asetUsed != null && b.compUsed != null &&
+               (b.asetUsed !== Number(b.asetVal) || b.compUsed !== Number(b.compVal))
+               ? '<br>Jarak dipakai (batas 50 m): aset ' + _ralatEscapeHtml(b.asetUsed) +
+                 ' m, pembanding ' + _ralatEscapeHtml(b.compUsed) + ' m' : '') +
              '<br>Aset: ' + _ralatEscapeHtml(_ralatTraceSource(b.asetTrace)) +
              '<br>Pembanding: ' + _ralatEscapeHtml(_ralatTraceSource(b.compTrace)) + '</div></td>' +
              '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-size:10px;">' + aetVal + '</td>' +
