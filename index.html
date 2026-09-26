@@ -264,6 +264,11 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .ralat-audit-summary.warning { border-color: #fbbf24; background: #fffbeb; }
 .ralat-audit-summary strong { display: block; margin-bottom: 4px; }
 .ralat-audit-summary details { margin-top: 6px; overflow-wrap: anywhere; }
+.ralat-trace { margin-top: 8px; text-align: left; max-width: 100%; }
+.ralat-trace summary { cursor: pointer; color: #1d4ed8; font-weight: 700; padding: 6px 0; }
+.ralat-trace-item { padding: 8px 0; border-top: 1px solid #dbe4ef; overflow-wrap: anywhere; line-height: 1.5; }
+.ralat-trace-item code { font-size: 10px; }
+.ralat-trace-source { color: #52647b; font-size: 10px; }
 .audit-row.excluded { background: #fce8e6; opacity: 0.8; }
 .audit-row.excluded td { color: var(--red); }
 
@@ -1056,6 +1061,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   .audit-table .audit-row { border: 1px solid var(--border); border-radius: 10px; margin: 8px 0; padding: 8px 10px; }
   .audit-table .audit-row td { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border: 0; text-align: right; overflow-wrap: anywhere; }
   .audit-table .audit-row td::before { content: attr(data-label); font-weight: 700; color: var(--navy); text-align: left; flex: 0 0 38%; }
+  .audit-table .audit-row td[data-label="Variabel"] { display: block; text-align: left; }
+  .audit-table .audit-row td[data-label="Variabel"]::before { display: block; margin-bottom: 6px; }
   .audit-table .audit-row input[type="checkbox"] { min-width: 22px; min-height: 22px; }
   .ralat-audit-summary { font-size: 13px; }
 
@@ -1604,7 +1611,7 @@ body.mmode-picking .mpick-hint { display: flex; }
           <div class="mc-var-grid3">
             <div><label>Mean μ (%)</label><input type="number" id="mcRalatMu" value="0" step="0.5" class="form-input mc-input" disabled style="opacity:0.6;"></div>
             <div><label>Stdev σ (%)</label><input type="number" id="mcRalatSigma" value="8" min="0" max="30" step="0.5" class="form-input mc-input"></div>
-            <div style="font-size:10px; color:#64748b; align-self:end; padding-bottom:8px;">μ=0 (unbiased estimator)</div>
+            <div style="font-size:10px; color:#64748b; align-self:end; padding-bottom:8px;">μ=0 adalah asumsi simulasi; belum diuji pada residual model.</div>
           </div>
         </div>
 
@@ -2531,12 +2538,14 @@ function initAVMAnalysis() {
       finishTimeOnly('Wilayah aset tidak memiliki model regresi yang dapat dipastikan. RaLAT tidak dijalankan.');
       return null;
     }
-    var asetFeats = ralatBuildFeatures(asetCoord, asetMeta, overpassAset, geocodeRes, activeModel);
+    var asetTrace = {};
+    var asetFeats = ralatBuildFeatures(asetCoord, asetMeta, overpassAset, geocodeRes, activeModel, asetTrace, 'aset');
 
     _ralatLastRun = {
       region: modelRegion,
       version: modelVersion,
       asetFeats: asetFeats,
+      asetTrace: asetTrace,
       geocodeRes: geocodeRes,
       asetMeta: asetMeta,
       status: ''
@@ -2570,8 +2579,9 @@ function initAVMAnalysis() {
         // Untuk pembanding, kita pakai field row.kota sebagai bestCity (tanpa
         // panggil Nominatim untuk hemat rate limit).
         var compGeocode = { bestCity: item.row.kota || '', city: item.row.kota || '', state: item.row.provinsi || '' };
-        var compFeats = ralatBuildFeatures(item.coordComp, compMeta, opRes, compGeocode, activeModel);
-        var engineRes = ralatEngineV2(activeModel, asetFeats, compFeats);
+        var compTrace = {};
+        var compFeats = ralatBuildFeatures(item.coordComp, compMeta, opRes, compGeocode, activeModel, compTrace, 'pembanding');
+        var engineRes = ralatEngineV2(activeModel, asetFeats, compFeats, asetTrace, compTrace);
         var adjustedPrice = item.priceTimeAdj * (1 + engineRes.adjPct);
 
         // Susun ralatInfo singkat (top-3 driver) untuk fallback display.
@@ -2592,6 +2602,8 @@ function initAVMAnalysis() {
           capped: engineRes.capped,
           asetFeats: asetFeats,
           compFeats: compFeats,
+          asetTrace: asetTrace,
+          compTrace: compTrace,
           coverage: engineRes.coverage
         });
       });
@@ -2706,7 +2718,7 @@ function recalcAVM() {
                    '<td data-label="ID"><strong>' + _ralatEscapeHtml(d.id) + '</strong></td>' +
                    '<td data-label="Harga /m²">' + formatRupiah(Math.round(d.price)) + '</td>' +
                    '<td data-label="Penyesuaian">' + _ralatRenderAdjBadge(d) + '</td>' +
-                   '<td data-label="Variabel" style="font-size:10px;">' + _ralatRenderDrivers(d) + _ralatRenderMissing(d) + '</td>' +
+                   '<td data-label="Variabel" style="font-size:10px;">' + _ralatRenderDrivers(d) + _ralatRenderMissing(d) + _ralatRenderVariableTrace(d) + '</td>' +
                    '<td data-label="Uji IQR">' + statusText + '</td></tr>';
   });
 
@@ -3169,6 +3181,7 @@ function runMonteCarloSimulation() {
       modelRegion: _ralatLastRun && _ralatLastRun.region || '',
       modelVersion: _ralatLastRun && _ralatLastRun.version || '',
       modelStatus: _ralatLastRun && _ralatLastRun.status || '',
+      modelValidation: 'Konversi koefisien RaLAT belum diverifikasi terhadap model regresi asli',
       time:   { enabled: enTime,  min: timeMin, mode: timeMode, max: timeMax },
       ralat:  { enabled: enRalat, sigma: ralatSigma },
       shock:  { enabled: enShock, min: shockMin, mode: shockMode, max: shockMax },
@@ -3525,6 +3538,7 @@ function downloadMCPDF() {
       : '') +
 
     '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px; page-break-after:avoid;">Audit Log Asumsi (Reproducibility)</h3>' +
+    '<div style="font-size:10px; color:#92400e; margin-bottom:8px;">' + _ralatEscapeHtml(a.modelValidation) + '</div>' +
     '<div style="font-size:10px; margin-bottom:8px;">Model RaLAT: ' + _ralatEscapeHtml(a.modelRegion || 'tidak tersedia') +
       ' · versi ' + _ralatEscapeHtml(a.modelVersion || '—') +
       (a.modelStatus ? ' · ' + _ralatEscapeHtml(a.modelStatus) : '') + '</div>' +
@@ -3671,6 +3685,7 @@ function downloadAVMPDF() {
       <strong style="color:#1e3a5f;">Batas model:</strong> Penyesuaian RaLAT menggunakan variabel terhitung pada
       model <code>${_ralatEscapeHtml(_ralatLastRun && _ralatLastRun.region || '–')}</code>
       versi <code>${_ralatEscapeHtml(_ralatLastRun && _ralatLastRun.version || '–')}</code>.
+      <strong>Status validasi: belum terverifikasi terhadap model regresi asli.</strong>
       Definisi fitur dan rumus konversi koefisien menjadi persen masih perlu dicocokkan dengan dokumentasi model asli.
       Hasil ini memerlukan pertimbangan penilai; sumber fitur spasial adalah OpenStreetMap dan Nominatim.
     </div>
@@ -4774,8 +4789,9 @@ function ralatFeatureIssue(name) {
 
 // Hitung jarak minimum dari coord ke elemen yang match tag matcher.
 // Returns meter atau null kalau tidak ada match.
-function _ralatMinDistance(coord, elements, matcher) {
+function _ralatMinDistance(coord, elements, matcher, nearest) {
   var best = Infinity;
+  var bestElement = null, bestCoord = null;
   for (var i = 0; i < elements.length; i++) {
     var el = elements[i];
     if (!el || !el.tags) continue;
@@ -4783,7 +4799,12 @@ function _ralatMinDistance(coord, elements, matcher) {
     var c = _ralatElCoord(el);
     if (!c) continue;
     var d = _ralatHaversine(coord.lat, coord.lng, c.lat, c.lng);
-    if (d < best) best = d;
+    if (d < best) { best = d; bestElement = el; bestCoord = c; }
+  }
+  if (isFinite(best) && nearest) {
+    nearest.element = bestElement;
+    nearest.coord = bestCoord;
+    nearest.distanceM = best;
   }
   return isFinite(best) ? best : null;
 }
@@ -4809,9 +4830,11 @@ function _ralatCountInRadius(coord, elements, matcher, radiusM) {
 //   overpassRes: {near:[], far:[]}
 //   geocodeRes:  {bestCity, county, state}
 //   activeModel: {varName:{tipe,koefisien}}
-function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
+function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel, traceOut, role) {
   var feats = {};
   if (!coord || !activeModel) return feats;
+  traceOut = traceOut || {};
+  var inputSource = role === 'aset' ? 'Form Karakter Aset Target' : 'Kolom data pembanding';
   meta = meta || {};
   overpassRes = overpassRes || { near: [], far: [], nearAvailable: false, farAvailable: false };
   geocodeRes = geocodeRes || { bestCity: '' };
@@ -4833,13 +4856,34 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
       if (RALAT_LANDMARKS[landmarkKey]) {
         var lm = RALAT_LANDMARKS[landmarkKey];
         feats[varName] = _ralatHaversine(coord.lat, coord.lng, lm.lat, lm.lng);
+        traceOut[varName] = { source: 'Titik referensi dalam kode (' + landmarkKey + ')', method: 'Garis lurus ke titik tetap', distanceM: feats[varName],
+          queryLat: coord.lat, queryLng: coord.lng, featureLat: lm.lat, featureLng: lm.lng };
         return;
       }
       // Cek matcher OSM
       var matcher = RALAT_TAG_MATCHERS[varName.toLowerCase()];
       if (matcher) {
-        var d = _ralatMinDistance(coord, allEls, matcher);
-        if (d !== null) feats[varName] = d;
+        var nearest = {};
+        var d = _ralatMinDistance(coord, allEls, matcher, nearest);
+        if (d !== null) {
+          feats[varName] = d;
+          var element = nearest.element;
+          var inNear = (overpassRes.near || []).indexOf(element) !== -1;
+          var tagNames = ['highway', 'shop', 'place', 'amenity', 'railway', 'aeroway', 'office', 'natural', 'waterway', 'landuse', 'tourism', 'historic', 'harbour', 'station', 'line'];
+          var tag = tagNames.map(function(k) { return element.tags && element.tags[k] ? k + '=' + element.tags[k] : ''; }).filter(Boolean).join(', ');
+          traceOut[varName] = {
+            source: 'OpenStreetMap via Overpass', osmType: element.type || '', osmId: element.id || '', tag: tag,
+            method: element.center ? 'Garis lurus ke titik tengah fitur' : 'Garis lurus ke titik fitur',
+            queryRadiusM: inNear ? 5000 : 20000, distanceM: d,
+            queryLat: coord.lat, queryLng: coord.lng, featureLat: nearest.coord.lat, featureLng: nearest.coord.lng
+          };
+        } else {
+          var farFeature = ['ln_distance_to_big_city', 'ln_distance_to_small_city', 'ln_distance_to_airport', 'ln_distance_to_lrt'].indexOf(varName.toLowerCase()) !== -1;
+          traceOut[varName] = { missingReason: (farFeature && overpassRes.farAvailable === false) ||
+            (!farFeature && overpassRes.nearAvailable === false)
+              ? 'Layanan peta pada radius pencarian tidak memberikan data'
+              : 'Fitur peta tidak ditemukan dalam radius pencarian' };
+        }
       }
       return;
     }
@@ -4863,6 +4907,9 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
       else if (poiKind === 'entertainment')               poiMatcher = function(t){ return t.amenity === 'theatre' || t.amenity === 'cinema' || t.amenity === 'nightclub'; };
       if (poiMatcher && overpassRes.nearAvailable !== false) {
         feats[varName] = _ralatCountInRadius(coord, overpassRes.near || [], poiMatcher, radius);
+        traceOut[varName] = { source: 'OpenStreetMap via Overpass', method: 'Jumlah fitur dalam radius ' + radius + ' m', queryRadiusM: 5000 };
+      } else if (poiMatcher) {
+        traceOut[varName] = { missingReason: 'Layanan peta radius 5 km tidak memberikan data' };
       }
       return;
     }
@@ -4870,27 +4917,34 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
     // --- ln_luas_tanah (numerik_ln) ---
     if (varName === 'ln_luas_tanah') {
       var lt = _ralatParseLuas(meta.luasTanah);
-      if (lt !== null && lt > 0) feats[varName] = Math.log(lt);
+      if (lt !== null && lt > 0) {
+        feats[varName] = Math.log(lt);
+        traceOut[varName] = { source: inputSource + ': luas tanah', method: 'ln(luas tanah dalam m²)' };
+      }
       return;
     }
 
     // --- lebar_jalan_di_depan_adj ---
     if (varName === 'lebar_jalan_di_depan_adj') {
       var lj = parseFloat(String(meta.lebarJalan || '').replace(',', '.'));
-      if (!isNaN(lj) && lj > 0) feats[varName] = lj;
+      if (!isNaN(lj) && lj > 0) {
+        feats[varName] = lj;
+        traceOut[varName] = { source: inputSource + ': lebar jalan', method: 'Meter' };
+      }
       return;
     }
 
     // --- Marker kota (is_<city>) ---
     if (/^is_/.test(varName)) {
       var token = varName.replace(/^is_/, '').toLowerCase();
+      var categorySource = { source: inputSource + ': peruntukan', method: 'Penanda 0/1' };
       // Special: kategori penggunaan
       if (['komersial', 'perumahan', 'industrial', 'industri', 'kebun', 'perkebunan'].indexOf(token) >= 0 && !meta.peruntukan) return;
-      if (token === 'komersial')  { feats[varName] = _ralatIsKomersial(meta) ? 1 : 0; return; }
-      if (token === 'perumahan')  { feats[varName] = _ralatIsPerumahan(meta) ? 1 : 0; return; }
-      if (token === 'industrial' || token === 'industri') { feats[varName] = _ralatIsIndustrial(meta) ? 1 : 0; return; }
-      if (token === 'kebun' || token === 'perkebunan')    { feats[varName] = _ralatIsKebun(meta) ? 1 : 0; return; }
-      if (token === 'hook' || token === 'hoek')           { if (!meta.posisi) return; feats[varName] = _ralatIsHook(meta) ? 1 : 0; return; }
+      if (token === 'komersial')  { feats[varName] = _ralatIsKomersial(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
+      if (token === 'perumahan')  { feats[varName] = _ralatIsPerumahan(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
+      if (token === 'industrial' || token === 'industri') { feats[varName] = _ralatIsIndustrial(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
+      if (token === 'kebun' || token === 'perkebunan')    { feats[varName] = _ralatIsKebun(meta) ? 1 : 0; traceOut[varName] = categorySource; return; }
+      if (token === 'hook' || token === 'hoek')           { if (!meta.posisi) return; feats[varName] = _ralatIsHook(meta) ? 1 : 0; traceOut[varName] = { source: inputSource + ': posisi tapak', method: 'Penanda 0/1' }; return; }
       // City marker — match dengan reverse-geocode bestCity
       if (!cityKey) return;
       var tokenNorm = token.replace(/[_\s]/g, '').toUpperCase();
@@ -4901,6 +4955,7 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
       } else {
         feats[varName] = 0;
       }
+      traceOut[varName] = { source: role === 'aset' ? 'Nama kota dari Nominatim' : 'Kolom Kota pembanding', method: 'Pencocokan teks nama kota 0/1' };
       return;
     }
 
@@ -4913,6 +4968,7 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
                       b.indexOf('persegi') !== -1 ||
                       b.indexOf('trapesium') !== -1;
       feats[varName] = beraturan ? 1 : 0;
+      traceOut[varName] = { source: inputSource + ': bentuk tapak', method: 'Penanda 0/1' };
       return;
     }
 
@@ -4976,12 +5032,14 @@ function _ralatIsHook(meta) {
 var RALAT_CAP = 0.50; // Hard cap ±50%
 var RALAT_LN_FLOOR_M = 50;
 
-function ralatEngineV2(activeModel, asetFeats, compFeats) {
+function ralatEngineV2(activeModel, asetFeats, compFeats, asetTrace, compTrace) {
   var rawSum = 0;
   var gross = 0;
   var breakdown = [];
   var skipped = [];
   var applicable = 0;
+  asetTrace = asetTrace || {};
+  compTrace = compTrace || {};
 
   Object.keys(activeModel).forEach(function(name) {
     var v = activeModel[name];
@@ -4993,34 +5051,41 @@ function ralatEngineV2(activeModel, asetFeats, compFeats) {
     var cVal = compFeats[name];
     if (aVal === undefined || cVal === undefined || aVal === null || cVal === null) {
       skipped.push({ name: name, reason: ralatFeatureIssue(name) ||
-        (aVal === undefined || aVal === null ? 'Data aset tidak tersedia' : 'Data pembanding tidak tersedia') });
+        (aVal === undefined || aVal === null
+          ? (asetTrace[name] && asetTrace[name].missingReason || 'Data aset tidak tersedia')
+          : (compTrace[name] && compTrace[name].missingReason || 'Data pembanding tidak tersedia')) });
       return;
     }
 
-    var kontrib = 0;
+    var delta = 0;
     if (tipe === 'ln' || tipe === 'numerik_ln') {
-      var aFl = Math.max(parseFloat(aVal), RALAT_LN_FLOOR_M);
-      var cFl = Math.max(parseFloat(cVal), RALAT_LN_FLOOR_M);
       // Untuk numerik_ln (ln_luas_tanah), nilai sudah dalam ln, jadi langsung
       // selisih nilai. Untuk ln_distance_to_*, nilai dalam meter → ln dulu.
       if (tipe === 'numerik_ln') {
-        // aVal/cVal sudah ln(luas), tinggal selisih
-        kontrib = (parseFloat(aVal) - parseFloat(cVal)) * v.koefisien;
+        delta = parseFloat(aVal) - parseFloat(cVal);
       } else {
-        kontrib = (Math.log(aFl) - Math.log(cFl)) * v.koefisien;
+        delta = Math.log(Math.max(parseFloat(aVal), RALAT_LN_FLOOR_M)) -
+                Math.log(Math.max(parseFloat(cVal), RALAT_LN_FLOOR_M));
       }
     } else {
-      // poi_count, marking, numerik, kategori → linear difference
-      kontrib = (parseFloat(aVal) - parseFloat(cVal)) * v.koefisien;
+      // poi_count, marking, numerik, kategori → selisih linear
+      delta = parseFloat(aVal) - parseFloat(cVal);
     }
 
-    if (!isFinite(kontrib)) kontrib = 0;
+    var kontrib = delta * v.koefisien;
+    if (!isFinite(kontrib)) {
+      skipped.push({ name: name, reason: 'Hasil numerik tidak valid; kontribusi tidak digunakan' });
+      return;
+    }
     rawSum += kontrib;
     gross  += Math.abs(kontrib);
     breakdown.push({
       var: name, tipe: tipe,
       asetVal: aVal, compVal: cVal,
       koef: v.koefisien,
+      delta: delta,
+      asetTrace: asetTrace[name] || null,
+      compTrace: compTrace[name] || null,
       kontribPct: kontrib
     });
   });
@@ -5156,6 +5221,40 @@ function _ralatRenderMissing(d) {
     ' variabel · ' + c.skipped.length + ' belum terhitung</summary><ul style="padding-left:18px;text-align:left;">' + items + '</ul></details>';
 }
 
+function _ralatTraceSource(t) {
+  if (!t) return 'Sumber belum tercatat';
+  var info = [t.source || 'Sumber belum tercatat'];
+  if (t.osmType && t.osmId) info.push('OSM ' + t.osmType + '/' + t.osmId);
+  if (t.tag) info.push(t.tag);
+  if (t.method) info.push(t.method);
+  if (t.queryRadiusM) info.push('radius pencarian ' + (t.queryRadiusM / 1000) + ' km');
+  if (isFinite(t.queryLat) && isFinite(t.queryLng) && isFinite(t.featureLat) && isFinite(t.featureLng)) {
+    info.push('dari ' + Number(t.queryLat).toFixed(6) + ',' + Number(t.queryLng).toFixed(6) +
+      ' ke ' + Number(t.featureLat).toFixed(6) + ',' + Number(t.featureLng).toFixed(6));
+  }
+  return info.join(' · ');
+}
+
+function _ralatRenderVariableTrace(d) {
+  if (!d || !d.breakdown || !d.breakdown.length) return '';
+  var rows = d.breakdown.map(function(b) {
+    var formula = b.tipe === 'ln' ? 'β × [ln(max(jarak aset, 50 m)) − ln(max(jarak pembanding, 50 m))]'
+      : b.tipe === 'numerik_ln' ? 'β × [ln(luas aset) − ln(luas pembanding)]'
+      : 'β × (nilai aset − nilai pembanding)';
+    var delta = typeof b.delta === 'number' ? b.delta.toPrecision(8) : '—';
+    return '<div class="ralat-trace-item"><code>' + _ralatEscapeHtml(b.var) + '</code>' +
+      '<div>' + _ralatEscapeHtml(formula) + '</div>' +
+      '<div>Aset ' + _ralatEscapeHtml(Number(b.asetVal).toPrecision(8)) +
+      ' · Pembanding ' + _ralatEscapeHtml(Number(b.compVal).toPrecision(8)) +
+      ' · Δ ' + _ralatEscapeHtml(delta) + ' · β ' + _ralatEscapeHtml(b.koef) +
+      ' · kontribusi ' + (b.kontribPct >= 0 ? '+' : '') + (b.kontribPct * 100).toFixed(3) + '%</div>' +
+      '<div class="ralat-trace-source">Aset: ' + _ralatEscapeHtml(_ralatTraceSource(b.asetTrace)) + '</div>' +
+      '<div class="ralat-trace-source">Pembanding: ' + _ralatEscapeHtml(_ralatTraceSource(b.compTrace)) + '</div></div>';
+  }).join('');
+  return '<details class="ralat-trace"><summary>Rincian rumus &amp; sumber ' + d.breakdown.length + ' variabel</summary>' +
+    '<div>Kontribusi dijumlahkan lalu totalnya dibatasi ±50%. Definisi dan konversi koefisien model asli belum diverifikasi.</div>' + rows + '</details>';
+}
+
 function renderRalatAuditSummary() {
   var el = document.getElementById('ralatAuditSummary');
   if (!el) return;
@@ -5167,12 +5266,14 @@ function renderRalatAuditSummary() {
   var diagnostics = _modelDiagnostics || {};
   var nUndated = (diagnostics.unversionedRows || []).length;
   var nDuplicate = (diagnostics.duplicateRows || []).length;
-  var warning = !!info.status || issueNames.length > 0 || nUndated > 0 || nDuplicate > 0;
-  el.classList.toggle('warning', warning);
+  // Workbook hanya berisi koefisien; validasi model aslinya belum tersedia.
+  el.classList.add('warning');
   var title = info.region && info.version
     ? 'RaLAT ' + _ralatEscapeHtml(info.region) + ' · versi ' + _ralatEscapeHtml(info.version)
     : 'RaLAT belum dapat dijalankan';
   var html = '<strong>' + title + '</strong>';
+  html += '<div><strong>Status: rumus koefisien dan definisi fitur model asli belum tervalidasi.</strong> ' +
+    'Angka RaLAT adalah hasil implementasi aplikasi untuk ditelaah penilai.</div>';
   if (info.status) html += '<div>' + _ralatEscapeHtml(info.status) + '</div>';
   if (coverage.length) {
     var minimum = Math.min.apply(null, coverage.map(function(d) { return d.coverage.used; }));
@@ -5185,7 +5286,7 @@ function renderRalatAuditSummary() {
       '</ul></details>';
   }
   if (nUndated || nDuplicate) html += '<div>Sheet Model_Regresi: ' + nUndated + ' baris tanpa versi dan ' + nDuplicate + ' baris duplikat dilewati.</div>';
-  html += '<div>Rumus konversi koefisien tetap perlu dicocokkan dengan dokumentasi model asli.</div>';
+  html += '<div>Periksa rincian rumus dan sumber pada masing-masing pembanding.</div>';
   el.innerHTML = html;
 }
 
@@ -5217,6 +5318,7 @@ function _ralatRenderModelMeta() {
          '🛰️ <strong>RaLAT v2</strong> · model <code>' + _ralatEscapeHtml(meta.region) + '</code> versi <code>' + _ralatEscapeHtml(meta.version) + '</code> · ' +
          nVar + ' variabel aset tersedia · kota terdeteksi: <strong>' + _ralatEscapeHtml(city) + '</strong>' +
          (partial ? ' · <strong>Cakupan variabel belum lengkap; lihat tab Audit.</strong>' : '') +
+         ' · <strong>Konversi koefisien belum tervalidasi terhadap model asli.</strong>' +
          '</div>';
 }
 
@@ -5238,7 +5340,10 @@ function _ralatRenderPDFBreakdown() {
       var pct = (b.kontribPct >= 0 ? '+' : '') + (b.kontribPct * 100).toFixed(2) + '%';
       var color = b.kontribPct >= 0 ? '#15803d' : '#dc2626';
       return '<tr>' +
-             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; font-family:monospace; font-size:10px;">' + _ralatVarLabel(b.var) + '</td>' +
+             '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; font-family:monospace; font-size:10px;">' + _ralatEscapeHtml(b.var) +
+             '<div style="font-family:sans-serif;font-size:8px;color:#64748b;">Δ ' + _ralatEscapeHtml(Number(b.delta).toPrecision(8)) +
+             '<br>Aset: ' + _ralatEscapeHtml(_ralatTraceSource(b.asetTrace)) +
+             '<br>Pembanding: ' + _ralatEscapeHtml(_ralatTraceSource(b.compTrace)) + '</div></td>' +
              '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-size:10px;">' + aetVal + '</td>' +
              '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-size:10px;">' + compVal + '</td>' +
              '<td style="padding:4px 6px; border-bottom:1px solid #f1f5f9; text-align:right; font-family:monospace; font-size:10px;">' + koefTxt + '</td>' +
@@ -5251,7 +5356,7 @@ function _ralatRenderPDFBreakdown() {
     var capWarn = d.capped ? ' <span style="color:#dc2626;">(di-cap dari ' + (d.rawAdjPct * 100).toFixed(1) + '%)</span>' : '';
     var grossTxt = (d.gross !== undefined) ? ' · gross ' + (d.gross * 100).toFixed(2) + '%' : '';
 
-    return '<div style="margin-top:14px; page-break-inside:avoid; border:1px solid #e2e8f0; border-radius:4px; overflow:hidden;">' +
+    return '<div style="margin-top:14px; border:1px solid #e2e8f0; border-radius:4px;">' +
            '<div style="background:#f8fafc; padding:6px 10px; font-weight:700; font-size:11px; color:#1e3a5f; border-bottom:1px solid #e2e8f0;">' +
            '📍 ' + d.id + ' · Total: <span style="color:' + (d.adjPct >= 0 ? '#15803d' : '#dc2626') + ';">' + totalPct + '</span>' + capWarn + grossTxt +
            '</div>' +
@@ -5269,7 +5374,7 @@ function _ralatRenderPDFBreakdown() {
   }).filter(Boolean).join('');
 
   return '<h3 style="color:#1e3a5f; font-size:14px; margin:30px 0 6px 0;">Komposisi Penyesuaian Spasial (RaLAT) — Per Pembanding</h3>' +
-         '<p style="font-size:10px; color:#5a6a7e; margin-bottom:8px;">Daftar lengkap kontribusi setiap variabel regresi terhadap penyesuaian harga per pembanding. Variabel dengan koefisien β positif → kenaikan harga searah dengan kenaikan nilai variabel.</p>' +
+         '<p style="font-size:10px; color:#5a6a7e; margin-bottom:8px;">Daftar kontribusi variabel: β × Δ, dengan Δ berupa selisih langsung atau selisih logaritma sesuai tipe. Jumlah kontribusi dibatasi ±50%; rumus model asli belum diverifikasi.</p>' +
          blocks;
 }
 
