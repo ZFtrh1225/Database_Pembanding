@@ -13,6 +13,8 @@ Pada workbook yang diperiksa, terdapat 687 baris berkoefisien, 13 wilayah, 36 ke
 3. Median pembanding terpilih setelah uji IQR menjadi nilai dasar SBM. SBM menghitung nilai harapan dari probabilitas serta penyesuaian skenario pengguna.
 4. Monte Carlo mengambil nilai dasar serta pilihan pembanding dari Analisa, lalu menggunakan distribusi dan parameter sendiri. Hasil P5–P95 ialah persentil simulasi, bukan selang kepercayaan nilai pasar.
 
+Saat tombol **Analisa** pada panel pencarian diklik, Audit mulai memeriksa model dan fitur. Setelah selesai, modal berpindah ke tab SBM. Karakter aset pada tab SBM adalah **input RaLAT**, walaupun ditempatkan dekat keluaran SBM: luas, lebar jalan, bentuk, posisi, dan penggunaan aset dibandingkan dengan karakter setiap pembanding. Setelah mengisi atau mengubahnya, tekan **Hitung Ulang Analisa & RaLAT** di panel karakter aset. Hasil median dan proyeksi SBM kemudian dihitung kembali. Bentuk, posisi, dan penggunaan yang belum diketahui tidak dianggap sebagai kondisi negatif/default; variabel terkait dilewati dan muncul di Audit.
+
 Jika versi/wilayah tidak dapat diverifikasi atau proses RaLAT gagal, aplikasi memakai penyesuaian waktu saja dan menunjukkan alasannya. Perubahan aset, koordinat, tanggal, tingkat penyesuaian waktu, pembanding terpilih, atau asumsi SBM membatalkan keluaran terkait yang sudah dihitung.
 
 ## Batas penafsiran

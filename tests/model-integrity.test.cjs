@@ -43,13 +43,16 @@ const context = vm.createContext({
   _analysisReady: true,
   _avmRawData: [{ price: 10 }],
   _avmCurrentMedian: 10,
+  currentData: [{ price: 10 }],
   document: {
     getElementById(id) {
       if (id === 'mcResultWrap' || id === 'btnDownloadMCPDF') return { style: { display: 'block' } };
+      if (id === 'btnRecalculateAVM') return context.recalculateButton;
       return null;
     }
   }
 });
+context.recalculateButton = { disabled: true };
 for (const name of ['_modelVersionFromId', '_groupRegressionRows']) {
   vm.runInContext(extractFunction(backend, name), context);
 }
@@ -102,6 +105,14 @@ const unknownUse = context.ralatBuildFeatures(
   { is_komersial: { tipe: 'marking', koefisien: 0.2 } }
 );
 assert.equal(unknownUse.is_komersial, undefined, 'Unknown use must not be classified as non-commercial');
+const unknownShape = context.ralatBuildFeatures(
+  { lat: -6.3, lng: 106.8 }, { bentuk: '', posisi: '' },
+  { near: [], far: [], nearAvailable: true, farAvailable: true },
+  { bestCity: 'Jakarta Selatan' },
+  { tapak_beraturan: { tipe: 'marking', koefisien: 0.2 }, is_hook: { tipe: 'marking', koefisien: 0.2 } }
+);
+assert.equal(unknownShape.tapak_beraturan, undefined);
+assert.equal(unknownShape.is_hook, undefined);
 
 const coverage = context.ralatEngineV2(
   { ln_distance_to_BEJ: { tipe: 'ln', koefisien: -0.5 }, POI_retail_1000m: { tipe: 'poi', koefisien: 0.02 } },
@@ -120,4 +131,5 @@ assert.equal(context._analysisReady, false);
 assert.equal(context._avmCurrentMedian, 0);
 assert.equal(context._mcLastResult, null);
 assert.equal(context._analysisRunToken, 1);
+assert.equal(context.recalculateButton.disabled, false, 'Editing target must enable a re-run inside modal');
 console.log('Model versioning, feature coverage, and simulation invalidation: OK');
