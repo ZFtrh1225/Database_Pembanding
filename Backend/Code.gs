@@ -148,37 +148,52 @@ function _isPointInPolygon(lat, lng, polygon) {
 // =========================================================================
 // FITUR BARU: MENGAMBIL DATABASE MODEL REGRESI DARI SPREADSHEET
 // =========================================================================
+function _modelVersionFromId(id) {
+  const match = String(id || '').trim().match(/(20\d{6})$/);
+  return match ? match[1] : null;
+}
+
+function _groupRegressionRows(data) {
+  const models = {};
+  const diagnostics = { unversionedRows: [], duplicateRows: [] };
+  data.forEach((row, index) => {
+    const modelName = String(row[2] || '').trim();
+    const variable = String(row[5] || '').trim();
+    if (row[6] === '' || row[6] === null || row[6] === undefined) return;
+    const coefficient = Number(row[6]);
+    if (!modelName || !variable || !Number.isFinite(coefficient)) return;
+
+    const version = _modelVersionFromId(row[1]);
+    const sheetRow = index + 2;
+    if (!version) {
+      diagnostics.unversionedRows.push(sheetRow);
+      return;
+    }
+    if (!models[modelName]) models[modelName] = {};
+    if (!models[modelName][version]) models[modelName][version] = {};
+    if (Object.prototype.hasOwnProperty.call(models[modelName][version], variable)) {
+      diagnostics.duplicateRows.push(sheetRow);
+      return;
+    }
+    models[modelName][version][variable] = {
+      tipe: String(row[3] || '').trim(),
+      koefisien: coefficient
+    };
+  });
+  return { models: models, diagnostics: diagnostics };
+}
+
 function getRegressionModels() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(MODEL_SHEET);
-  if (!sheet) return {}; // Kembalikan objek kosong jika sheet belum dibuat
+  if (!sheet) return { models: {}, diagnostics: { unversionedRows: [], duplicateRows: [] } };
 
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return {};
+  if (lastRow < 2) return { models: {}, diagnostics: { unversionedRows: [], duplicateRows: [] } };
 
-  // Membaca Kolom A (Order) hingga Kolom G (Koefisien)
+  // B menyimpan versi YYYYMMDD pada akhir ID. Setiap versi merupakan model utuh.
   const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
-  const models = {};
-
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
-    const modelName = String(row[2]).trim();  // Kolom C: Model (Misal: Jawa Timur)
-    const type = String(row[3]).trim();       // Kolom D: Tipe (Misal: ln, marking)
-    const variable = String(row[5]).trim();   // Kolom F: Variable (Misal: ln_distance_to_mall)
-    const koefisien = parseFloat(row[6]);     // Kolom G: Koefisien (-0.2126...)
-
-    if (!modelName || isNaN(koefisien)) continue;
-
-    if (!models[modelName]) {
-      models[modelName] = {};
-    }
-
-    models[modelName][variable] = {
-      tipe: type,
-      koefisien: koefisien
-    };
-  }
-  return models;
+  return _groupRegressionRows(data);
 }
 // =========================================================================
 
@@ -240,7 +255,7 @@ function searchData(params) {
     
     // TAMBAHAN: Tarik data model regresi dan lemparkan ke respon
     const regModels = getRegressionModels();
-    return { success: true, data: result, total: result.length, models: regModels };
+    return { success: true, data: result, total: result.length, models: regModels.models, modelDiagnostics: regModels.diagnostics };
     
   } catch (err) { return { success: false, error: err.message }; }
 }

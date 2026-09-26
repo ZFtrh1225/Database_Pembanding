@@ -260,6 +260,10 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .audit-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; margin-top: 15px; }
 .audit-table th { background: #f0f4f8; padding: 8px; color: var(--navy); }
 .audit-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+.ralat-audit-summary { padding: 12px; border: 1px solid #cbd5e1; border-radius: 9px; background: #f8fafc; color: var(--navy); font-size: 12px; line-height: 1.55; margin-bottom: 12px; }
+.ralat-audit-summary.warning { border-color: #fbbf24; background: #fffbeb; }
+.ralat-audit-summary strong { display: block; margin-bottom: 4px; }
+.ralat-audit-summary details { margin-top: 6px; overflow-wrap: anywhere; }
 .audit-row.excluded { background: #fce8e6; opacity: 0.8; }
 .audit-row.excluded td { color: var(--red); }
 
@@ -1047,6 +1051,13 @@ body.mmode-picking .mpick-hint { display: flex; }
   /* Audit table horizontally scrollable */
   .audit-table { font-size: 11px; }
   .audit-table th, .audit-table td { padding: 8px 6px; }
+  .audit-table thead { display: none; }
+  .audit-table, .audit-table tbody, .audit-table tr, .audit-table td { display: block; width: 100%; }
+  .audit-table .audit-row { border: 1px solid var(--border); border-radius: 10px; margin: 8px 0; padding: 8px 10px; }
+  .audit-table .audit-row td { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border: 0; text-align: right; overflow-wrap: anywhere; }
+  .audit-table .audit-row td::before { content: attr(data-label); font-weight: 700; color: var(--navy); text-align: left; flex: 0 0 38%; }
+  .audit-table .audit-row input[type="checkbox"] { min-width: 22px; min-height: 22px; }
+  .ralat-audit-summary { font-size: 13px; }
 
   /* Map loading bigger spinner */
   .spinner { width: 48px; height: 48px; border-width: 4px; }
@@ -1439,7 +1450,7 @@ body.mmode-picking .mpick-hint { display: flex; }
             <div class="span-2" style="grid-column: span 2;">
               <label class="form-label" style="font-size:10px;">Penggunaan / Peruntukan</label>
               <select id="rlAsetPeruntukan" class="form-select" style="padding:5px 8px; font-size:12px;" onchange="updateAsetTargetMeta()">
-                <option value="">— Auto (dari mayoritas pembanding) —</option>
+                <option value="">— Belum diketahui (kategori tidak dihitung) —</option>
                 <option>Pemukiman</option>
                 <option>Perumahan</option>
                 <option>Perdagangan dan Jasa</option>
@@ -1452,7 +1463,7 @@ body.mmode-picking .mpick-hint { display: flex; }
             </div>
           </div>
           <div id="ralatAsetHint" style="font-size:10px; color:#5a6a7e; margin-top:6px;">
-            Field kosong → variabel terkait di RaLAT akan di-skip untuk pembanding tersebut.
+            Isi karakter aset yang diketahui. Variabel dengan input kosong akan tercatat sebagai belum terhitung.
           </div>
         </div>
         <!-- ============ /Karakter Aset Target ============ -->
@@ -1516,8 +1527,9 @@ body.mmode-picking .mpick-hint { display: flex; }
 
       <div id="tab-audit" class="avm-tab-content">
         <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 15px; line-height: 1.5;">
-          <strong>Kendali Mutu (Quality Control):</strong> Harga di bawah telah melewati <em>Time Adjustment</em> dan <strong>RaLAT</strong> (Penyesuaian Spasial Ekonometrika). Centang untuk memaksakan data masuk ke perhitungan Base Case.
+          <strong>Kendali Mutu:</strong> Harga di bawah telah disesuaikan untuk waktu; penyesuaian RaLAT hanya berlaku jika wilayah, versi, dan fitur model tersedia. Periksa status serta cakupan variabel di bawah. Centang untuk memasukkan pembanding ke median.
         </div>
+        <div id="ralatAuditSummary" class="ralat-audit-summary" role="status" aria-live="polite">Menyiapkan analisis model…</div>
         <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
           <table class="audit-table">
             <thead>
@@ -1536,10 +1548,10 @@ body.mmode-picking .mpick-hint { display: flex; }
         </div>
       </div>
 
-      <!-- ============ TAB 3: MONTE CARLO SIMULATION (SPI 103.5.5 / IVS 105.40.7) ============ -->
+      <!-- ============ TAB 3: MONTE CARLO SIMULATION ============ -->
       <div id="tab-mc" class="avm-tab-content">
         <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.5;">
-          <strong>🎲 Monte Carlo Simulation</strong> — Mengkuantifikasi <em>valuation uncertainty</em> dengan ribuan iterasi acak. Mengacu <strong>SPI 103 §5.5</strong> dan <strong>IVS 105 §40.7</strong>.
+          <strong>🎲 Monte Carlo Simulation</strong> — Rentang hasil berdasarkan data pembanding dan asumsi risiko yang dipilih. Hasilnya adalah simulasi, bukan kesimpulan nilai penilai.
         </div>
 
         <!-- Ringkasan basis & jumlah iterasi -->
@@ -1583,9 +1595,9 @@ body.mmode-picking .mpick-hint { display: flex; }
             <span class="mc-var-badge tier1">T1</span>
             <strong>2. RaLAT Residual Error</strong>
             <span class="mc-var-dist">Normal</span>
-            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableRalat" checked> Aktifkan</label>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableRalat"> Aktifkan</label>
           </div>
-          <div class="mc-var-desc">Residual error model regresi spasial yang tidak tertangkap fitur POI (CLT-based).</div>
+            <div class="mc-var-desc">Asumsi galat manual. Nilai ini belum dihitung dari residual model di sheet Model_Regresi.</div>
           <div class="mc-var-grid3">
             <div><label>Mean μ (%)</label><input type="number" id="mcRalatMu" value="0" step="0.5" class="form-input mc-input" disabled style="opacity:0.6;"></div>
             <div><label>Stdev σ (%)</label><input type="number" id="mcRalatSigma" value="8" min="0" max="30" step="0.5" class="form-input mc-input"></div>
@@ -1644,7 +1656,7 @@ body.mmode-picking .mpick-hint { display: flex; }
         </div>
 
         <!-- Tombol Run -->
-        <button type="button" id="btnRunMC" onclick="runMonteCarloSimulation()" style="width:100%; margin-top:12px; padding:11px; background:linear-gradient(135deg,#7c3aed,#2d6be4); color:#fff; border:none; border-radius:8px; font-weight:800; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <button type="button" id="btnRunMC" onclick="runMonteCarloSimulation()" disabled style="width:100%; margin-top:12px; padding:11px; background:linear-gradient(135deg,#7c3aed,#2d6be4); color:#fff; border:none; border-radius:8px; font-weight:800; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           Jalankan Simulasi
         </button>
@@ -1659,17 +1671,17 @@ body.mmode-picking .mpick-hint { display: flex; }
             <div class="mc-stat-card" style="background:#fee2e2;"><div class="mc-stat-label">P95 (Best 5%)</div><div class="mc-stat-val" id="mcStatP95" style="color:#991b1b;">–</div></div>
           </div>
 
-          <!-- VaR & Confidence Interval -->
+          <!-- Persentil simulasi dan selisih dari nilai dasar -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
             <div style="background:#1e3a5f; color:#fff; border-radius:8px; padding:10px 12px;">
-              <div style="font-size:11px; color:#a9c6f5; font-weight:600;">CI 90% (P5 — P95)</div>
+              <div style="font-size:11px; color:#a9c6f5; font-weight:600;">Rentang P5–P95 simulasi</div>
               <div id="mcCI90" style="font-size:13px; font-weight:700; margin-top:4px;">–</div>
-              <div style="font-size:10px; color:#a9c6f5; margin-top:4px;">Range nilai wajar untuk laporan SPI 103</div>
+              <div style="font-size:10px; color:#a9c6f5; margin-top:4px;">Rentang hasil simulasi berdasarkan asumsi</div>
             </div>
             <div style="background:#7c2d12; color:#fff; border-radius:8px; padding:10px 12px;">
               <div style="font-size:11px; color:#fed7aa; font-weight:600;">VaR 95% &amp; 99%</div>
               <div id="mcVaR" style="font-size:13px; font-weight:700; margin-top:4px;">–</div>
-              <div style="font-size:10px; color:#fed7aa; margin-top:4px;">Nilai terburuk untuk agunan (SPI 366)</div>
+              <div style="font-size:10px; color:#fed7aa; margin-top:4px;">Selisih terhadap nilai dasar pada skenario yang disimulasikan</div>
             </div>
           </div>
 
@@ -1701,7 +1713,7 @@ body.mmode-picking .mpick-hint { display: flex; }
     
     <div class="modal-footer" style="justify-content: flex-end; align-items: center; background: #fafafa;">
         <button class="btn-submit" onclick="closeAnalyticsModal()" style="width: auto; background:transparent; color:var(--text-sub); border:1px solid var(--border); margin-right:5px;">Tutup</button>
-        <button class="btn-submit" onclick="downloadAVMPDF()" style="width: auto; background:#f4b400; color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Unduh Laporan SBM</button>
+        <button class="btn-submit" id="btnDownloadAVMPDF" onclick="downloadAVMPDF()" disabled style="width: auto; background:#f4b400; color:#fff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Unduh Laporan SBM</button>
         <button class="btn-submit" id="btnDownloadMCPDF" onclick="downloadMCPDF()" style="width: auto; background:#7c3aed; color:#fff; display:none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Unduh Laporan Monte Carlo</button>
     </div>
   </div>
@@ -2004,7 +2016,7 @@ var compareList = [];
 var compareTargetId = null;
 var _currentYear = new Date().getFullYear();
 
-// Tanggal Penilaian eksplisit (SPI 103 wajib). Default: hari ini.
+// Tanggal penilaian yang dipakai untuk penyesuaian waktu. Default: hari ini.
 // Diset oleh user melalui date picker di modal Analisa.
 var _valuationDate = new Date();
 
@@ -2038,11 +2050,10 @@ function setValuationDateFromInput(val) {
     if (!isNaN(d)) _valuationDate = d;
   }
   _currentYear = _valuationDate.getFullYear();
-  // Re-render modal AVM jika sedang terbuka
+  // Tanggal penilaian mengubah penyesuaian waktu dan seluruh hasil turunan.
   var modalOpen = document.getElementById('analyticsOverlay').classList.contains('open');
-  if (modalOpen && _avmRawData && _avmRawData.length > 0) {
-    initAVMAnalysis();
-  }
+  markAnalysisStale();
+  if (modalOpen && currentData && currentData.length > 0) initAVMAnalysis();
   // Refresh aging flag di tabel
   if (currentData && currentData.length > 0) renderTable(currentData);
 }
@@ -2053,6 +2064,10 @@ var _avmRawData = [];
 var _avmCurrentMedian = 0;
 var _asetPOIData = null; 
 window.regressionModels = {}; // Global var untuk menyimpan koefisien Ekonometrika
+var _modelDiagnostics = { unversionedRows: [], duplicateRows: [] };
+var _analysisRunToken = 0;
+var _mcRunToken = 0;
+var _analysisReady = false;
 
 // RaLAT v2: metadata aset target (diisi user di panel "Karakter Aset Target")
 var _asetTargetMeta = {
@@ -2060,7 +2075,7 @@ var _asetTargetMeta = {
   lebarJalan:  null,   // angka (m)
   bentuk:      'Beraturan',
   posisi:      'Tengah',
-  peruntukan:  ''      // string, default = auto pick dari pembanding
+  peruntukan:  ''      // kosong berarti kategori penggunaan tidak diketahui
 };
 
 // RaLAT v2: cache hasil engine versi terakhir (untuk PDF & audit drill-down)
@@ -2107,6 +2122,10 @@ document.addEventListener("DOMContentLoaded", function() {
       btnPoly.style.display = 'none'; _drawingPolygon = false; document.getElementById('map').style.cursor = '';
       polyPoints = []; if (polyLayer) { gMap.removeLayer(polyLayer); polyLayer = null; }
     }
+  });
+  ['timeAdjRate', 'mapSearch'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', markAnalysisStale);
   });
 });
 
@@ -2374,32 +2393,13 @@ function switchAVMTab(tabName) {
 function initAVMAnalysis() {
   if (!currentData || currentData.length === 0) { toast('Lakukan pencarian data terlebih dahulu!', 'error'); return; }
 
-  // ============ RaLAT v2: pilih model region & versi ============
-  // Pakai data pertama sebagai proxy untuk provinsi/kota dataset.
-  var probeRow = currentData[0];
-  var modelRegion = ralatPickModelRegion(probeRow.provinsi, probeRow.kota);
-  var regionMap = (modelRegion && window.regressionModels) ? window.regressionModels[modelRegion] : null;
-  var modelVersion = ralatPickLatestVersion(regionMap);
-  var activeModel = (regionMap && modelVersion) ? regionMap[modelVersion] : null;
-
-  // Backward compat: kalau struktur lama (flat per provinsi) masih dipakai backend lain,
-  // ralatNormalizeModels sudah membungkusnya ke {current: {...}}, jadi cabang ini selalu hit.
-  // Tapi kalau modelRegion tidak ditemukan, coba fallback ke key provinsi mentah.
-  if (!activeModel && window.regressionModels) {
-    var fallbackKey = probeRow.provinsi || 'Nasional';
-    var fallbackMap = window.regressionModels[fallbackKey];
-    if (fallbackMap) {
-      modelRegion = fallbackKey;
-      modelVersion = ralatPickLatestVersion(fallbackMap);
-      activeModel = fallbackMap[modelVersion];
-    }
-  }
-
-  if (!activeModel) {
-    console.warn('[RaLAT v2] Model untuk region "' + (modelRegion || probeRow.provinsi) + '" tidak ditemukan. Tanpa penyesuaian spasial.');
-  } else {
-    console.log('[RaLAT v2] Model aktif: ' + modelRegion + ' / ' + modelVersion + ' — ' + Object.keys(activeModel).length + ' variabel');
-  }
+  var runToken = ++_analysisRunToken;
+  _analysisReady = false;
+  document.getElementById('btnDownloadAVMPDF').disabled = true;
+  document.getElementById('btnRunMC').disabled = true;
+  invalidateMonteCarlo();
+  var modelRegion = null, modelVersion = null, activeModel = null;
+  var usedFallback = false;
 
   // Clamp time adjustment rate ke rentang wajar [-20%, +50%] per tahun
   var rawRate = document.getElementById('timeAdjRate').value;
@@ -2413,27 +2413,26 @@ function initAVMAnalysis() {
   _avmRawData = [];
 
   // Pusat radius (koordinat aset target). Ambil dari mapSearch.
-  var centerLatLng = null;
   var asetCoord = null;
   var inputSearch = document.getElementById('mapSearch').value.split(',');
-  if (inputSearch.length === 2 && !isNaN(parseFloat(inputSearch[0]))) {
+  if (inputSearch.length === 2 && isFinite(parseFloat(inputSearch[0])) && isFinite(parseFloat(inputSearch[1]))) {
     var aLat = parseFloat(inputSearch[0]);
     var aLng = parseFloat(inputSearch[1]);
-    centerLatLng = new google.maps.LatLng(aLat, aLng);
-    asetCoord = { lat: aLat, lng: aLng };
+    if (Math.abs(aLat) <= 90 && Math.abs(aLng) <= 180) asetCoord = { lat: aLat, lng: aLng };
   }
 
   // Sinkronkan UI form aset target → _asetTargetMeta
-  updateAsetTargetMeta();
+  updateAsetTargetMeta(true);
 
   // Buka modal dulu untuk UX, tampilkan state loading.
   var modalAuditBody = document.getElementById('auditTableBody');
   if (modalAuditBody) {
-    modalAuditBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">' +
+    modalAuditBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">' +
       '<div class="spinner" style="width:20px;height:20px;display:inline-block;margin-right:8px;vertical-align:middle;"></div>' +
-      'Menjalankan RaLAT v2 (Overpass + Nominatim + ' + (activeModel ? Object.keys(activeModel).length : 0) + ' variabel)…' +
+      'Memeriksa wilayah aset dan versi model RaLAT…' +
       '</td></tr>';
   }
+  document.getElementById('ralatAuditSummary').textContent = 'Memeriksa wilayah aset dan versi model…';
   document.getElementById('modalMedianPrice').textContent = 'Rp 0';
   document.getElementById('modalDataCount').textContent = '… memuat';
   switchAVMTab('audit');
@@ -2471,42 +2470,61 @@ function initAVMAnalysis() {
 
   if (rowsForRalat.length === 0) {
     toast('Tidak ada data valid untuk dianalisa.', 'error');
-    if (modalAuditBody) modalAuditBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--red);">Tidak ada data valid.</td></tr>';
+    if (modalAuditBody) modalAuditBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--red);">Tidak ada data valid.</td></tr>';
+    document.getElementById('modalDataCount').textContent = '0 data valid';
     return;
   }
 
-  // Path A: tidak ada model atau koordinat aset → langsung fallback (no RaLAT).
-  if (!activeModel || !asetCoord) {
+  function finishTimeOnly(reason) {
+    if (runToken !== _analysisRunToken) return;
+    usedFallback = true;
+    _avmRawData = [];
     rowsForRalat.forEach(function(item) {
       _avmRawData.push({
         uid:  item.row._uid,
         id:   item.row.id,
         price: item.priceTimeAdj,
-        ralatInfo: !asetCoord ? '<em>Pusat radius tidak diset</em>' : '<em>Model regresi tidak tersedia</em>',
+        ralatInfo: '<em>Hanya penyesuaian waktu</em>',
         breakdown: [],
         adjPct: 0,
         gross: 0,
         capped: false
       });
     });
-    _ralatLastRun = { region: modelRegion || null, version: modelVersion || null, asetFeats: null, geocodeRes: null };
+    _ralatLastRun = { region: modelRegion, version: modelVersion, status: reason, asetFeats: null, geocodeRes: null };
     recalcAVM();
     switchAVMTab('sbm');
+    toast(reason, 'error');
+  }
+
+  if (!asetCoord) {
+    finishTimeOnly('Koordinat aset belum valid. RaLAT tidak dijalankan.');
     return;
   }
 
-  // Path B: jalankan pipeline penuh. Pakai meta aset dari form, fallback ke
-  // mayoritas peruntukan pembanding kalau user belum mengisi.
+  // Path B: karakter aset harus berasal dari input aset, bukan ditebak dari pembanding.
   var asetMeta = Object.assign({}, _asetTargetMeta);
-  if (!asetMeta.peruntukan) asetMeta.peruntukan = ralatAutoPickPeruntukan(currentData);
 
   // Promise: reverse-geocode + Overpass aset
   var geocodePromise = ralatReverseGeocode(asetCoord.lat, asetCoord.lng);
   var overpassAsetPromise = _ralatV2Fetch(asetCoord.lat, asetCoord.lng);
 
   Promise.all([geocodePromise, overpassAsetPromise]).then(function(arr) {
+    if (runToken !== _analysisRunToken) return null;
     var geocodeRes = arr[0];
     var overpassAset = arr[1];
+    modelRegion = ralatPickModelRegion(geocodeRes.state, geocodeRes.bestCity);
+    var regionMap = modelRegion && window.regressionModels ? window.regressionModels[modelRegion] : null;
+    modelVersion = ralatPickLatestVersion(regionMap);
+    activeModel = regionMap && modelVersion ? regionMap[modelVersion] : null;
+    if (regionMap && regionMap.current && !modelVersion) {
+      finishTimeOnly('Backend masih mengirim gabungan koefisien tanpa versi. Perbarui deployment Code.gs sebelum menjalankan RaLAT.');
+      return null;
+    }
+    if (!modelRegion || !activeModel) {
+      finishTimeOnly('Wilayah aset tidak memiliki model regresi yang dapat dipastikan. RaLAT tidak dijalankan.');
+      return null;
+    }
     var asetFeats = ralatBuildFeatures(asetCoord, asetMeta, overpassAset, geocodeRes, activeModel);
 
     _ralatLastRun = {
@@ -2514,7 +2532,8 @@ function initAVMAnalysis() {
       version: modelVersion,
       asetFeats: asetFeats,
       geocodeRes: geocodeRes,
-      asetMeta: asetMeta
+      asetMeta: asetMeta,
+      status: ''
     };
 
     // Loop pembanding: butuh Overpass per koordinat (kebanyakan cache hit).
@@ -2523,10 +2542,11 @@ function initAVMAnalysis() {
       if (!item.coordComp) return Promise.resolve(null);
       return _ralatV2Fetch(item.coordComp.lat, item.coordComp.lng)
         .then(function(opRes) { return { item: item, opRes: opRes }; })
-        .catch(function() { return { item: item, opRes: { near:[], far:[] } }; });
+        .catch(function() { return { item: item, opRes: { near:[], far:[], nearAvailable:false, farAvailable:false } }; });
     });
 
     return Promise.all(compPromises).then(function(results) {
+      if (runToken !== _analysisRunToken) return;
       results.forEach(function(slot) {
         if (!slot) return;
         var item = slot.item;
@@ -2565,31 +2585,25 @@ function initAVMAnalysis() {
           gross: engineRes.gross,
           capped: engineRes.capped,
           asetFeats: asetFeats,
-          compFeats: compFeats
+          compFeats: compFeats,
+          coverage: engineRes.coverage
         });
       });
     });
   }).then(function() {
+    if (runToken !== _analysisRunToken || usedFallback) return;
     var elapsed = ((Date.now() - pipelineStarted) / 1000).toFixed(1);
+    if (_avmRawData.length && _avmRawData.every(function(d) { return d.coverage && d.coverage.used === 0; })) {
+      _ralatLastRun.status = 'Tidak ada variabel RaLAT yang dapat dihitung. Harga hanya disesuaikan waktunya.';
+    }
     console.log('[RaLAT v2] Pipeline selesai dalam ' + elapsed + 's untuk ' + _avmRawData.length + ' pembanding');
     recalcAVM();
     switchAVMTab('sbm');
     toast('RaLAT v2 selesai · model ' + modelRegion + ' (' + modelVersion + ') · ' + _avmRawData.length + ' pembanding', 'success');
   }).catch(function(err) {
+    if (runToken !== _analysisRunToken) return;
     console.error('[RaLAT v2] Pipeline gagal:', err);
-    toast('RaLAT v2 gagal: ' + (err && err.message ? err.message : err) + ' — fallback ke time-adjustment saja.', 'error');
-    // Fallback: pakai harga time-adjusted tanpa RaLAT
-    rowsForRalat.forEach(function(item) {
-      _avmRawData.push({
-        uid:  item.row._uid,
-        id:   item.row.id,
-        price: item.priceTimeAdj,
-        ralatInfo: '<span style="color:#dc2626;">RaLAT gagal · pakai time-adj</span>',
-        breakdown: [], adjPct: 0, gross: 0, capped: false
-      });
-    });
-    recalcAVM();
-    switchAVMTab('sbm');
+    finishTimeOnly('RaLAT gagal: ' + (err && err.message ? err.message : err) + '. Hanya penyesuaian waktu yang digunakan.');
   });
 }
 
@@ -2670,7 +2684,7 @@ function recalcAVM() {
 
   _avmRawData.forEach(function(d) {
       var systemIncluded = (d.price >= lowerBound && d.price <= upperBound);
-      var statusText = systemIncluded ? '<span style="color:#16a34a;font-weight:bold;">Sesuai Standar</span>' : '<span style="color:#dc2626;font-weight:bold;">Outlier (Di luar IQR)</span>';
+      var statusText = systemIncluded ? '<span style="color:#16a34a;font-weight:bold;">Lolos uji IQR</span>' : '<span style="color:#dc2626;font-weight:bold;">Di luar IQR</span>';
       
       var isManuallyOverridden = _avmOverrideState.hasOwnProperty(d.uid);
       var finalIncluded = isManuallyOverridden ? _avmOverrideState[d.uid] : systemIncluded;
@@ -2681,15 +2695,16 @@ function recalcAVM() {
       var rowClass = finalIncluded ? '' : 'excluded';
 
       htmlAudit += '<tr class="audit-row ' + rowClass + '">' +
-                   '<td style="text-align:center;"><input type="checkbox" onchange="toggleAVMOverride(\'' + d.uid + '\', this.checked)" ' + checkedAttr + '></td>' +
-                   '<td><strong>' + d.id + '</strong></td>' +
-                   '<td>' + formatRupiah(Math.round(d.price)) + '</td>' +
-                   '<td>' + _ralatRenderAdjBadge(d) + '</td>' +
-                   '<td style="font-size:10px;">' + _ralatRenderDrivers(d) + '</td>' +
-                   '<td>' + statusText + '</td></tr>';
+                   '<td data-label="Pakai"><input type="checkbox" aria-label="Pakai pembanding ' + _ralatEscapeHtml(d.id) + '" onchange="toggleAVMOverride(\'' + d.uid + '\', this.checked)" ' + checkedAttr + '></td>' +
+                   '<td data-label="ID"><strong>' + _ralatEscapeHtml(d.id) + '</strong></td>' +
+                   '<td data-label="Harga /m²">' + formatRupiah(Math.round(d.price)) + '</td>' +
+                   '<td data-label="Penyesuaian">' + _ralatRenderAdjBadge(d) + '</td>' +
+                   '<td data-label="Variabel" style="font-size:10px;">' + _ralatRenderDrivers(d) + _ralatRenderMissing(d) + '</td>' +
+                   '<td data-label="Uji IQR">' + statusText + '</td></tr>';
   });
 
   document.getElementById('auditTableBody').innerHTML = htmlAudit;
+  renderRalatAuditSummary();
 
   finalPrices.sort((a, b) => a - b);
   _avmCurrentMedian = getMed(finalPrices);
@@ -2697,7 +2712,7 @@ function recalcAVM() {
   document.getElementById('modalMedianPrice').textContent = formatRupiah(Math.round(_avmCurrentMedian));
   document.getElementById('modalDataCount').textContent = finalPrices.length + " Data Valid";
 
-  var insightMsg = "Berdasarkan kendali mutu (Audit), Base Case senilai " + formatRupiah(Math.round(_avmCurrentMedian)) + " telah divalidasi. Masukkan asumsi skenario SBM untuk memproyeksikan Expected Value.";
+  var insightMsg = "Median pembanding yang dipilih setelah uji IQR adalah " + formatRupiah(Math.round(_avmCurrentMedian)) + ". Periksa cakupan variabel pada Audit dan masukkan asumsi skenario SBM untuk menghitung nilai harapan.";
   
   // --- LOGIKA AI AGENT EDGE NARRATIVE ---
   if (_asetPOIData) {
@@ -2720,11 +2735,15 @@ function recalcAVM() {
   document.getElementById('modalSmartInsight').innerHTML = insightMsg + _ralatRenderModelMeta();
   document.getElementById('modalSmartInsight').style.borderLeftColor = "#16a34a";
 
+  _analysisReady = finalPrices.length > 0;
+  document.getElementById('btnDownloadAVMPDF').disabled = !_analysisReady;
+  document.getElementById('btnRunMC').disabled = !_analysisReady;
   calculateSBM(); 
 }
 
 function toggleAVMOverride(uid, isChecked) {
   _avmOverrideState[uid] = isChecked;
+  invalidateMonteCarlo();
   recalcAVM(); 
 }
 
@@ -2738,6 +2757,11 @@ function _clamp(val, min, max, fallback) {
 }
 
 function calculateSBM() {
+  invalidateMonteCarlo();
+  if (!_analysisReady) {
+    document.getElementById('sbmExpectedValue').textContent = 'Jalankan Analisa';
+    return;
+  }
   // Clamp probabilitas ke [0, 100], adjustment ke [-90, +200]
   var elPP = document.getElementById('sbmProbPess');
   var elPB = document.getElementById('sbmProbBase');
@@ -2769,10 +2793,14 @@ function calculateSBM() {
                            '%. Wajib 100% (Pesimis + Normal + Optimis).';
       evEl.textContent = 'ERROR';
       evEl.style.color = '#fca5a5';
+      document.getElementById('btnDownloadAVMPDF').disabled = true;
+      document.getElementById('btnRunMC').disabled = true;
       return;
   } else {
       warnEl.style.display = 'none';
       evEl.style.color = '#fff';
+      document.getElementById('btnDownloadAVMPDF').disabled = false;
+      document.getElementById('btnRunMC').disabled = false;
   }
 
   var valPess = _avmCurrentMedian * (1 + (aPess/100)) * (pPess/100);
@@ -2787,13 +2815,29 @@ function calculateSBM() {
 function closeAnalyticsModal() { document.getElementById('analyticsOverlay').classList.remove('open'); }
 
 /* =========================================================================
-   🎲 MONTE CARLO SIMULATION ENGINE (SPI 103.5.5 / IVS 105.40.7)
+    🎲 MONTE CARLO SIMULATION ENGINE
    - 5 variabel acak: Time, RaLAT, Shock, Bootstrap, Dirichlet
    - Distribusi hybrid: Triangular / Normal (Box-Muller) / Empirical / Dirichlet (Gamma sum)
 ========================================================================= */
 
 var _mcIterations = 10000;
 var _mcLastResult = null; // { samples, stats, assumptions, baseValue, sensitivity }
+
+function invalidateMonteCarlo() {
+  ++_mcRunToken;
+  _mcLastResult = null;
+  var wrap = document.getElementById('mcResultWrap');
+  var pdfButton = document.getElementById('btnDownloadMCPDF');
+  if (wrap) wrap.style.display = 'none';
+  if (pdfButton) pdfButton.style.display = 'none';
+}
+
+document.getElementById('tab-mc').addEventListener('input', function(event) {
+  if (event.target && event.target.matches('input')) invalidateMonteCarlo();
+});
+document.getElementById('tab-mc').addEventListener('change', function(event) {
+  if (event.target && event.target.matches('input')) invalidateMonteCarlo();
+});
 
 // ---------- Random Number Generators ----------
 
@@ -2901,12 +2945,7 @@ function syncMCBaseFromAVM() {
   if (!baseEl) return;
   if (_avmCurrentMedian > 0) {
     baseEl.textContent = formatRupiah(Math.round(_avmCurrentMedian));
-    var validCount = (_avmRawData || []).filter(function(d) {
-      var ov = _avmOverrideState.hasOwnProperty(d.uid);
-      // Hitung yang benar2 included (perkiraan; recalcAVM yang otoritatif)
-      return true;
-    }).length;
-    countEl.textContent = validCount + ' pembanding terdaftar';
+    countEl.textContent = _mcGetValidPrices().length + ' pembanding digunakan';
   } else {
     baseEl.textContent = 'Rp 0';
     countEl.textContent = 'Jalankan Analisa dulu';
@@ -2914,6 +2953,7 @@ function syncMCBaseFromAVM() {
 }
 
 function setMCIterations(n, btnEl) {
+  invalidateMonteCarlo();
   _mcIterations = n;
   document.querySelectorAll('.mc-iter-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btnEl) btnEl.classList.add('active');
@@ -2950,6 +2990,10 @@ function _mcGetValidPrices() {
 }
 
 function runMonteCarloSimulation() {
+  if (!_analysisReady) {
+    toast('Jalankan ulang Analisa sebelum simulasi.', 'error');
+    return;
+  }
   if (!_avmRawData || _avmRawData.length === 0 || _avmCurrentMedian <= 0) {
     toast('Jalankan tombol "Analisa" terlebih dulu agar Base Case tersedia.', 'error');
     return;
@@ -2962,6 +3006,7 @@ function runMonteCarloSimulation() {
   }
 
   var baseMedian = _avmCurrentMedian;
+  var runToken = _mcRunToken;
   var N = _mcIterations;
   var btn = document.getElementById('btnRunMC');
   var origText = btn.innerHTML;
@@ -3003,6 +3048,20 @@ function runMonteCarloSimulation() {
 
   var thresholdRaw = document.getElementById('mcThreshold').value;
   var threshold = thresholdRaw && !isNaN(parseFloat(thresholdRaw)) ? parseFloat(thresholdRaw) : (baseMedian * 0.9);
+
+  var invalidAssumptions = '';
+  if (Math.abs(sumP - 1) > 0.0001) invalidAssumptions = 'Total probabilitas SBM wajib 100% sebelum simulasi.';
+  else if ((enTime && !(timeMin <= timeMode && timeMode <= timeMax)) ||
+           (enShock && !(shockMin <= shockMode && shockMode <= shockMax)))
+    invalidAssumptions = 'Asumsi triangular harus memenuhi minimum ≤ modus ≤ maksimum.';
+  else if (enRalat && (!isFinite(ralatSigma) || ralatSigma < 0))
+    invalidAssumptions = 'Simpangan baku residual RaLAT tidak valid.';
+  if (invalidAssumptions) {
+    btn.disabled = false;
+    btn.innerHTML = origText;
+    toast(invalidAssumptions, 'error');
+    return;
+  }
 
   // Eksekusi async (setTimeout supaya UI sempat update spinner)
   setTimeout(function() {
@@ -3100,6 +3159,9 @@ function runMonteCarloSimulation() {
       elapsedMs: elapsedMs,
       baseValue: baseMedian,
       validCount: validPrices.length,
+      modelRegion: _ralatLastRun && _ralatLastRun.region || '',
+      modelVersion: _ralatLastRun && _ralatLastRun.version || '',
+      modelStatus: _ralatLastRun && _ralatLastRun.status || '',
       time:   { enabled: enTime,  min: timeMin, mode: timeMode, max: timeMax },
       ralat:  { enabled: enRalat, sigma: ralatSigma },
       shock:  { enabled: enShock, min: shockMin, mode: shockMode, max: shockMax },
@@ -3108,6 +3170,11 @@ function runMonteCarloSimulation() {
       threshold: threshold
     };
 
+    if (runToken !== _mcRunToken) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+      return;
+    }
     _mcLastResult = {
       samples: sortedArr,
       stats: stats,
@@ -3176,7 +3243,7 @@ function renderMCResults(result) {
   document.getElementById('mcStatP5').textContent = formatRupiah(Math.round(s.p5));
   document.getElementById('mcStatP95').textContent = formatRupiah(Math.round(s.p95));
 
-  // CI 90%
+  // Persentil keluaran simulasi, bukan selang kepercayaan nilai pasar.
   document.getElementById('mcCI90').innerHTML =
     formatRupiah(Math.round(s.p5)) + ' — ' + formatRupiah(Math.round(s.p95)) +
     '<div style="font-size:10px; opacity:.85; margin-top:2px;">CV: ' + s.cv.toFixed(2) + '% · σ: ' + formatRupiah(Math.round(s.std)) + '</div>';
@@ -3315,7 +3382,7 @@ function renderMCResults(result) {
   auditLog += '<div><strong>Variabel 4 — Bootstrap:</strong> ' + (a.boot.enabled ? 'Empirical resample (n=' + a.boot.samplesPerIter + ' per iterasi, with replacement)' : '<em>OFF</em>') + '</div>';
   auditLog += '<div><strong>Variabel 5 — SBM Dirichlet:</strong> ' + (a.dir.enabled ? 'Dirichlet(α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa + ')' : '<em>OFF</em>') + '</div>';
   auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
-  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Standar acuan: SPI 103 Pasal 5.5 (Valuation Uncertainty), IVS 105 Pasal 40.7, SPI 366 Pasal 7.2 (VaR untuk agunan), KEPI Pasal 8 (justifikasi metode).</em></div>';
+  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Hasil bergantung pada data pembanding, cakupan model, dan asumsi pengguna. Dasar koefisien perlu diverifikasi sebelum digunakan dalam kesimpulan nilai.</em></div>';
   document.getElementById('mcAuditLog').innerHTML = auditLog;
 }
 
@@ -3372,7 +3439,7 @@ function downloadMCPDF() {
   template.innerHTML =
     '<div style="border-bottom: 3px solid #7c3aed; padding-bottom:15px; margin-bottom:20px;">' +
       '<h1 style="color:#1e3a5f; margin:0;">Laporan Monte Carlo Simulation</h1>' +
-      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Quantifying Valuation Uncertainty &middot; Mengacu SPI 103 Pasal 5.5 &amp; IVS 105 Pasal 40.7</p>' +
+      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Simulasi berdasarkan data pembanding dan asumsi pengguna</p>' +
     '</div>' +
 
     '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
@@ -3412,25 +3479,25 @@ function downloadMCPDF() {
       '</tr>' +
     '</table>' +
 
-    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Confidence Interval &amp; Value at Risk (VaR)</h3>' +
+    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Persentil Simulasi &amp; Selisih dari Nilai Dasar</h3>' +
     '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
       '<tr style="background:#1e3a5f; color:#fff;">' +
         '<th style="padding:8px; border:1px solid #1e3a5f;">Indikator</th>' +
         '<th style="padding:8px; border:1px solid #1e3a5f;">Nilai</th>' +
         '<th style="padding:8px; border:1px solid #1e3a5f;">Interpretasi</th>' +
       '</tr>' +
-      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 90% (P5 - P95)</strong></td>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>Rentang P5–P95</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p5)) + ' s/d ' + formatRupiah(Math.round(s.p95)) + '</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Range nilai wajar untuk pelaporan SPI 103 Pasal 5.5</td></tr>' +
-      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>CI 98% (P1 - P99)</strong></td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Rentang hasil simulasi berdasarkan asumsi yang digunakan</td></tr>' +
+      '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>Rentang P1–P99</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8;">' + formatRupiah(Math.round(s.p1)) + ' s/d ' + formatRupiah(Math.round(s.p99)) + '</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Rentang ekstrem untuk laporan high-stakes (M&amp;A, litigasi)</td></tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Rentang hasil simulasi di antara persentil 1 dan 99</td></tr>' +
       '<tr style="background:#fef2f2;"><td style="padding:8px; border:1px solid #d1dbe8;"><strong>VaR 95%</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var95)) + '/m&sup2;</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Potensi kerugian dengan probabilitas maksimal 5% (SPI 366 - agunan)</td></tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Selisih nilai dasar dan persentil ke-5 hasil simulasi</td></tr>' +
       '<tr style="background:#fef2f2;"><td style="padding:8px; border:1px solid #d1dbe8;"><strong>VaR 99%</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var99)) + '/m&sup2;</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Stress scenario untuk PSAK 71 / Basel III</td></tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Selisih nilai dasar dan persentil ke-1 hasil simulasi</td></tr>' +
       '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>P[Nilai &lt; ' + formatRupiah(Math.round(s.threshold)) + ']</strong></td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; font-weight:bold; color:' + (s.probBelowThreshold > 20 ? '#dc2626' : s.probBelowThreshold > 5 ? '#d97706' : '#15803d') + ';">' + s.probBelowThreshold.toFixed(2) + '%</td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Probabilitas threshold (negosiasi/cut-off)</td></tr>' +
@@ -3451,6 +3518,9 @@ function downloadMCPDF() {
       : '') +
 
     '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px; page-break-after:avoid;">Audit Log Asumsi (Reproducibility)</h3>' +
+    '<div style="font-size:10px; margin-bottom:8px;">Model RaLAT: ' + _ralatEscapeHtml(a.modelRegion || 'tidak tersedia') +
+      ' · versi ' + _ralatEscapeHtml(a.modelVersion || '—') +
+      (a.modelStatus ? ' · ' + _ralatEscapeHtml(a.modelStatus) : '') + '</div>' +
     '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px; page-break-inside:avoid;">' +
       '<tr style="background:#fafafa;"><th style="padding:6px; border:1px solid #d1dbe8; text-align:left;">Variabel</th>' +
         '<th style="padding:6px; border:1px solid #d1dbe8;">Distribusi</th>' +
@@ -3458,7 +3528,7 @@ function downloadMCPDF() {
         '<th style="padding:6px; border:1px solid #d1dbe8;">Status</th></tr>' + assumptionRows + '</table>' +
 
     '<div style="margin-top:20px; padding:12px; background:#f8fafc; border-left:4px solid #7c3aed; font-size:10px; color:#475569; line-height:1.5; border-radius:4px; page-break-inside:avoid;">' +
-      '<strong style="color:#1e3a5f;">Disclaimer Statistik:</strong> Hasil simulasi merepresentasikan ' + a.iterations.toLocaleString('id-ID') + ' skenario probabilistik berdasarkan asumsi distribusi yang ditentukan penilai. Confidence Interval &amp; VaR adalah estimasi statistik, bukan prediksi pasti, dan tidak menggantikan <em>professional judgement</em>. Asumsi distribusi wajib didukung riset pasar (BI Property Index, REI, Colliers, Knight Frank) sesuai KEPI Pasal 8.' +
+      '<strong style="color:#1e3a5f;">Catatan statistik:</strong> Hasil simulasi merepresentasikan ' + a.iterations.toLocaleString('id-ID') + ' skenario berdasarkan asumsi pengguna. Rentang persentil dan selisih nilai dasar adalah hasil asumsi simulasi, bukan selang kepercayaan nilai pasar atau prediksi pasti. Penilai perlu mendukung asumsi dengan bukti pasar.' +
     '</div>' +
 
     '<div style="margin-top:30px; font-size:11px; color:#5a6a7e; text-align:right;">' +
@@ -3514,6 +3584,7 @@ function downloadMCPDF() {
 })();
 
 function downloadAVMPDF() {
+  if (!_analysisReady) { toast('Jalankan ulang Analisa sebelum mengunduh PDF.', 'error'); return; }
   toast('Membangun Laporan PDF AVM...', 'loading');
   var template = document.getElementById('pdfAVMTemplate');
   
@@ -3529,11 +3600,17 @@ function downloadAVMPDF() {
 
   var auditHtml = document.getElementById('auditTableBody').innerHTML;
   var insightHtml = document.getElementById('modalSmartInsight').innerHTML;
+  var modelAuditHtml = document.getElementById('ralatAuditSummary').innerHTML;
+  var missingForPDF = _avmRawData.map(function(d) {
+    if (!d.coverage || !d.coverage.skipped.length) return '';
+    return '<li><strong>' + _ralatEscapeHtml(d.id) + '</strong> (' + d.coverage.used + '/' + d.coverage.total + ' terhitung): ' +
+      d.coverage.skipped.map(function(s) { return '<code>' + _ralatEscapeHtml(s.name) + '</code> — ' + _ralatEscapeHtml(s.reason); }).join('; ') + '</li>';
+  }).filter(Boolean).join('');
 
   template.innerHTML = `
     <div style="border-bottom: 3px solid #2d6be4; padding-bottom:15px; margin-bottom:20px;">
       <h1 style="color:#1e3a5f; margin:0;">Laporan Valuasi Skenario Hibrida (SBM)</h1>
-      <p style="color:#5a6a7e; margin:5px 0 0 0;">Dihasilkan oleh WebGIS Appraisal System (mengacu IVS 400 — Real Property Interests)</p>
+      <p style="color:#5a6a7e; margin:5px 0 0 0;">Dihasilkan oleh WebGIS Appraisal System berdasarkan input dan asumsi analisis</p>
     </div>
     
     <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
@@ -3567,6 +3644,7 @@ function downloadAVMPDF() {
     </table>
 
     <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Audit Trail & Penyesuaian Spasial (RaLAT)</h3>
+    <div style="font-size:10px; border:1px solid #d1dbe8; padding:8px; margin-bottom:10px;">${modelAuditHtml}</div>
     <table style="width:100%; border-collapse:collapse; font-size:10.5px; text-align:left;">
       <thead><tr>
         <th style="padding:6px; border-bottom:1px solid #d1dbe8;">Digunakan</th>
@@ -3578,16 +3656,16 @@ function downloadAVMPDF() {
       <tbody>${auditHtml.replace(/<input type="checkbox"[^>]*checked[^>]*>/g, '✅').replace(/<input type="checkbox"[^>]*>/g, '❌').replace(/<td><span style="color:#(?:16a34a|dc2626);font-weight:bold;">.*?<\/span><\/td><\/tr>/g, '</tr>')}</tbody>
     </table>
 
+    ${missingForPDF ? '<div style="font-size:10px; page-break-inside:avoid;"><strong>Variabel tidak terhitung per pembanding:</strong><ul>' + missingForPDF + '</ul></div>' : ''}
+
     ${_ralatRenderPDFBreakdown()}
 
     <div style="margin-top:25px; padding:12px; background:#f8fafc; border-left:4px solid #2d6be4; font-size:10px; color:#475569; line-height:1.5; border-radius:4px;">
-      <strong style="color:#1e3a5f;">Disclaimer Ekonometrik:</strong> Adjustment dihitung dari koefisien
-      regresi hedonic log-log pada model
-      <code>${(_ralatLastRun && _ralatLastRun.region) ? _ralatLastRun.region : '–'}</code>
-      versi <code>${(_ralatLastRun && _ralatLastRun.version) ? _ralatLastRun.version : '–'}</code>.
-      Koefisien β tidak menyatakan hubungan kausalitas dan tidak menggantikan
-      <em>professional judgement</em> penilai. Sumber spasial: OpenStreetMap (Overpass) +
-      Nominatim, di-cache 7–30 hari.
+      <strong style="color:#1e3a5f;">Batas model:</strong> Penyesuaian RaLAT menggunakan variabel terhitung pada
+      model <code>${_ralatEscapeHtml(_ralatLastRun && _ralatLastRun.region || '–')}</code>
+      versi <code>${_ralatEscapeHtml(_ralatLastRun && _ralatLastRun.version || '–')}</code>.
+      Definisi fitur dan rumus konversi koefisien menjadi persen masih perlu dicocokkan dengan dokumentasi model asli.
+      Hasil ini memerlukan pertimbangan penilai; sumber fitur spasial adalah OpenStreetMap dan Nominatim.
     </div>
 
     <div style="margin-top:40px; font-size:11px; color:#5a6a7e; text-align:right;">
@@ -3828,17 +3906,19 @@ function doSearch() {
       toast('Area belum digambar atau tidak valid (butuh min 3 titik).', 'error'); return;
   }
 
+  // Hasil pencarian sebelumnya tidak boleh dipakai selama permintaan baru berjalan.
+  markAnalysisStale();
+
   GAS.script.run
     .withSuccessHandler(function (res) {
       btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
       if (res.success) {
         
         // TAMBAHAN: Menyimpan Model Ekonometrika dari Server ke Memori Browser
-        if (res.models) {
-            // RaLAT v2: normalize ke struktur ber-versi & fix typo tipe
-            window.regressionModels = ralatNormalizeModels(res.models);
-        }
+        window.regressionModels = ralatNormalizeModels(res.models || {});
+        _modelDiagnostics = res.modelDiagnostics || { unversionedRows: [], duplicateRows: [] };
 
+        _ralatLastRun = { region:null, version:null, status:'Jalankan Analisa untuk data pencarian terbaru.' };
         currentData = res.data.map(function(row, index) {
           row._uid = 'prop_' + index;
           var indStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
@@ -4275,6 +4355,7 @@ function analyzePOI(lat, lng, uid) {
 // Untuk provinsi yang ambigu (Banten, Jawa Barat) gunakan kota dari Nominatim.
 var RALAT_PROVINCE_TO_REGION = {
   'DKI JAKARTA':              'Jabodetabek',
+  'DAERAH KHUSUS IBUKOTA JAKARTA': 'Jabodetabek',
   'JAKARTA':                  'Jabodetabek',
   'BANTEN':                   'Banten',          // override jika kota=Tangerang/Tangsel → Jabodetabek
   'JAWA BARAT':               'Jawa Barat',      // override jika kota=Bekasi/Bogor/Depok → Jabodetabek
@@ -4344,6 +4425,7 @@ function ralatPickModelRegion(provinsi, kota) {
   // 2. Province mapping
   if (pNorm && RALAT_PROVINCE_TO_REGION[pNorm]) return RALAT_PROVINCE_TO_REGION[pNorm];
   // 3. Fallback: cari subset (mis. "KALIMANTAN BARAT" → "KALIMANTAN ...")
+  if (!pNorm) return null;
   for (var key in RALAT_PROVINCE_TO_REGION) {
     if (pNorm.indexOf(key) === 0 || key.indexOf(pNorm) === 0) {
       return RALAT_PROVINCE_TO_REGION[key];
@@ -4374,9 +4456,8 @@ var RALAT_LANDMARKS = {
 //   { "RegionName": { varName: { tipe, koefisien, ... } } }
 // Untuk RaLAT v2 kita butuh struktur ber-versi:
 //   { "RegionName": { "20241213": {varName:{...}}, "20241202":{...} } }
-// Backend belum mengekspos versioning, jadi normalizer ini idempotent:
-//   - Kalau struktur sudah ber-versi, biarkan.
-//   - Kalau belum (flat varName), bungkus ke pseudo-version "current".
+// Backend saat ini mengirim model per versi; respons deployment lama yang datar
+// tetap dikenali sebagai "current" dan ditolak di initAVMAnalysis.
 // Side effect: fix typo "katergori" → "kategori" pada field tipe.
 function ralatNormalizeModels(rawModels) {
   if (!rawModels || typeof rawModels !== 'object') return {};
@@ -4424,9 +4505,8 @@ function _ralatFixVarTypes(varDict) {
 
 function ralatPickLatestVersion(regionMap) {
   if (!regionMap) return null;
-  var keys = Object.keys(regionMap);
+  var keys = Object.keys(regionMap).filter(function(v) { return /^20\d{6}$/.test(v); });
   if (keys.length === 0) return null;
-  // 'current' selalu kalah dari versi tanggal
   keys.sort();
   return keys[keys.length - 1];
 }
@@ -4543,7 +4623,7 @@ function _ralatV2Fetch(lat, lng) {
           var els = (d && d.elements) ? d.elements : [];
           _ralatV2CacheSet(lat, lng, nearR, 'near', els);
           return els;
-        }).catch(function(){ return []; });
+        }).catch(function(){ return null; });
 
   var farP = farCached
     ? Promise.resolve(farCached)
@@ -4552,10 +4632,13 @@ function _ralatV2Fetch(lat, lng) {
           var els = (d && d.elements) ? d.elements : [];
           _ralatV2CacheSet(lat, lng, farR, 'far', els);
           return els;
-        }).catch(function(){ return []; });
+        }).catch(function(){ return null; });
 
   return Promise.all([nearP, farP]).then(function(arr) {
-    return { near: arr[0] || [], far: arr[1] || [] };
+    return {
+      near: arr[0] || [], far: arr[1] || [],
+      nearAvailable: arr[0] !== null, farAvailable: arr[1] !== null
+    };
   });
 }
 
@@ -4592,7 +4675,7 @@ function ralatReverseGeocode(lat, lng) {
             encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lng) +
             '&zoom=10&accept-language=id';
   return fetch(url, { headers: { 'Accept-Language': 'id' } })
-    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(r) { if (!r.ok) throw new Error('Geocoding gagal'); return r.json(); })
     .then(function(data) {
       var addr = (data && data.address) ? data.address : {};
       var picked = {
@@ -4658,6 +4741,30 @@ var RALAT_TAG_MATCHERS = {
   'ln_distance_to_small_city':     function(t){ return t.place === 'town'; }
 };
 
+// Null berarti tersedia; teks lain menjelaskan variabel yang belum dapat dihitung
+// sesuai definisi aslinya. Jangan mengganti persentase/kelas model dengan tebakan.
+function ralatFeatureIssue(name) {
+  var n = String(name).toLowerCase();
+  if (n === 'const' || n === '_cons' || n === 'cons' || n === 'intercept' || n === 'konstanta') return null;
+  if (n.indexOf('ln_distance_to_') === 0) {
+    var landmark = n.slice('ln_distance_to_'.length);
+    if (['jakarta', 'tigaraksa', 'tangsel'].indexOf(landmark) >= 0 || landmark.indexOf('satelite_') === 0)
+      return 'Titik acuan jarak pada model asli belum terkonfirmasi';
+    return RALAT_LANDMARKS[landmark] || RALAT_TAG_MATCHERS[n] ? null : 'Peta variabel jarak belum tersedia';
+  }
+  if (n.indexOf('poi_') === 0) {
+    var match = n.match(/^poi_(.+)_(\d+)m$/);
+    if (!match) return 'Format variabel POI belum dikenali';
+    return ['mall','shop','hospital','school','restaurant','hotel','bus_stop','bus','university','historical','historic','entertainment'].indexOf(match[1]) >= 0
+      ? null : 'Definisi dan sumber POI belum dipetakan';
+  }
+  if (n === 'industrial_area_percentage') return 'Persentase kawasan industri belum diukur; indikator 0/1 tidak setara';
+  if (n === 'luas_lower' || n === 'luas_upper') return 'Ambang kelas luas dari model asli belum tersedia';
+  if (['is_bogor_rural_area','is_perumahan_address','is_campuran','is_developmental_area','is_hutan','is_permukiman','is_lombok','marking_jabodetabek'].indexOf(n) >= 0)
+    return 'Definisi kategori model belum tersedia';
+  return null;
+}
+
 // Hitung jarak minimum dari coord ke elemen yang match tag matcher.
 // Returns meter atau null kalau tidak ada match.
 function _ralatMinDistance(coord, elements, matcher) {
@@ -4699,7 +4806,7 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
   var feats = {};
   if (!coord || !activeModel) return feats;
   meta = meta || {};
-  overpassRes = overpassRes || { near: [], far: [] };
+  overpassRes = overpassRes || { near: [], far: [], nearAvailable: false, farAvailable: false };
   geocodeRes = geocodeRes || { bestCity: '' };
   var allEls = (overpassRes.near || []).concat(overpassRes.far || []);
   var cityKey = _ralatNorm(geocodeRes.bestCity);
@@ -4707,6 +4814,7 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
   Object.keys(activeModel).forEach(function(varName) {
     var v = activeModel[varName];
     var tipe = ralatClassifyVar(varName, v.tipe);
+    if (ralatFeatureIssue(varName)) return;
 
     // --- Konstanta: skip (cancel di selisih) ---
     if (tipe === 'konstanta') return;
@@ -4714,14 +4822,14 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
     // --- Variabel ln distance ke fitur OSM ---
     if (tipe === 'ln' && /^ln_distance_to_/.test(varName)) {
       // Cek dulu landmark hardcoded
-      var landmarkKey = varName.replace('ln_distance_to_', '');
+      var landmarkKey = varName.replace('ln_distance_to_', '').toLowerCase();
       if (RALAT_LANDMARKS[landmarkKey]) {
         var lm = RALAT_LANDMARKS[landmarkKey];
         feats[varName] = _ralatHaversine(coord.lat, coord.lng, lm.lat, lm.lng);
         return;
       }
       // Cek matcher OSM
-      var matcher = RALAT_TAG_MATCHERS[varName];
+      var matcher = RALAT_TAG_MATCHERS[varName.toLowerCase()];
       if (matcher) {
         var d = _ralatMinDistance(coord, allEls, matcher);
         if (d !== null) feats[varName] = d;
@@ -4746,8 +4854,8 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
       else if (poiKind === 'university')                  poiMatcher = function(t){ return t.amenity === 'university'; };
       else if (poiKind === 'historical' || poiKind === 'historic') poiMatcher = function(t){ return !!t.historic; };
       else if (poiKind === 'entertainment')               poiMatcher = function(t){ return t.amenity === 'theatre' || t.amenity === 'cinema' || t.amenity === 'nightclub'; };
-      if (poiMatcher) {
-        feats[varName] = _ralatCountInRadius(coord, allEls, poiMatcher, radius);
+      if (poiMatcher && overpassRes.nearAvailable !== false) {
+        feats[varName] = _ralatCountInRadius(coord, overpassRes.near || [], poiMatcher, radius);
       }
       return;
     }
@@ -4766,25 +4874,18 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
       return;
     }
 
-    // --- industrial_area_percentage ---
-    if (varName === 'industrial_area_percentage') {
-      // MVP: kalau peruntukan = Industri/Pergudangan → 1, else 0.
-      // Advanced (TODO): hitung overlap polygon landuse=industrial.
-      var p = String(meta.peruntukan || '').toLowerCase();
-      feats[varName] = (p.indexOf('industri') !== -1 || p.indexOf('pergudangan') !== -1) ? 1 : 0;
-      return;
-    }
-
     // --- Marker kota (is_<city>) ---
     if (/^is_/.test(varName)) {
       var token = varName.replace(/^is_/, '').toLowerCase();
       // Special: kategori penggunaan
+      if (['komersial', 'perumahan', 'industrial', 'industri', 'kebun', 'perkebunan'].indexOf(token) >= 0 && !meta.peruntukan) return;
       if (token === 'komersial')  { feats[varName] = _ralatIsKomersial(meta) ? 1 : 0; return; }
       if (token === 'perumahan')  { feats[varName] = _ralatIsPerumahan(meta) ? 1 : 0; return; }
       if (token === 'industrial' || token === 'industri') { feats[varName] = _ralatIsIndustrial(meta) ? 1 : 0; return; }
       if (token === 'kebun' || token === 'perkebunan')    { feats[varName] = _ralatIsKebun(meta) ? 1 : 0; return; }
       if (token === 'hook' || token === 'hoek')           { feats[varName] = _ralatIsHook(meta) ? 1 : 0; return; }
       // City marker — match dengan reverse-geocode bestCity
+      if (!cityKey) return;
       var tokenNorm = token.replace(/[_\s]/g, '').toUpperCase();
       var cityNorm = cityKey.replace(/[_\s]/g, '');
       // Fuzzy: cocok kalau cityNorm mengandung tokenNorm atau sebaliknya
@@ -4804,17 +4905,6 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel) {
                       b.indexOf('persegi') !== -1 ||
                       b.indexOf('trapesium') !== -1;
       feats[varName] = beraturan ? 1 : 0;
-      return;
-    }
-
-    // --- luas_lower / luas_upper (size class dummies) ---
-    // Asumsi: lower < median, upper > median. Threshold ditentukan dari
-    // distribusi dataset. Untuk MVP: pakai threshold 200 m² (lower) dan 1000 m² (upper).
-    if (varName === 'luas_lower' || varName === 'luas_upper') {
-      var ltC = _ralatParseLuas(meta.luasTanah);
-      if (ltC === null || ltC <= 0) { feats[varName] = 0; return; }
-      if (varName === 'luas_lower') feats[varName] = (ltC < 200) ? 1 : 0;
-      else                          feats[varName] = (ltC > 1000) ? 1 : 0;
       return;
     }
 
@@ -4882,16 +4972,22 @@ function ralatEngineV2(activeModel, asetFeats, compFeats) {
   var rawSum = 0;
   var gross = 0;
   var breakdown = [];
+  var skipped = [];
+  var applicable = 0;
 
   Object.keys(activeModel).forEach(function(name) {
     var v = activeModel[name];
     var tipe = ralatClassifyVar(name, v.tipe);
     if (tipe === 'konstanta') return;
+    applicable++;
 
     var aVal = asetFeats[name];
     var cVal = compFeats[name];
-    // Skip jika salah satu sisi tidak punya data (variabel tidak bisa dihitung)
-    if (aVal === undefined || cVal === undefined || aVal === null || cVal === null) return;
+    if (aVal === undefined || cVal === undefined || aVal === null || cVal === null) {
+      skipped.push({ name: name, reason: ralatFeatureIssue(name) ||
+        (aVal === undefined || aVal === null ? 'Data aset tidak tersedia' : 'Data pembanding tidak tersedia') });
+      return;
+    }
 
     var kontrib = 0;
     if (tipe === 'ln' || tipe === 'numerik_ln') {
@@ -4935,12 +5031,38 @@ function ralatEngineV2(activeModel, asetFeats, compFeats) {
     rawAdjPct: rawSum,
     capped: capped,
     gross: gross,
-    breakdown: breakdown
+    breakdown: breakdown,
+    coverage: { used: breakdown.length, total: applicable, skipped: skipped }
   };
 }
 
 /* ------- [I] UI helpers untuk form aset target ------- */
-function updateAsetTargetMeta() {
+function markAnalysisStale() {
+  ++_analysisRunToken;
+  _analysisReady = false;
+  _avmRawData = [];
+  _avmCurrentMedian = 0;
+  _ralatLastRun = { region: null, version: null, status: 'Input berubah. Jalankan Analisa lagi.' };
+  invalidateMonteCarlo();
+  var pdf = document.getElementById('btnDownloadAVMPDF');
+  var mc = document.getElementById('btnRunMC');
+  if (pdf) pdf.disabled = true;
+  if (mc) mc.disabled = true;
+  var median = document.getElementById('modalMedianPrice');
+  var count = document.getElementById('modalDataCount');
+  var sbm = document.getElementById('sbmExpectedValue');
+  var summary = document.getElementById('ralatAuditSummary');
+  var audit = document.getElementById('auditTableBody');
+  if (median) median.textContent = '—';
+  if (count) count.textContent = 'Analisa perlu diulang';
+  if (sbm) sbm.textContent = 'Jalankan Analisa';
+  if (summary) summary.textContent = _ralatLastRun.status;
+  if (audit) audit.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Input berubah. Jalankan Analisa lagi.</td></tr>';
+  var insight = document.getElementById('modalSmartInsight');
+  if (insight) insight.textContent = _ralatLastRun.status;
+}
+
+function updateAsetTargetMeta(silent) {
   function num(id) {
     var el = document.getElementById(id);
     if (!el) return null;
@@ -4958,23 +5080,7 @@ function updateAsetTargetMeta() {
     posisi:     val('rlAsetPosisi') || 'Tengah',
     peruntukan: val('rlAsetPeruntukan') || ''
   };
-}
-
-// Auto-pick peruntukan dari mayoritas pembanding (modus). Hanya dipakai
-// kalau user belum mengisi field "Penggunaan" secara eksplisit.
-function ralatAutoPickPeruntukan(rows) {
-  if (!rows || rows.length === 0) return '';
-  var counts = {};
-  rows.forEach(function(r) {
-    var p = String(r.peruntukan || '').trim();
-    if (!p) return;
-    counts[p] = (counts[p] || 0) + 1;
-  });
-  var best = '', bestN = 0;
-  Object.keys(counts).forEach(function(k) {
-    if (counts[k] > bestN) { best = k; bestN = counts[k]; }
-  });
-  return best;
+  if (!silent) markAnalysisStale();
 }
 
 /* ------- [K] Render helpers untuk audit trail v2 ------- */
@@ -5024,6 +5130,55 @@ function _ralatRenderDrivers(d) {
   return '<div class="ralat-driver-list">' + lines.join('') + more + '</div>';
 }
 
+function _ralatEscapeHtml(value) {
+  return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _ralatRenderMissing(d) {
+  if (!d.coverage) return '';
+  var c = d.coverage;
+  if (!c.skipped.length) return '<div>' + c.used + '/' + c.total + ' variabel terhitung</div>';
+  var items = c.skipped.map(function(s) {
+    return '<li><code>' + _ralatEscapeHtml(s.name) + '</code>: ' + _ralatEscapeHtml(s.reason) + '</li>';
+  }).join('');
+  return '<details><summary style="cursor:pointer;color:#b45309;">' + c.used + '/' + c.total +
+    ' variabel · ' + c.skipped.length + ' belum terhitung</summary><ul style="padding-left:18px;text-align:left;">' + items + '</ul></details>';
+}
+
+function renderRalatAuditSummary() {
+  var el = document.getElementById('ralatAuditSummary');
+  if (!el) return;
+  var info = _ralatLastRun || {};
+  var coverage = _avmRawData.filter(function(d) { return !!d.coverage; });
+  var missing = {};
+  coverage.forEach(function(d) { d.coverage.skipped.forEach(function(s) { missing[s.name] = s.reason; }); });
+  var issueNames = Object.keys(missing);
+  var diagnostics = _modelDiagnostics || {};
+  var nUndated = (diagnostics.unversionedRows || []).length;
+  var nDuplicate = (diagnostics.duplicateRows || []).length;
+  var warning = !!info.status || issueNames.length > 0 || nUndated > 0 || nDuplicate > 0;
+  el.classList.toggle('warning', warning);
+  var title = info.region && info.version
+    ? 'RaLAT ' + _ralatEscapeHtml(info.region) + ' · versi ' + _ralatEscapeHtml(info.version)
+    : 'RaLAT belum dapat dijalankan';
+  var html = '<strong>' + title + '</strong>';
+  if (info.status) html += '<div>' + _ralatEscapeHtml(info.status) + '</div>';
+  if (coverage.length) {
+    var minimum = Math.min.apply(null, coverage.map(function(d) { return d.coverage.used; }));
+    var total = coverage[0].coverage.total;
+    html += '<div>' + coverage.length + ' pembanding diproses · minimal ' + minimum + '/' + total + ' variabel terhitung per pembanding.</div>';
+  }
+  if (issueNames.length) {
+    html += '<details><summary>' + issueNames.length + ' variabel belum terhitung (lihat alasan)</summary><ul style="padding-left:18px;">' +
+      issueNames.map(function(name) { return '<li><code>' + _ralatEscapeHtml(name) + '</code>: ' + _ralatEscapeHtml(missing[name]) + '</li>'; }).join('') +
+      '</ul></details>';
+  }
+  if (nUndated || nDuplicate) html += '<div>Sheet Model_Regresi: ' + nUndated + ' baris tanpa versi dan ' + nDuplicate + ' baris duplikat dilewati.</div>';
+  html += '<div>Rumus konversi koefisien tetap perlu dicocokkan dengan dokumentasi model asli.</div>';
+  el.innerHTML = html;
+}
+
 function _ralatFormatVarDetail(b) {
   function fmt(v) {
     if (v === null || v === undefined) return '–';
@@ -5040,13 +5195,18 @@ function _ralatFormatVarDetail(b) {
 }
 
 function _ralatRenderModelMeta() {
-  if (!_ralatLastRun || !_ralatLastRun.region) return '';
+  if (!_ralatLastRun) return '';
   var meta = _ralatLastRun;
+  if (meta.status) return '<div class="ralat-meta-line" style="border-left-color:#d97706;">' +
+    _ralatEscapeHtml(meta.status) + ' SBM memakai median harga yang hanya disesuaikan waktunya.</div>';
+  if (!meta.region) return '';
   var nVar = meta.asetFeats ? Object.keys(meta.asetFeats).length : 0;
   var city = (meta.geocodeRes && meta.geocodeRes.bestCity) ? meta.geocodeRes.bestCity : '–';
+  var partial = _avmRawData.some(function(d) { return d.coverage && d.coverage.used < d.coverage.total; });
   return '<div class="ralat-meta-line">' +
-         '🛰️ <strong>RaLAT v2</strong> · model <code>' + meta.region + '</code> versi <code>' + meta.version + '</code> · ' +
-         nVar + ' variabel terhitung · kota terdeteksi: <strong>' + city + '</strong>' +
+         '🛰️ <strong>RaLAT v2</strong> · model <code>' + _ralatEscapeHtml(meta.region) + '</code> versi <code>' + _ralatEscapeHtml(meta.version) + '</code> · ' +
+         nVar + ' variabel aset tersedia · kota terdeteksi: <strong>' + _ralatEscapeHtml(city) + '</strong>' +
+         (partial ? ' · <strong>Cakupan variabel belum lengkap; lihat tab Audit.</strong>' : '') +
          '</div>';
 }
 
@@ -5137,7 +5297,7 @@ function geocodeLocation() {
 }
 
 function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), osmEl = document.getElementById('osmMap'), tableEl = document.getElementById('tableView'); if (v === 'map') { if (_currentMapMode === 'gmaps') { mapEl.style.display = 'block'; osmEl.style.display = 'none'; } else { mapEl.style.display = 'none'; osmEl.style.display = 'block'; } tableEl.classList.remove('active'); if (_currentMapMode === 'gmaps' && gMap) setTimeout(function () { google.maps.event.trigger(gMap, 'resize'); }, 50); if (_currentMapMode === 'osm' && _osmMap) setTimeout(function () { _osmMap.invalidateSize(); }, 50); } else { mapEl.style.display = 'none'; osmEl.style.display = 'none'; tableEl.classList.add('active'); } }
-function resetFilter() { document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; toast('Filter direset', ''); }
+function resetFilter() { markAnalysisStale(); document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Lengkap"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; toast('Filter direset', ''); }
 
 function openModalNew() { _editingId = null; _editingFoto = ''; _originalKoordinat = null; document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding'; document.getElementById('f_id').disabled = false; document.getElementById('btnSubmit').textContent = '💾 Simpan Data'; document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; document.querySelectorAll('.modal .form-input, .modal .form-select').forEach(function(i) { i.value = ''; }); removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
 function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; document.getElementById('f_objek').value = row.objek; document.getElementById('f_tipe').value = row.tipeBangunan; document.getElementById('f_legalitas').value = row.legalitas; document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; document.getElementById('f_statusHarga').value = row.statusHarga; document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
