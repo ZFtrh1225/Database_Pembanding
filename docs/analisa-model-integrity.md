@@ -17,6 +17,20 @@ Saat tombol **Analisa** pada panel pencarian diklik, Audit mulai memeriksa model
 
 Jika versi/wilayah tidak dapat diverifikasi atau proses RaLAT gagal, aplikasi memakai penyesuaian waktu saja dan menunjukkan alasannya. Perubahan aset, koordinat, tanggal, tingkat penyesuaian waktu, pembanding terpilih, atau asumsi SBM membatalkan keluaran terkait yang sudah dihitung.
 
+## Dua pencarian Overpass yang berdiri sendiri
+
+**Analisis Jarak POI** pada peta menampilkan fasilitas sekitar aset atau pembanding. Penilai memilih radius 2,5 km, 5 km, atau 10 km; aplikasi memeriksa semua kelompok pada radius itu, menampilkan sampai tiga fasilitas terdekat per jenis, dan menyatakan ketika suatu kelompok belum tercatat di OSM. Kelompoknya meliputi transportasi, kesehatan, pendidikan, peribadatan, dan niaga. Query menerima titik, bangunan, dan relasi OSM. Jarak adalah garis lurus ke koordinat titik atau titik perwakilan bangunan/area; titik perwakilan tidak harus berupa pintu masuk. Nama dan tingkat sekolah, jenis puskesmas/posyandu, serta bangunan niaga yang belum jelas diberi label sesuai data OSM yang tersedia. Hasilnya merupakan informasi lingkungan, bukan koreksi otomatis dalam RaLAT.
+
+**Overpass RaLAT** dibuat setelah wilayah dan versi model diketahui. Hanya tag OSM yang terkait variabel spasial pada versi itu yang diminta. Pencarian 20 km dilewati bila tidak ada variabel wilayah jauh. Kamus query mempertahankan tipe objek/tag dan radius 5 km/20 km sebelumnya untuk membatasi perubahan angka akibat optimasi. Variabel yang bersumber dari karakter aset/pembanding tidak memicu permintaan peta. Cache POI dan RaLAT terpisah, memuat versi aturan query, koordinat, radius, serta identitas model/tag bila relevan. Layanan peta yang gagal tetap dicatat berbeda dari hasil pencarian kosong.
+
+Daftar fasilitas POI yang diperluas **tidak mengubah** matcher RaLAT: `POI_hospital_1000m` tetap mengambil `amenity=hospital`, tidak menghitung klinik dan puskesmas. `POI_retail_1000m` tetap dilewati karena kategori toko saat pelatihan model tidak tersedia. Informasi fasilitas POI juga tidak lagi disisipkan sebagai klaim otomatis tentang HBU atau likuiditas pada insight SBM.
+
+### Status validasi setelah pengembangan
+
+1. **Kelengkapan POI:** alur pencarian tidak berhenti hanya karena satu jenis fasilitas ditemukan, dan bangunan/area dapat tampil. Kelengkapan OSM setempat serta kebenaran nama perlu diperiksa penilai di lapangan.
+2. **Konsistensi RaLAT:** pemilihan tag mengikuti versi model, sementara rumus dan matcher variabel tetap sama. Pengujian kode memeriksa partisi query, larangan tercampurnya klinik ke hospital, jejak fitur, dan contoh aritmetika manual. Ini membuktikan perilaku implementasi untuk contoh uji, bukan akurasi model pada pasar.
+3. **Definisi dan rumus model asli:** spreadsheet `Model_Regresi` dan berkas repo tidak memuat spesifikasi pembentukan variabel dependen maupun kode pelatihan yang dapat membuktikan apakah `β × Δ` boleh dipakai sebagai persen langsung. Maka status **belum tervalidasi terhadap regresi asli** tetap muncul pada Audit dan PDF; tidak ada perubahan rumus koreksi atau koefisien. Dokumen yang diperlukan tercantum di bagian bawah.
+
 ## Batas penafsiran
 
 Sheet ini menyediakan label bahasa manusia, tetapi tidak menyediakan definisi lengkap setiap variabel, koordinat acuan sejumlah fitur jarak, ambang kelas luas, transformasi variabel dependen, maupun diagnostik dan validasi model. Label yang tampil pada Audit merupakan **teks asli dari sheet**, bukan bukti bahwa implementasi fitur sudah sama dengan saat model dilatih. Variabel yang tidak dapat dibangun sesuai definisi aslinya dilewati dan dicatat; khususnya kategori retail POI, persentase kawasan industri, kelas luas, dan sejumlah titik acuan yang belum dikonfirmasi. Rumus yang mengubah selisih koefisien menjadi persen penyesuaian masih perlu dicocokkan dengan dokumentasi estimasi model asli sebelum hasil dipakai sebagai kesimpulan penilaian. Hasil SBM dan Monte Carlo juga bergantung pada asumsi pengguna dan tidak memvalidasi RaLAT.
@@ -43,6 +57,17 @@ Kontribusi dijumlahkan sebagai perubahan proporsional harga, dibatasi ke rentang
 Contoh uji aritmetika dengan koefisien Sumatra versi `20241213`: jarak ke jalan utama 100 m (aset) dan 200 m (pembanding), lebar jalan 8 m dan 6 m. β jarak `−0,04100143518` berasal dari baris 597, β lebar `0,04002363823` dari baris 593. Kontribusi jarak = `0,02842002919`; kontribusi lebar = `0,08004727646`; jumlah = `0,10846730565`. Harga pembanding Rp1.000.000/m² setelah koreksi waktu menjadi sekitar **Rp1.108.467/m²** menurut rumus aplikasi. Jika variabel dependen model ternyata berbentuk log harga dan aturan model mengharuskan `exp(jumlah) − 1`, hasil contoh akan menjadi **Rp1.114.568/m²**. Selisih sekitar 0,6101 poin persentase ini menunjukkan mengapa jenis variabel dependen harus dibuktikan dahulu. Kedua angka ini ilustrasi aritmetika, bukan pilihan rumus baru atau nilai pasar yang tervalidasi.
 
 Untuk `ln_distance_to_road`, aplikasi saat ini memilih fitur OSM terdekat dengan tag `highway=primary`, `trunk`, atau `motorway` pada hasil Overpass. Jarak diukur sebagai **garis lurus ke titik tengah way** yang dikembalikan OSM, bukan jarak ke sisi jalan atau jarak tempuh. Jejak menampilkan way, tag, koordinat, dan radius yang dipakai. Definisi “jalan utama”, geometri jarak, dan cakupan radius harus dibandingkan dengan definisi variabel yang dipakai saat pelatihan model.
+
+### Pemeriksaan dari contoh Audit Sumatra
+
+Pada satu tangkapan layar Analisa Sumatra `20241213`, Audit menunjukkan 12 pembanding, minimal 22 dari 25 variabel terhitung. Ini adalah **cakupan data**, bukan tingkat akurasi model. Untuk satu pembanding yang terlihat:
+
+- `is_komersial` bernilai 0 untuk aset dan 1 untuk pembanding. β `0,4960917532` di `Model_Regresi` baris 594 memberi `(0−1) × β = −49,609%`. Input kategori aset dan pembanding yang sebenarnya tidak tampak dalam tangkapan layar, sehingga nilai 0/1 perlu diperiksa pada rincian sumber.
+- `ln_distance_to_road` menampilkan jarak terukur aset `17,274647 m` dan pembanding `262,08696 m`. Aturan aplikasi membatasi jarak masuk rumus ke minimum 50 m. Dengan β `−0,04100143518` di baris 597, kontribusinya `β × [ln(50)−ln(262,08696)] ≈ +6,793%`. Rincian Audit/PDF sekarang menampilkan kedua jarak yang **dipakai dalam rumus** jika berbeda dari jarak mentah.
+
+Dua kontribusi ini saja belum dapat membuktikan total penyesuaian sekitar −36% atau harga akhir yang terlihat, karena masih ada 20 variabel lain yang terhitung dan informasi harga sebelum koreksi waktu tidak tampak. Besarnya satu kontribusi kategori hampir 50% adalah alasan penting untuk memeriksa definisi `is_komersial` dan bentuk regresi asli sebelum menafsirkan nilai akhirnya.
+
+Jika label dan nomor baris `Model_Regresi` belum muncul setelah PR yang menambah metadata digabung, periksa deployment frontend dan `Backend/Code.gs`. Pada frontend terbaru, Audit memberi peringatan khusus bila respons backend masih belum mengirim nomor baris; setelah backend dipasang, jalankan **Cari** dan **Analisa** lagi untuk mengambil respons baru. Menggabungkan PR di GitHub saja tidak memperbarui deployment Google Apps Script.
 
 ### Dokumen yang diperlukan untuk menuntaskan validasi
 
