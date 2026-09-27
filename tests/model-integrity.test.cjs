@@ -450,3 +450,94 @@ context._overpassFetchWithFallback = query => {
   assert.equal(cachedCity.farMeta.fromCache,true);
   console.log('POI terpisah, query RaLAT per model, cache, rumus manual, dan audit: OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+// Simulasi terkontrol: risiko lain nonaktif sehingga keluaran harus persis
+// harga tiga skenario; rata-rata dan rentangnya dapat dihitung manual.
+const mcInputs = {
+  sbmHorizonMonths: { value: '12' },
+  mcEnableTime: { checked: false }, mcEnableRalat: { checked: false },
+  mcEnableShock: { checked: false }, mcEnableBoot: { checked: false },
+  mcEnableDirichlet: { checked: false },
+  mcTimeMin: { value: '-3' }, mcTimeMode: { value: '5' }, mcTimeMax: { value: '12' },
+  mcRalatSigma: { value: '8' },
+  mcShockMin: { value: '-20' }, mcShockMode: { value: '0' }, mcShockMax: { value: '5' },
+  mcDirichletK: { value: '10' },
+  sbmProbPess: { value: '15' }, sbmProbBase: { value: '60' }, sbmProbOpt: { value: '25' },
+  sbmAdjPess: { value: '-15' }, sbmAdjOpt: { value: '10' },
+  mcThreshold: { value: '' },
+  btnRunMC: { disabled: false, innerHTML: 'Jalankan' },
+  btnDownloadMCPDF: { style: { display: 'none' } }
+};
+const mcContext = vm.createContext({
+  console, performance: { now: () => 0 }, setTimeout: callback => callback(),
+  toast: () => {}, document: { getElementById: id => mcInputs[id] },
+  _analysisReady: true, _avmRawData: [{ price: 2000000 }],
+  _avmCurrentMedian: 2000000, _mcIterations: 10000, _mcRunToken: 0,
+  _ralatLastRun: null, _mcGetValidPrices: () => [2000000, 2000000],
+  renderMCResults: () => {}
+});
+for (const name of [
+  '_clamp', '_sbmHorizonMonths', '_mcTimeFactor', '_mcSampleNormal',
+  '_mcSampleGamma', '_mcSampleDirichlet', '_mcDrawScenario',
+  '_mcPercentile', '_mcMean', '_mcStdev', '_mcCorr', 'runMonteCarloSimulation'
+]) vm.runInContext(extractFunction(html, name), mcContext);
+mcContext._mcSampleGamma = alpha => alpha;
+assert.equal(mcContext._mcSampleDirichlet([0, 6, 4])[0], 0,
+  'Peluang SBM 0% harus tetap tidak mungkin terpilih saat Dirichlet aktif');
+let drawIndex = 0;
+mcContext._mcRandom = () => ((drawIndex++ % 100) + 0.5) / 100;
+mcContext.runMonteCarloSimulation();
+let mcResult = mcContext._mcLastResult;
+assert.deepEqual(Array.from(mcResult.assumptions.dir.counts), [1500, 6000, 2500]);
+assert.equal(mcResult.stats.mean, 2005000, 'Mean mendekati SBM tertimbang secara tepat');
+assert.equal(mcResult.stats.p5, 1700000, 'P5 melihat hasil pesimis, bukan nilai rata-rata campuran');
+assert.equal(mcResult.stats.p95, 2200000, 'P95 melihat hasil optimis');
+assert.equal(mcResult.stats.var95, 300000, 'Selisih dari nilai dasar memakai P5 baru');
+assert.ok(mcResult.sensitivity.some(s => s.name === 'Pilihan Skenario SBM'),
+  'Pilihan skenario tetap muncul pada sensitivitas meskipun Dirichlet nonaktif');
+
+let dirCalls = 0;
+mcInputs.mcEnableDirichlet.checked = true;
+mcContext._mcSampleDirichlet = () => { dirCalls++; return [0.5, 0.5, 0]; };
+drawIndex = 0;
+mcContext.runMonteCarloSimulation();
+mcResult = mcContext._mcLastResult;
+assert.equal(dirCalls, 1, 'Satu set bobot Dirichlet berlaku untuk seluruh simulasi');
+assert.deepEqual(Array.from(mcResult.assumptions.dir.counts), [5000, 5000, 0]);
+assert.equal(mcResult.stats.p95, 2000000, 'Skenario peluang 0% tidak masuk persentil atas');
+assert.deepEqual(Array.from(mcResult.assumptions.dir.pSbm), [0.15, 0.6, 0.25]);
+
+// Pemeriksaan keluaran: angka yang ditampilkan dan PDF memakai hasil run ini.
+for (const id of [
+  'mcResultWrap', 'mcScenarioMix', 'mcScenarioPess', 'mcScenarioBase',
+  'mcScenarioOpt', 'mcStatMean', 'mcStatP50', 'mcStatP5', 'mcStatP95',
+  'mcCI90', 'mcVaR', 'mcThresholdResult', 'mcAuditLog', 'pdfMCTemplate'
+]) mcInputs[id] = { style: {}, textContent: '', innerHTML: '' };
+for (const id of ['mcHistogramChart', 'mcTornadoChart']) {
+  mcInputs[id] = { getContext: () => ({}) };
+}
+mcContext.formatRupiah = value => 'Rp ' + value;
+mcContext._ralatEscapeHtml = value => String(value);
+mcContext._formatValuationDateID = () => '28 September 2026';
+mcContext.activeUsername = 'Penguji';
+mcContext._mcChartHist = null;
+mcContext._mcChartTornado = null;
+mcContext.Chart = class {
+  destroy() {}
+  toBase64Image() { return 'data:image/png;base64,AQ=='; }
+};
+mcContext.html2pdf = () => ({
+  set() { return this; }, from() { return this; }, save() { return Promise.resolve(); }
+});
+for (const name of ['_mcBuildHistogram', 'renderMCResults', 'downloadMCPDF']) {
+  vm.runInContext(extractFunction(html, name), mcContext);
+}
+mcContext.renderMCResults(mcResult);
+assert.match(mcInputs.mcScenarioPess.textContent, /5\.000 kali \(50\.0%\)/);
+assert.match(mcInputs.mcScenarioOpt.textContent, /0 kali \(0\.0%\)/);
+assert.match(mcInputs.mcScenarioMix.textContent, /Peluang yang dipakai: 50\.0% \/ 50\.0% \/ 0\.0%/);
+mcContext.downloadMCPDF();
+assert.match(mcInputs.pdfMCTemplate.innerHTML, /Pemilihan Skenario SBM/);
+assert.match(mcInputs.pdfMCTemplate.innerHTML, /5\.000 \(50\.0%\)/);
+assert.match(mcInputs.pdfMCTemplate.innerHTML, /0 \(0\.0%\)/);
+console.log('Monte Carlo diskret, peluang nol, dan Dirichlet satu kali per simulasi: OK');
