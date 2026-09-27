@@ -325,9 +325,12 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .mc-stat-card { background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:8px 10px; text-align:center; }
 .mc-stat-label { font-size:10px; color:var(--text-sub); font-weight:600; }
 .mc-stat-val { font-size:13px; font-weight:800; color:var(--navy); margin-top:3px; line-height:1.2; }
+.mc-scenario-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:8px 0 12px; }
+.mc-scenario-grid > div { min-width:0; padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; font-size:11px; color:var(--navy); }
 
 @media (max-width: 768px) {
   .mc-var-grid3 { grid-template-columns:1fr; }
+  .mc-scenario-grid { grid-template-columns:1fr; }
   #mcResultWrap > div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns:repeat(2,1fr) !important; }
   #mcResultWrap > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
 }
@@ -1667,9 +1670,9 @@ body.mmode-picking .mpick-hint { display: flex; }
             <span class="mc-var-badge tier2">T2</span>
             <strong>5. SBM Probability Mix</strong>
             <span class="mc-var-dist">Dirichlet</span>
-            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableDirichlet" checked> Aktifkan</label>
+            <label class="mc-var-toggle"><input type="checkbox" id="mcEnableDirichlet"> Aktifkan</label>
           </div>
-          <div class="mc-var-desc">Goyang probabilitas SBM (Pess/Base/Opt) dengan total tetap 100%. α dari nilai SBM tab 1.</div>
+          <div class="mc-var-desc">Opsional: ambil satu set peluang baru untuk seluruh simulasi; tiap pengulangan tetap memilih satu skenario. Jika nonaktif, peluang SBM dipakai apa adanya. κ kecil membuat peluang antarjalankan lebih berubah.</div>
           <div class="mc-var-grid3">
             <div><label>Concentration κ</label><input type="number" id="mcDirichletK" value="10" min="1" max="100" step="1" class="form-input mc-input"></div>
             <div style="grid-column: span 2; font-size:10px; color:#64748b; align-self:end; padding-bottom:8px;">κ tinggi = probabilitas stabil di sekitar SBM. κ rendah = lebih liar.</div>
@@ -1695,10 +1698,18 @@ body.mmode-picking .mpick-hint { display: flex; }
         <div id="mcResultWrap" style="display:none; margin-top:14px;">
           <!-- Statistik utama -->
           <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px;">
-            <div class="mc-stat-card"><div class="mc-stat-label">Mean</div><div class="mc-stat-val" id="mcStatMean">–</div></div>
+            <div class="mc-stat-card"><div class="mc-stat-label">Rata-rata simulasi</div><div class="mc-stat-val" id="mcStatMean">–</div></div>
             <div class="mc-stat-card"><div class="mc-stat-label">Median (P50)</div><div class="mc-stat-val" id="mcStatP50">–</div></div>
             <div class="mc-stat-card"><div class="mc-stat-label">P5 (5% hasil di bawahnya)</div><div class="mc-stat-val" id="mcStatP5">–</div></div>
             <div class="mc-stat-card"><div class="mc-stat-label">P95 (5% hasil di atasnya)</div><div class="mc-stat-val" id="mcStatP95">–</div></div>
+          </div>
+
+          <div style="font-size:11px; font-weight:700; color:var(--navy);">Skenario yang terpilih dalam simulasi ini</div>
+          <div id="mcScenarioMix" style="font-size:10.5px; color:var(--text-sub); line-height:1.5; margin-top:3px;"></div>
+          <div class="mc-scenario-grid">
+            <div id="mcScenarioPess">Pesimis: –</div>
+            <div id="mcScenarioBase">Normal: –</div>
+            <div id="mcScenarioOpt">Optimis: –</div>
           </div>
 
           <!-- Persentil simulasi dan selisih dari nilai dasar -->
@@ -2953,10 +2964,22 @@ function _mcSampleGamma(alpha) {
 
 // Dirichlet(α₁..αₖ) → vektor probabilitas yang sum = 1
 function _mcSampleDirichlet(alphas) {
-  var gammas = alphas.map(function(a) { return _mcSampleGamma(Math.max(a, 0.01)); });
+  // Peluang yang diset 0 oleh pengguna harus tetap 0 setelah pengacakan.
+  var gammas = alphas.map(function(a) { return a > 0 ? _mcSampleGamma(a) : 0; });
   var sum = gammas.reduce(function(a, b) { return a + b; }, 0);
-  if (sum <= 0) return alphas.map(function() { return 1 / alphas.length; });
+  if (!(sum > 0)) {
+    var total = alphas.reduce(function(a, b) { return a + Math.max(0, b); }, 0);
+    return alphas.map(function(a) { return total > 0 ? Math.max(0, a) / total : 1 / alphas.length; });
+  }
   return gammas.map(function(g) { return g / sum; });
+}
+
+// Pilih tepat satu skenario: indeks 0 pesimis, 1 normal, 2 optimis.
+function _mcDrawScenario(probs) {
+  var draw = _mcRandom();
+  if (draw < probs[0]) return 0;
+  if (draw < probs[0] + probs[1]) return 1;
+  return 2;
 }
 
 // Empirical bootstrap → resample array dengan replacement
@@ -3146,7 +3169,13 @@ function runMonteCarloSimulation() {
     var contribRalat = new Float64Array(N);
     var contribShock = new Float64Array(N);
     var contribBoot = new Float64Array(N);
-    var contribDir = new Float64Array(N);
+    var contribSbm = new Float64Array(N);
+    // Ketidakpastian bobot berlaku untuk satu rangkaian simulasi. Jika diacak
+    // per iterasi lalu dipilih satu skenario, efek κ hilang pada distribusi marginal.
+    var probs = enDir ? _mcSampleDirichlet([alphaPess, alphaBase, alphaOpt]) : [pPess, pBase, pOpt];
+    var scenarioCounts = [0, 0, 0];
+    var scenarioFactors = [1 + aPess, 1, 1 + aOpt];
+    var expectedScenarioFactor = scenarioFactors[0] * probs[0] + probs[1] + scenarioFactors[2] * probs[2];
 
     for (var i = 0; i < N; i++) {
       // Variabel 4: Bootstrap → goyangkan median basis
@@ -3161,14 +3190,10 @@ function runMonteCarloSimulation() {
       // Variabel 3: Market Shock (Triangular asimetris) → faktor (1 + s%)
       var fShock = enShock ? (1 + _mcSampleTriangular(shockMin, shockMode, shockMax) / 100) : 1;
 
-      // Variabel 5: Dirichlet probabilitas + adj SBM tetap
-      var probs;
-      if (enDir) {
-        probs = _mcSampleDirichlet([alphaPess, alphaBase, alphaOpt]);
-      } else {
-        probs = [pPess, pBase, pOpt];
-      }
-      var fSbm = (1 + aPess) * probs[0] + 1 * probs[1] + (1 + aOpt) * probs[2];
+      // Setiap iterasi mengalami satu skenario, bukan rata-rata tiga skenario.
+      var scenarioIndex = _mcDrawScenario(probs);
+      scenarioCounts[scenarioIndex]++;
+      var fSbm = scenarioFactors[scenarioIndex];
 
       var v = medSample * fTime * fRalat * fShock * fSbm;
       // Floor ke 0 (tidak ada nilai negatif)
@@ -3180,7 +3205,7 @@ function runMonteCarloSimulation() {
       contribRalat[i] = enRalat ? (fRalat - 1) : 0;
       contribShock[i] = enShock ? (fShock - 1) : 0;
       contribBoot[i]  = enBoot  ? (medSample / baseMedian - 1) : 0;
-      contribDir[i]   = enDir   ? (fSbm - ((1 + aPess) * pPess + 1 * pBase + (1 + aOpt) * pOpt)) : 0;
+      contribSbm[i]   = fSbm - expectedScenarioFactor;
     }
 
     var t1 = performance.now();
@@ -3222,7 +3247,7 @@ function runMonteCarloSimulation() {
       { name: 'Time Rate',             enabled: enTime,  corr: enTime  ? _mcCorr(contribTime,  samples) : 0 },
       { name: 'RaLAT Residual',        enabled: enRalat, corr: enRalat ? _mcCorr(contribRalat, samples) : 0 },
       { name: 'Market Shock',          enabled: enShock, corr: enShock ? _mcCorr(contribShock, samples) : 0 },
-      { name: 'SBM Dirichlet Mix',     enabled: enDir,   corr: enDir   ? _mcCorr(contribDir,   samples) : 0 }
+      { name: 'Pilihan Skenario SBM', enabled: true, corr: _mcCorr(contribSbm, samples) }
     ].filter(function(s) { return s.enabled; })
      .sort(function(a, b) { return Math.abs(b.corr) - Math.abs(a.corr); });
 
@@ -3240,7 +3265,7 @@ function runMonteCarloSimulation() {
       ralat:  { enabled: enRalat, sigma: ralatSigma },
       shock:  { enabled: enShock, min: shockMin, mode: shockMode, max: shockMax },
       boot:   { enabled: enBoot, samplesPerIter: validPrices.length },
-      dir:    { enabled: enDir, kappa: dirK, alphas: [alphaPess, alphaBase, alphaOpt], pSbm: [pPess, pBase, pOpt], adjSbm: [aPess, 0, aOpt] },
+      dir:    { enabled: enDir, kappa: dirK, alphas: [alphaPess, alphaBase, alphaOpt], pSbm: [pPess, pBase, pOpt], sampledProbs: probs, counts: scenarioCounts, adjSbm: [aPess, 0, aOpt] },
       threshold: threshold
     };
 
@@ -3308,6 +3333,7 @@ function _mcBuildHistogram(samples, bins) {
 
 function renderMCResults(result) {
   var s = result.stats;
+  var mix = result.assumptions.dir;
   var resultWrap = document.getElementById('mcResultWrap');
   resultWrap.style.display = 'block';
 
@@ -3316,6 +3342,16 @@ function renderMCResults(result) {
   document.getElementById('mcStatP50').textContent = formatRupiah(Math.round(s.p50));
   document.getElementById('mcStatP5').textContent = formatRupiah(Math.round(s.p5));
   document.getElementById('mcStatP95').textContent = formatRupiah(Math.round(s.p95));
+
+  document.getElementById('mcScenarioMix').textContent =
+    'Peluang dari SBM: ' + mix.pSbm.map(function(p) { return (p * 100).toFixed(1) + '%'; }).join(' / ') +
+    '. Peluang yang dipakai: ' + mix.sampledProbs.map(function(p) { return (p * 100).toFixed(1) + '%'; }).join(' / ') +
+    (mix.enabled ? ' (diacak sekali untuk simulasi ini).' : ' (sama dengan input SBM).');
+  ['mcScenarioPess', 'mcScenarioBase', 'mcScenarioOpt'].forEach(function(id, idx) {
+    var label = ['Pesimis', 'Normal', 'Optimis'][idx];
+    document.getElementById(id).textContent = label + ': ' + mix.counts[idx].toLocaleString('id-ID') +
+      ' kali (' + (mix.counts[idx] / result.assumptions.iterations * 100).toFixed(1) + '%)';
+  });
 
   // Persentil keluaran simulasi, bukan selang kepercayaan nilai pasar.
   document.getElementById('mcCI90').innerHTML =
@@ -3448,7 +3484,8 @@ function renderMCResults(result) {
   auditLog += '<div><strong>Variabel 2 — RaLAT Residual:</strong> ' + (a.ralat.enabled ? 'Normal(0, σ=' + a.ralat.sigma + '%)' : '<em>OFF</em>') + '</div>';
   auditLog += '<div><strong>Variabel 3 — Market Shock:</strong> ' + (a.shock.enabled ? 'Triangular(' + a.shock.min + '%, ' + a.shock.mode + '%, ' + a.shock.max + '%)' : '<em>OFF</em>') + '</div>';
   auditLog += '<div><strong>Variabel 4 — Bootstrap:</strong> ' + (a.boot.enabled ? 'Empirical resample (n=' + a.boot.samplesPerIter + ' per iterasi, with replacement)' : '<em>OFF</em>') + '</div>';
-  auditLog += '<div><strong>Variabel 5 — SBM Dirichlet:</strong> ' + (a.dir.enabled ? 'Dirichlet(α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa + ')' : '<em>OFF</em>') + '</div>';
+  auditLog += '<div><strong>Variabel 5 — SBM Dirichlet:</strong> ' + (a.dir.enabled ? 'Sekali per simulasi, Dirichlet(α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa + ')' : '<em>OFF; peluang SBM tetap</em>') + '</div>';
+  auditLog += '<div><strong>Pemilihan satu skenario per iterasi:</strong> selalu aktif. Peluang terpakai Pesimis/Normal/Optimis: ' + a.dir.sampledProbs.map(function(p) { return (100 * p).toFixed(1) + '%'; }).join(' / ') + '; jumlah terpilih: ' + a.dir.counts.join(' / ') + '.</div>';
   auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
   auditLog += '<div style="color:#64748b; font-size:10px;"><em>Jika SBM, Time Rate, atau Market Shock mewakili perubahan pasar yang sama, perkaliannya dapat menghitung pengaruh itu berulang. Angka awal dan ambang adalah asumsi pengguna, bukan standar. Hasil bergantung pada data pembanding dan cakupan model; dasar koefisien perlu diverifikasi sebelum digunakan dalam kesimpulan nilai.</em></div>';
   document.getElementById('mcAuditLog').innerHTML = auditLog;
@@ -3467,6 +3504,13 @@ function downloadMCPDF() {
   var r = _mcLastResult;
   var s = r.stats;
   var a = r.assumptions;
+  var scenarioRows = ['Pesimis', 'Normal', 'Optimis'].map(function(name, i) {
+    return '<tr><td style="padding:7px; border:1px solid #d1dbe8;">' + name + '</td>' +
+      '<td style="padding:7px; border:1px solid #d1dbe8;">' + (a.dir.pSbm[i] * 100).toFixed(1) + '%</td>' +
+      '<td style="padding:7px; border:1px solid #d1dbe8;">' + (a.dir.sampledProbs[i] * 100).toFixed(1) + '%</td>' +
+      '<td style="padding:7px; border:1px solid #d1dbe8;">' + a.dir.counts[i].toLocaleString('id-ID') +
+      ' (' + (a.dir.counts[i] / a.iterations * 100).toFixed(1) + '%)</td></tr>';
+  }).join('');
 
   // Convert chart canvas → image
   var histImg = _mcChartHist ? _mcChartHist.toBase64Image() : '';
@@ -3499,7 +3543,7 @@ function downloadMCPDF() {
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.boot.enabled) + '</td></tr>' +
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">5. SBM Probability Mix</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Dirichlet</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.dir.enabled ? 'alpha=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], kappa=' + a.dir.kappa : '-') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.dir.enabled ? 'Sekali per simulasi, alpha=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], kappa=' + a.dir.kappa : 'Peluang SBM tetap; skenario tetap dipilih tiap iterasi') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.dir.enabled) + '</td></tr>';
 
   template.innerHTML =
@@ -3516,12 +3560,22 @@ function downloadMCPDF() {
           '<div style="font-size:10px; color:#8a9ab0; margin-top:5px;">Validasi: ' + a.validCount + ' pembanding (IQR)</div>' +
         '</td>' +
         '<td style="padding:15px; background:#ede9fe; border-radius:0 8px 8px 0; width:50%; text-align:right;">' +
-          '<div style="font-size:12px; color:#7c3aed; font-weight:700;">EXPECTED VALUE (Mean)</div>' +
+          '<div style="font-size:12px; color:#7c3aed; font-weight:700;">RATA-RATA HASIL SIMULASI</div>' +
           '<div style="font-size:24px; color:#7c3aed; font-weight:800; margin-top:5px;">' + formatRupiah(Math.round(s.mean)) + '/m&sup2;</div>' +
           '<div style="font-size:10px; color:#7c3aed; margin-top:5px;">' + a.iterations.toLocaleString('id-ID') + ' iterasi &middot; ' + a.elapsedMs + ' ms</div>' +
         '</td>' +
       '</tr>' +
     '</table>' +
+
+    '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Pemilihan Skenario SBM</h3>' +
+    '<p style="font-size:10.5px; color:#475569;">Satu skenario dipilih tiap iterasi. ' +
+      (a.dir.enabled ? 'Dirichlet mengacak peluang sekali pada awal simulasi ini; peluang antarsimulasi dapat berubah.' : 'Peluang yang dipakai sama dengan input SBM.') +
+      ' Persentase kemunculan hanya hasil acak pada simulasi ini.</p>' +
+    '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
+      '<tr style="background:#fafafa;"><th style="padding:7px; border:1px solid #d1dbe8;">Skenario</th>' +
+      '<th style="padding:7px; border:1px solid #d1dbe8;">Peluang input</th>' +
+      '<th style="padding:7px; border:1px solid #d1dbe8;">Peluang terpakai</th>' +
+      '<th style="padding:7px; border:1px solid #d1dbe8;">Terpilih</th></tr>' + scenarioRows + '</table>' +
 
     '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px;">Statistik Distribusi Nilai</h3>' +
     '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
