@@ -1504,6 +1504,11 @@ body.mmode-picking .mpick-hint { display: flex; }
         <div class="avm-insight" id="modalSmartInsight">Menghitung skenario pasar...</div>
         
         <div style="margin-top: 20px; font-weight: 700; font-size: 13px; color: var(--navy); border-bottom: 1px solid var(--border); padding-bottom: 5px;">Input Asumsi Masa Depan (SBM / OPM)</div>
+        <div class="form-group" style="margin:12px 0; max-width:260px;">
+          <label class="form-label" for="sbmHorizonMonths">Periode skenario dari tanggal penilaian (bulan)</label>
+          <input type="number" id="sbmHorizonMonths" class="form-input" value="12" min="1" max="120" step="1" inputmode="numeric" oninput="calculateSBM()" onchange="calculateSBM()">
+        </div>
+        <div style="font-size:11px; color:var(--text-sub); line-height:1.5; margin-bottom:10px;">Angka 12 bulan dan seluruh persentase di bawah adalah contoh asumsi yang dapat diubah, bukan standar MAPPI. Koreksi skenario adalah perubahan total selama periode yang dipilih; mengubah periode saja tidak mengubah persentasenya. Nilai dasar ialah median pembanding pada tanggal penilaian.</div>
         
         <div class="sbm-grid">
           <div class="sbm-card">
@@ -1577,6 +1582,7 @@ body.mmode-picking .mpick-hint { display: flex; }
         <div style="font-size: 12px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.5;">
           <strong>🎲 Monte Carlo Simulation</strong> — Rentang hasil berdasarkan data pembanding dan asumsi risiko yang dipilih. Hasilnya adalah simulasi, bukan kesimpulan nilai penilai.
         </div>
+        <div style="font-size:11px; line-height:1.5; background:#f8fafc; padding:10px 12px; border-radius:8px; margin-bottom:12px;">Periode Monte Carlo mengikuti periode SBM (awal 12 bulan). Time Rate adalah asumsi perubahan <strong>masa depan</strong> per tahun; koreksi waktu pembanding dalam Analisa sudah diterapkan untuk periode <strong>sebelum tanggal penilaian</strong>. Periksa apakah asumsi SBM, Time Rate, dan Market Shock Anda menggambarkan peristiwa yang sama: jika ya, pengaruhnya dapat terhitung berulang.</div>
 
         <!-- Ringkasan basis & jumlah iterasi -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
@@ -1606,7 +1612,7 @@ body.mmode-picking .mpick-hint { display: flex; }
             <span class="mc-var-dist">Triangular</span>
             <label class="mc-var-toggle"><input type="checkbox" id="mcEnableTime" checked> Aktifkan</label>
           </div>
-          <div class="mc-var-desc">Ketidakpastian rate eskalasi pasar properti per tahun (BI Property Price Index, REI, Colliers).</div>
+          <div class="mc-var-desc">Asumsi pengguna tentang perubahan harga pasar per tahun selama periode proyeksi. Contoh angka awal bukan statistik yang diukur dari data pembanding.</div>
           <div class="mc-var-grid3">
             <div><label>Min (%)</label><input type="number" id="mcTimeMin" value="-3" step="0.5" class="form-input mc-input"></div>
             <div><label>Most Likely (%)</label><input type="number" id="mcTimeMode" value="5" step="0.5" class="form-input mc-input"></div>
@@ -1636,7 +1642,7 @@ body.mmode-picking .mpick-hint { display: flex; }
             <span class="mc-var-dist">Triangular Asimetris</span>
             <label class="mc-var-toggle"><input type="checkbox" id="mcEnableShock" checked> Aktifkan</label>
           </div>
-          <div class="mc-var-desc">Kejutan makro non-properti (BI rate, kurs, force majeure). Asimetri ke bawah (1998: -40%, 2008: -15%, COVID: -8%).</div>
+          <div class="mc-var-desc">Asumsi pengguna tentang kejutan satu kali selama periode proyeksi. Contoh angka awal bukan taksiran statistik peristiwa sejarah.</div>
           <div class="mc-var-grid3">
             <div><label>Min (%)</label><input type="number" id="mcShockMin" value="-20" step="1" class="form-input mc-input"></div>
             <div><label>Most Likely (%)</label><input type="number" id="mcShockMode" value="0" step="0.5" class="form-input mc-input"></div>
@@ -1672,10 +1678,10 @@ body.mmode-picking .mpick-hint { display: flex; }
 
         <!-- Threshold for Probability of Loss -->
         <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:10px 12px; margin-top:8px;">
-          <label style="font-size:11px; font-weight:700; color:#991b1b;">⚠️ Threshold Risiko (P[Nilai &lt; threshold])</label>
+          <label style="font-size:11px; font-weight:700; color:#991b1b;">Ambang pilihan pengguna (P[Nilai &lt; ambang])</label>
           <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
             <input type="number" id="mcThreshold" placeholder="cth: 9000000" step="100000" class="form-input mc-input" style="flex:1;">
-            <span style="font-size:10px; color:#64748b;">/m² · kosongkan untuk auto (90% × Base)</span>
+            <span style="font-size:10px; color:#64748b;">/m² · kosongkan untuk contoh (90% × nilai dasar), bukan batas standar</span>
           </div>
         </div>
 
@@ -1691,8 +1697,8 @@ body.mmode-picking .mpick-hint { display: flex; }
           <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px;">
             <div class="mc-stat-card"><div class="mc-stat-label">Mean</div><div class="mc-stat-val" id="mcStatMean">–</div></div>
             <div class="mc-stat-card"><div class="mc-stat-label">Median (P50)</div><div class="mc-stat-val" id="mcStatP50">–</div></div>
-            <div class="mc-stat-card" style="background:#dcfce7;"><div class="mc-stat-label">P5 (Worst 5%)</div><div class="mc-stat-val" id="mcStatP5" style="color:#15803d;">–</div></div>
-            <div class="mc-stat-card" style="background:#fee2e2;"><div class="mc-stat-label">P95 (Best 5%)</div><div class="mc-stat-val" id="mcStatP95" style="color:#991b1b;">–</div></div>
+            <div class="mc-stat-card"><div class="mc-stat-label">P5 (5% hasil di bawahnya)</div><div class="mc-stat-val" id="mcStatP5">–</div></div>
+            <div class="mc-stat-card"><div class="mc-stat-label">P95 (5% hasil di atasnya)</div><div class="mc-stat-val" id="mcStatP95">–</div></div>
           </div>
 
           <!-- Persentil simulasi dan selisih dari nilai dasar -->
@@ -1711,6 +1717,7 @@ body.mmode-picking .mpick-hint { display: flex; }
 
           <!-- Probability of Threshold -->
           <div id="mcThresholdResult" style="background:#f8fafc; border-left:4px solid #7c3aed; padding:10px 12px; border-radius:4px; font-size:12px; margin-bottom:12px;"></div>
+          <div style="font-size:11px; color:var(--text-sub); line-height:1.5; margin-bottom:12px;">Cara membaca: P50 adalah titik tengah hasil simulasi; P5 dan P95 membatasi 90% hasil simulasi. VaR adalah selisih terhadap median nilai dasar per m², bukan kerugian uang yang pasti. Peluang di bawah ambang bergantung pada ambang pilihan Anda. Tidak ada batas otomatis yang menyatakan hasil ini bagus atau buruk.</div>
 
           <!-- Histogram -->
           <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:12px;">
@@ -1720,7 +1727,7 @@ body.mmode-picking .mpick-hint { display: flex; }
 
           <!-- Tornado Sensitivity -->
           <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:12px;">
-            <div style="font-size:11px; font-weight:700; color:var(--navy); margin-bottom:8px;">🌪️ Sensitivity (Tornado Chart)</div>
+            <div style="font-size:11px; font-weight:700; color:var(--navy); margin-bottom:8px;">🌪️ Sensitivitas (korelasi dalam simulasi ini)</div>
             <div style="position:relative; height:180px;"><canvas id="mcTornadoChart"></canvas></div>
           </div>
 
@@ -2792,6 +2799,16 @@ function _clamp(val, min, max, fallback) {
   return n;
 }
 
+function _sbmHorizonMonths() {
+  var input = document.getElementById('sbmHorizonMonths');
+  var n = Number(input && input.value);
+  return input && String(input.value).trim() !== '' && Number.isInteger(n) && n >= 1 && n <= 120 ? n : NaN;
+}
+
+function _mcTimeFactor(annualRatePercent, months) {
+  return Math.pow(1 + annualRatePercent / 100, months / 12);
+}
+
 function calculateSBM() {
   invalidateMonteCarlo();
   if (!_analysisReady) {
@@ -2823,6 +2840,16 @@ function calculateSBM() {
   var warnEl = document.getElementById('sbmWarning');
   var evEl = document.getElementById('sbmExpectedValue');
 
+  var months = _sbmHorizonMonths();
+  if (!isFinite(months)) {
+      warnEl.style.display = 'block';
+      warnEl.textContent = 'Isi periode proyeksi dengan bilangan bulat 1–120 bulan.';
+      evEl.textContent = 'Periode belum valid';
+      evEl.style.color = '#fca5a5';
+      document.getElementById('btnDownloadAVMPDF').disabled = true;
+      document.getElementById('btnRunMC').disabled = true;
+      return;
+  }
   if (Math.abs(totalProb - 100) > 0.01) {
       warnEl.style.display = 'block';
       warnEl.textContent = '⚠️ Total probabilitas saat ini = ' + totalProb.toFixed(1) +
@@ -3040,6 +3067,11 @@ function runMonteCarloSimulation() {
     toast('Minimal 2 pembanding valid diperlukan untuk simulasi Monte Carlo.', 'error');
     return;
   }
+  var horizonMonths = _sbmHorizonMonths();
+  if (!isFinite(horizonMonths)) {
+    toast('Isi periode proyeksi SBM dengan bilangan bulat 1–120 bulan.', 'error');
+    return;
+  }
 
   var baseMedian = _avmCurrentMedian;
   var runToken = _mcRunToken;
@@ -3082,11 +3114,15 @@ function runMonteCarloSimulation() {
   var aPess = _clamp(document.getElementById('sbmAdjPess').value, -90, 200, -15) / 100;
   var aOpt  = _clamp(document.getElementById('sbmAdjOpt').value, -90, 200, 10) / 100;
 
-  var thresholdRaw = document.getElementById('mcThreshold').value;
-  var threshold = thresholdRaw && !isNaN(parseFloat(thresholdRaw)) ? parseFloat(thresholdRaw) : (baseMedian * 0.9);
+  var thresholdRaw = document.getElementById('mcThreshold').value.trim();
+  var threshold = thresholdRaw === '' ? baseMedian * 0.9 : Number(thresholdRaw);
 
   var invalidAssumptions = '';
   if (Math.abs(sumP - 1) > 0.0001) invalidAssumptions = 'Total probabilitas SBM wajib 100% sebelum simulasi.';
+  else if (!isFinite(threshold) || threshold < 0) invalidAssumptions = 'Ambang harga per m² harus berupa angka positif atau nol.';
+  else if ((enTime && (!isFinite(timeMin) || !isFinite(timeMode) || !isFinite(timeMax) || timeMin <= -100)) ||
+           (enShock && (!isFinite(shockMin) || !isFinite(shockMode) || !isFinite(shockMax) || shockMin <= -100)))
+    invalidAssumptions = 'Minimum Time Rate dan Market Shock harus lebih besar dari −100%.';
   else if ((enTime && !(timeMin <= timeMode && timeMode <= timeMax)) ||
            (enShock && !(shockMin <= shockMode && shockMode <= shockMax)))
     invalidAssumptions = 'Asumsi triangular harus memenuhi minimum ≤ modus ≤ maksimum.';
@@ -3116,8 +3152,8 @@ function runMonteCarloSimulation() {
       // Variabel 4: Bootstrap → goyangkan median basis
       var medSample = enBoot ? _mcBootstrapMedian(validPrices) : baseMedian;
 
-      // Variabel 1: Time Rate (Triangular) → faktor (1 + r%)
-      var fTime = enTime ? (1 + _mcSampleTriangular(timeMin, timeMode, timeMax) / 100) : 1;
+      // Variabel 1: Time Rate per tahun → pertumbuhan majemuk sesuai periode SBM.
+      var fTime = enTime ? _mcTimeFactor(_mcSampleTriangular(timeMin, timeMode, timeMax), horizonMonths) : 1;
 
       // Variabel 2: RaLAT residual (Normal) → faktor (1 + e%)
       var fRalat = enRalat ? (1 + _mcSampleNormal(0, ralatSigma) / 100) : 1;
@@ -3194,6 +3230,7 @@ function runMonteCarloSimulation() {
       iterations: N,
       elapsedMs: elapsedMs,
       baseValue: baseMedian,
+      horizonMonths: horizonMonths,
       validCount: validPrices.length,
       modelRegion: _ralatLastRun && _ralatLastRun.region || '',
       modelVersion: _ralatLastRun && _ralatLastRun.version || '',
@@ -3291,12 +3328,11 @@ function renderMCResults(result) {
     '<br>VaR<sub>99</sub>: ' + formatRupiah(Math.round(s.var99));
 
   // Threshold result
-  var thColor = s.probBelowThreshold > 20 ? '#dc2626' : (s.probBelowThreshold > 5 ? '#d97706' : '#15803d');
   document.getElementById('mcThresholdResult').innerHTML =
     '<strong>P(Nilai &lt; ' + formatRupiah(Math.round(s.threshold)) + '/m²) = </strong>' +
-    '<span style="color:' + thColor + '; font-size:16px; font-weight:800;">' + s.probBelowThreshold.toFixed(2) + '%</span>' +
+    '<span style="color:#1e3a5f; font-size:16px; font-weight:800;">' + s.probBelowThreshold.toFixed(2) + '%</span>' +
     '<div style="font-size:10.5px; color:#64748b; margin-top:4px;">' +
-      'Probabilitas nilai aset jatuh di bawah ambang batas dari ' + result.assumptions.iterations.toLocaleString('id-ID') + ' simulasi.' +
+      'Bagian hasil di bawah ambang pilihan pengguna dari ' + result.assumptions.iterations.toLocaleString('id-ID') + ' simulasi selama ' + result.assumptions.horizonMonths + ' bulan. Angka ini bukan penilaian bagus/buruk.' +
     '</div>';
 
   // Histogram
@@ -3365,12 +3401,7 @@ function renderMCResults(result) {
   var ctxT = document.getElementById('mcTornadoChart').getContext('2d');
   var tornadoData = result.sensitivity.map(function(s) { return Math.abs(s.corr); });
   var tornadoLabels = result.sensitivity.map(function(s) { return s.name; });
-  var tornadoColors = result.sensitivity.map(function(s) {
-    var v = Math.abs(s.corr);
-    if (v > 0.5) return 'rgba(220,38,38,0.85)';
-    if (v > 0.25) return 'rgba(217,119,6,0.85)';
-    return 'rgba(45,107,228,0.85)';
-  });
+  var tornadoColors = result.sensitivity.map(function() { return 'rgba(45,107,228,0.85)'; });
 
   _mcChartTornado = new Chart(ctxT, {
     type: 'bar',
@@ -3394,8 +3425,7 @@ function renderMCResults(result) {
             label: function(item) {
               var orig = result.sensitivity[item.dataIndex];
               var sign = orig.corr >= 0 ? '+' : '−';
-              return 'r = ' + sign + Math.abs(orig.corr).toFixed(3) +
-                ' · ' + (Math.abs(orig.corr) > 0.5 ? 'Tinggi' : Math.abs(orig.corr) > 0.25 ? 'Sedang' : 'Rendah');
+              return 'r = ' + sign + Math.abs(orig.corr).toFixed(3) + ' (relatif terhadap simulasi ini)';
             }
           }
         }
@@ -3411,6 +3441,7 @@ function renderMCResults(result) {
   var a = result.assumptions;
   var auditLog = '';
   auditLog += '<div><strong>Iterasi:</strong> ' + a.iterations.toLocaleString('id-ID') + ' (waktu eksekusi: ' + a.elapsedMs + ' ms)</div>';
+  auditLog += '<div><strong>Periode skenario:</strong> ' + a.horizonMonths + ' bulan dari tanggal penilaian. Koreksi SBM adalah perubahan total selama periode ini; Time Rate per tahun dimajemukkan dengan pangkat (bulan / 12).</div>';
   auditLog += '<div><strong>Basis (Median IQR-validated):</strong> ' + formatRupiah(Math.round(a.baseValue)) + ' · ' + a.validCount + ' pembanding</div>';
   auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
   auditLog += '<div><strong>Variabel 1 — Time Rate:</strong> ' + (a.time.enabled ? 'Triangular(' + a.time.min + '%, ' + a.time.mode + '%, ' + a.time.max + '%)' : '<em>OFF</em>') + '</div>';
@@ -3419,7 +3450,7 @@ function renderMCResults(result) {
   auditLog += '<div><strong>Variabel 4 — Bootstrap:</strong> ' + (a.boot.enabled ? 'Empirical resample (n=' + a.boot.samplesPerIter + ' per iterasi, with replacement)' : '<em>OFF</em>') + '</div>';
   auditLog += '<div><strong>Variabel 5 — SBM Dirichlet:</strong> ' + (a.dir.enabled ? 'Dirichlet(α=[' + a.dir.alphas.map(function(x){return x.toFixed(2);}).join(', ') + '], κ=' + a.dir.kappa + ')' : '<em>OFF</em>') + '</div>';
   auditLog += '<hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">';
-  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Hasil bergantung pada data pembanding, cakupan model, dan asumsi pengguna. Dasar koefisien perlu diverifikasi sebelum digunakan dalam kesimpulan nilai.</em></div>';
+  auditLog += '<div style="color:#64748b; font-size:10px;"><em>Jika SBM, Time Rate, atau Market Shock mewakili perubahan pasar yang sama, perkaliannya dapat menghitung pengaruh itu berulang. Angka awal dan ambang adalah asumsi pengguna, bukan standar. Hasil bergantung pada data pembanding dan cakupan model; dasar koefisien perlu diverifikasi sebelum digunakan dalam kesimpulan nilai.</em></div>';
   document.getElementById('mcAuditLog').innerHTML = auditLog;
 }
 
@@ -3443,10 +3474,8 @@ function downloadMCPDF() {
 
   var sensRows = r.sensitivity.map(function(x, i) {
     var sign = x.corr >= 0 ? '+' : '-';
-    var cls = Math.abs(x.corr) > 0.5 ? 'Tinggi' : Math.abs(x.corr) > 0.25 ? 'Sedang' : 'Rendah';
     return '<tr><td style="padding:6px; border:1px solid #d1dbe8;">' + (i + 1) + '. ' + x.name + '</td>' +
-           '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + sign + Math.abs(x.corr).toFixed(3) + '</td>' +
-           '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + cls + '</td></tr>';
+           '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + sign + Math.abs(x.corr).toFixed(3) + '</td></tr>';
   }).join('');
 
   function _yn(b) { return b ? '[ AKTIF ]' : '[ NONAKTIF ]'; }
@@ -3454,7 +3483,7 @@ function downloadMCPDF() {
   var assumptionRows =
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">1. Time Rate</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Triangular</td>' +
-    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.time.enabled ? 'min=' + a.time.min + '%, mode=' + a.time.mode + '%, max=' + a.time.max + '%' : '-') + '</td>' +
+    '<td style="padding:6px; border:1px solid #d1dbe8;">' + (a.time.enabled ? 'rate/tahun: min=' + a.time.min + '%, mode=' + a.time.mode + '%, max=' + a.time.max + '%' : '-') + '</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8; text-align:center;">' + _yn(a.time.enabled) + '</td></tr>' +
     '<tr><td style="padding:6px; border:1px solid #d1dbe8;">2. RaLAT Residual</td>' +
     '<td style="padding:6px; border:1px solid #d1dbe8;">Normal</td>' +
@@ -3476,7 +3505,7 @@ function downloadMCPDF() {
   template.innerHTML =
     '<div style="border-bottom: 3px solid #7c3aed; padding-bottom:15px; margin-bottom:20px;">' +
       '<h1 style="color:#1e3a5f; margin:0;">Laporan Monte Carlo Simulation</h1>' +
-      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Simulasi berdasarkan data pembanding dan asumsi pengguna</p>' +
+      '<p style="color:#5a6a7e; margin:5px 0 0 0;">Simulasi ' + a.horizonMonths + ' bulan dari tanggal penilaian berdasarkan data pembanding dan asumsi pengguna</p>' +
     '</div>' +
 
     '<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">' +
@@ -3536,8 +3565,8 @@ function downloadMCPDF() {
         '<td style="padding:8px; border:1px solid #d1dbe8; color:#dc2626;">' + formatRupiah(Math.round(s.var99)) + '/m&sup2;</td>' +
         '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Selisih nilai dasar dan persentil ke-1 hasil simulasi</td></tr>' +
       '<tr><td style="padding:8px; border:1px solid #d1dbe8;"><strong>P[Nilai &lt; ' + formatRupiah(Math.round(s.threshold)) + ']</strong></td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-weight:bold; color:' + (s.probBelowThreshold > 20 ? '#dc2626' : s.probBelowThreshold > 5 ? '#d97706' : '#15803d') + ';">' + s.probBelowThreshold.toFixed(2) + '%</td>' +
-        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Probabilitas threshold (negosiasi/cut-off)</td></tr>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-weight:bold;">' + s.probBelowThreshold.toFixed(2) + '%</td>' +
+        '<td style="padding:8px; border:1px solid #d1dbe8; font-size:10.5px;">Bagian hasil di bawah ambang pilihan pengguna, bukan kategori bagus atau buruk</td></tr>' +
     '</table>' +
 
     (histImg ?
@@ -3551,11 +3580,12 @@ function downloadMCPDF() {
       '<table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:20px;">' +
         '<tr style="background:#fafafa;"><th style="padding:6px; border:1px solid #d1dbe8; text-align:left;">Variabel</th>' +
         '<th style="padding:6px; border:1px solid #d1dbe8;">|r| Pearson</th>' +
-        '<th style="padding:6px; border:1px solid #d1dbe8;">Tingkat Pengaruh</th></tr>' + sensRows + '</table>'
+        '</tr>' + sensRows + '</table>'
       : '') +
 
     '<h3 style="color:#1e3a5f; font-size:14px; margin:20px 0 10px; page-break-after:avoid;">Audit Log Asumsi (Reproducibility)</h3>' +
     '<div style="font-size:10px; color:#92400e; margin-bottom:8px;">' + _ralatEscapeHtml(a.modelValidation) + '</div>' +
+    '<div style="font-size:10px; margin-bottom:8px;">Periode: ' + a.horizonMonths + ' bulan. Koreksi SBM adalah perubahan total selama periode ini. Rate tahunan Time Rate dimajemukkan dengan pangkat (bulan / 12); Shock satu kali. Jika SBM, Time Rate, dan Shock mewakili peristiwa sama, hasil dapat menghitungnya berulang. Semua angka awal dan ambang hanya asumsi, bukan standar.</div>' +
     '<div style="font-size:10px; margin-bottom:8px;">Model RaLAT: ' + _ralatEscapeHtml(a.modelRegion || 'tidak tersedia') +
       ' · versi ' + _ralatEscapeHtml(a.modelVersion || '—') +
       (a.modelStatus ? ' · ' + _ralatEscapeHtml(a.modelStatus) : '') + '</div>' +
@@ -3566,7 +3596,7 @@ function downloadMCPDF() {
         '<th style="padding:6px; border:1px solid #d1dbe8;">Status</th></tr>' + assumptionRows + '</table>' +
 
     '<div style="margin-top:20px; padding:12px; background:#f8fafc; border-left:4px solid #7c3aed; font-size:10px; color:#475569; line-height:1.5; border-radius:4px; page-break-inside:avoid;">' +
-      '<strong style="color:#1e3a5f;">Catatan statistik:</strong> Hasil simulasi merepresentasikan ' + a.iterations.toLocaleString('id-ID') + ' skenario berdasarkan asumsi pengguna. Rentang persentil dan selisih nilai dasar adalah hasil asumsi simulasi, bukan selang kepercayaan nilai pasar atau prediksi pasti. Penilai perlu mendukung asumsi dengan bukti pasar.' +
+      '<strong style="color:#1e3a5f;">Catatan statistik:</strong> Hasil simulasi merepresentasikan ' + a.iterations.toLocaleString('id-ID') + ' skenario berdasarkan asumsi pengguna. P5 memiliki 5% hasil di bawahnya, P95 memiliki 5% hasil di atasnya. VaR adalah selisih per m² dari median nilai dasar, bukan kerugian pasti. Rentang persentil bukan selang kepercayaan nilai pasar atau prediksi pasti. Penilai perlu mendukung asumsi dengan bukti pasar.' +
     '</div>' +
 
     '<div style="margin-top:30px; font-size:11px; color:#5a6a7e; text-align:right;">' +
@@ -3623,12 +3653,14 @@ function downloadMCPDF() {
 
 function downloadAVMPDF() {
   if (!_analysisReady) { toast('Jalankan ulang Analisa sebelum mengunduh PDF.', 'error'); return; }
-  toast('Membangun Laporan PDF AVM...', 'loading');
   var template = document.getElementById('pdfAVMTemplate');
   
   var medianRp = document.getElementById('modalMedianPrice').textContent;
   var dataCount = document.getElementById('modalDataCount').textContent;
   var evRp = document.getElementById('sbmExpectedValue').textContent;
+  var horizonMonths = _sbmHorizonMonths();
+  if (!isFinite(horizonMonths)) { toast('Isi periode proyeksi SBM dengan bilangan bulat 1–120 bulan.', 'error'); return; }
+  toast('Membangun Laporan PDF AVM...', 'loading');
 
   var pPess = document.getElementById('sbmProbPess').value;
   var aPess = document.getElementById('sbmAdjPess').value;
@@ -3672,6 +3704,7 @@ function downloadAVMPDF() {
     </div>
 
     <h3 style="color:#1e3a5f; font-size:14px; margin-bottom:10px;">Parameter Probabilitas (Scenario Based Method)</h3>
+    <p style="font-size:11px; color:#475569;">Periode ${horizonMonths} bulan dari tanggal penilaian. Persentase tiap skenario adalah perubahan total selama periode ini, bukan rate tahunan; nilai awal adalah asumsi pengguna, bukan standar. Nilai harapan adalah rata-rata tertimbang, bukan harga jual yang dijamin.</p>
     <table style="width:100%; border-collapse:collapse; text-align:center; font-size:12px; margin-bottom:25px;">
       <tr>
         <th style="padding:8px; border:1px solid #d1dbe8; background:#fafafa;">Skenario</th>

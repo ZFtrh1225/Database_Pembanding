@@ -74,6 +74,21 @@ for (const name of [
   catch (error) { throw new Error('Gagal memuat ' + name + ': ' + error.message, { cause: error }); }
 }
 
+for (const name of ['_sbmHorizonMonths', '_mcTimeFactor']) {
+  vm.runInContext(extractFunction(html, name), context);
+}
+assert.equal(context._mcTimeFactor(5, 12), 1.05, '12 bulan mempertahankan faktor waktu lama');
+assert.ok(Math.abs(context._mcTimeFactor(5, 6) - Math.sqrt(1.05)) < 1e-12, '6 bulan memajemukkan setengah tahun');
+assert.ok(Math.abs(context._mcTimeFactor(5, 24) - 1.1025) < 1e-12, '24 bulan memajemukkan dua tahun');
+const initialGetElement = context.document.getElementById;
+for (const [value, expected] of [['12', 12], ['6.5', NaN], ['0', NaN], ['121', NaN], ['', NaN]]) {
+  context.document.getElementById = id => id === 'sbmHorizonMonths' ? { value } : initialGetElement(id);
+  const actual = context._sbmHorizonMonths();
+  if (Number.isNaN(expected)) assert.ok(Number.isNaN(actual), 'Tolak periode tidak valid: ' + value);
+  else assert.equal(actual, expected);
+}
+context.document.getElementById = initialGetElement;
+
 // Kamus query RaLAT sengaja terpisah dari POI lingkungan.
 const queryRegistry = html.slice(html.indexOf('var RALAT_QUERY_TAGS ='), html.indexOf('function _ralatV2CacheKey('));
 vm.runInContext(queryRegistry, context);
