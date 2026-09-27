@@ -245,16 +245,19 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .poi-item:last-child { border-bottom: none; }
 .poi-name { color: var(--navy); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
 .poi-dist { color: var(--blue); font-weight: 800; background: var(--sky); padding: 2px 6px; border-radius: 4px; font-size: 10px; }
-.poi-btn { width: 100%; background: #e8f0fe; color: #2d6be4; border: 1px dashed #2d6be4; border-radius: 6px; padding: 8px; font-size: 11px; font-weight: 700; font-family: var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
+.poi-btn { width: 100%; min-height: 44px; background: #e8f0fe; color: #2d6be4; border: 1px dashed #2d6be4; border-radius: 6px; padding: 8px; font-size: 11px; font-weight: 700; font-family: var(--font); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
 .poi-btn:hover:not(:disabled) { background: #2d6be4; color: #fff; border-style: solid; box-shadow: 0 4px 10px rgba(45,107,228,.2); }
 .poi-btn:disabled { opacity: 0.6; cursor: not-wait; border-style: solid; }
 .poi-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #2d6be4; border-radius: 6px; font-family: var(--font); font-size: 11px; color: var(--navy); box-shadow: 0 4px 8px rgba(0,0,0,0.25); padding: 5px 8px; }
 .poi-tooltip::before { border-top-color: #2d6be4 !important; }
 .poi-controls { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:8px 0; color:var(--navy); font-weight:700; }
-.poi-controls select { min-height:38px; min-width:110px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--navy); padding:6px; font:inherit; }
+.poi-controls select { min-height:44px; min-width:110px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--navy); padding:6px; font:inherit; }
 .poi-group { border:1px solid var(--border); border-radius:9px; margin:8px 0; padding:8px 10px; background:#fff; }
-.poi-group summary { cursor:pointer; font-weight:800; color:var(--navy); min-height:30px; }
+.poi-group summary { cursor:pointer; font-weight:800; color:var(--navy); min-height:44px; align-content:center; }
 .poi-subtype { margin:10px 0 4px; color:var(--navy); font-weight:700; }
+.poi-more { border-top:1px solid #edf1f5; }
+.poi-more summary { display:list-item; cursor:pointer; color:var(--blue); font-weight:700; min-height:44px; align-content:center; padding:4px 0; }
+.poi-more[open] summary { border-bottom:1px solid #edf1f5; }
 .poi-entry { display:flex; align-items:start; justify-content:space-between; gap:8px; padding:7px 0; border-top:1px solid #edf1f5; }
 .poi-entry a { overflow-wrap:anywhere; color:var(--blue); font-weight:600; }
 .poi-entry small { display:block; color:#5a6a7e; line-height:1.4; }
@@ -1550,6 +1553,7 @@ body.mmode-picking .mpick-hint { display: flex; }
           <strong>Kendali Mutu:</strong> Harga di bawah telah disesuaikan untuk waktu; penyesuaian RaLAT hanya berlaku jika wilayah, versi, dan fitur model tersedia. Periksa status serta cakupan variabel di bawah. Centang untuk memasukkan pembanding ke median.
         </div>
         <div id="ralatAuditSummary" class="ralat-audit-summary" role="status" aria-live="polite">Menyiapkan analisis model…</div>
+        <button type="button" id="btnDownloadRalatAudit" class="poi-btn" onclick="downloadRalatAuditCSV()" disabled style="margin:0 0 12px; max-width:300px;">Unduh data pemeriksaan RaLAT (CSV)</button>
         <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
           <table class="audit-table">
             <thead>
@@ -2415,6 +2419,8 @@ function initAVMAnalysis() {
   var runToken = ++_analysisRunToken;
   _analysisReady = false;
   document.getElementById('btnDownloadAVMPDF').disabled = true;
+  var auditCSVBtn = document.getElementById('btnDownloadRalatAudit');
+  if (auditCSVBtn) auditCSVBtn.disabled = true;
   document.getElementById('btnRunMC').disabled = true;
   document.getElementById('btnRecalculateAVM').disabled = true;
   invalidateMonteCarlo();
@@ -2483,6 +2489,7 @@ function initAVMAnalysis() {
     rowsForRalat.push({
       row: row,
       coordComp: coordComp,   // {lat, lng} atau null
+      priceObserved: price,
       priceTimeAdj: priceTimeAdj,
       diffYears: diffYears
     });
@@ -2505,6 +2512,8 @@ function initAVMAnalysis() {
         uid:  item.row._uid,
         id:   item.row.id,
         price: item.priceTimeAdj,
+        priceObserved: item.priceObserved,
+        priceAfterTime: item.priceTimeAdj,
         ralatInfo: '<em>Hanya penyesuaian waktu</em>',
         breakdown: [],
         adjPct: 0,
@@ -2600,6 +2609,8 @@ function initAVMAnalysis() {
           uid:   item.row._uid,
           id:    item.row.id,
           price: adjustedPrice,
+          priceObserved: item.priceObserved,
+          priceAfterTime: item.priceTimeAdj,
           ralatInfo: top3 || '<em>Tidak ada variabel terhitung</em>',
           breakdown: engineRes.breakdown,
           adjPct: engineRes.adjPct,
@@ -2731,6 +2742,8 @@ function recalcAVM() {
 
   document.getElementById('auditTableBody').innerHTML = htmlAudit;
   renderRalatAuditSummary();
+  var auditCSVBtn = document.getElementById('btnDownloadRalatAudit');
+  if (auditCSVBtn) auditCSVBtn.disabled = !_avmRawData.some(function(d) { return !!d.coverage; });
 
   finalPrices.sort((a, b) => a - b);
   _avmCurrentMedian = getMed(finalPrices);
@@ -4274,6 +4287,24 @@ function _poiResults(elements, lat, lng, radius) {
     return groups;
 }
 
+function _poiEntryHtml(item) {
+    var distText = item.dist >= 1000 ? (item.dist / 1000).toFixed(2) + ' km' : Math.round(item.dist) + ' m';
+    var url = 'https://www.openstreetmap.org/' + item.type + '/' + encodeURIComponent(item.id);
+    return '<div class="poi-entry"><span><a href="' + url + '" target="_blank" rel="noopener noreferrer">' + _ralatEscapeHtml(item.name) + '</a>' +
+      '<small>OSM ' + item.type + '/' + _ralatEscapeHtml(item.id) + (item.approximate ? ' · titik perwakilan area' : '') + '</small></span>' +
+      '<span class="poi-dist">' + distText + '</span></div>';
+}
+
+function _poiSubtypeHtml(kind, items) {
+    var html = '<div class="poi-subtype">' + _ralatEscapeHtml(kind) + ' (' + items.length + ')</div>';
+    html += items.slice(0, 3).map(_poiEntryHtml).join('');
+    if (items.length > 3) {
+      html += '<details class="poi-more"><summary>Tampilkan ' + (items.length - 3) + ' fasilitas lainnya</summary>' +
+        items.slice(3).map(_poiEntryHtml).join('') + '</details>';
+    }
+    return html;
+}
+
 function analyzePOI(lat, lng, uid) {
     var btn = document.getElementById('btn_poi_' + uid);
     var resDiv = document.getElementById('poi_res_' + uid);
@@ -4308,16 +4339,8 @@ function analyzePOI(lat, lng, uid) {
           if (!total) html += '<p class="poi-note">Belum tercatat di OSM dalam radius ' + label + '.</p>';
           var closest = null;
           subtypes.forEach(function(kind) {
-            html += '<div class="poi-subtype">' + _ralatEscapeHtml(kind) + ' (' + types[kind].length + ')</div>';
-            types[kind].slice(0, 3).forEach(function(item) {
-              if (!closest || item.dist < closest.dist) closest = item;
-              var distText = item.dist >= 1000 ? (item.dist/1000).toFixed(2) + ' km' : Math.round(item.dist) + ' m';
-              var url = 'https://www.openstreetmap.org/' + item.type + '/' + encodeURIComponent(item.id);
-              html += '<div class="poi-entry"><span><a href="' + url + '" target="_blank" rel="noopener noreferrer">' + _ralatEscapeHtml(item.name) + '</a>' +
-                '<small>OSM ' + item.type + '/' + _ralatEscapeHtml(item.id) + (item.approximate ? ' · titik perwakilan area' : '') + '</small></span>' +
-                '<span class="poi-dist">' + distText + '</span></div>';
-            });
-            if (types[kind].length > 3) html += '<small>' + (types[kind].length - 3) + ' fasilitas lain tercatat pada jenis ini.</small>';
+            html += _poiSubtypeHtml(kind, types[kind]);
+            if (!closest || types[kind][0].dist < closest.dist) closest = types[kind][0];
           });
           html += '</details>';
           if (closest) {
@@ -5156,6 +5179,8 @@ function markAnalysisStale() {
   _ralatLastRun = { region: null, version: null, status: 'Input berubah. Jalankan Analisa lagi.' };
   invalidateMonteCarlo();
   var pdf = document.getElementById('btnDownloadAVMPDF');
+  var auditCSVBtn = document.getElementById('btnDownloadRalatAudit');
+  if (auditCSVBtn) auditCSVBtn.disabled = true;
   var mc = document.getElementById('btnRunMC');
   if (pdf) pdf.disabled = true;
   if (mc) mc.disabled = true;
@@ -5276,8 +5301,93 @@ function _ralatTraceSource(t) {
   return info.join(' · ');
 }
 
+// Pemeriksaan kedua atas aritmetika aplikasi. Status "sesuai" tidak berarti
+// model regresi asli telah dibuktikan memakai definisi dan rumus yang sama.
+function _ralatCheckArithmetic(d) {
+  if (!d || !d.breakdown || !d.breakdown.length || !isFinite(d.priceAfterTime)) {
+    return { status:'tidak tersedia', reason:'Tidak ada pasangan harga dan kontribusi RaLAT yang dapat diperiksa.' };
+  }
+  function close(a, b) {
+    return isFinite(a) && isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+  }
+  var sum = 0;
+  for (var i = 0; i < d.breakdown.length; i++) {
+    var b = d.breakdown[i];
+    var a = Number(b.asetVal), c = Number(b.compVal), beta = Number(b.koef);
+    var delta = b.tipe === 'ln'
+      ? Math.log(Math.max(a, RALAT_LN_FLOOR_M)) - Math.log(Math.max(c, RALAT_LN_FLOOR_M))
+      : a - c;
+    if (!close(delta, b.delta) || !close(beta * delta, b.kontribPct)) {
+      return { status:'selisih', reason:'Selisih pada variabel ' + b.var + '; periksa nilai dan koefisien.' };
+    }
+    sum += beta * delta;
+  }
+  var capped = Math.max(-RALAT_CAP, Math.min(RALAT_CAP, sum));
+  var expectedPrice = Number(d.priceAfterTime) * (1 + capped);
+  if (!close(sum, d.rawAdjPct) || !close(capped, d.adjPct) || !close(expectedPrice, d.price) || d.capped !== (sum !== capped)) {
+    return { status:'selisih', reason:'Jumlah kontribusi, pembatas, atau harga akhir tidak cocok.' };
+  }
+  return { status:'sesuai', reason:'Cek aritmetika aplikasi cocok; definisi dan rumus model asli belum tervalidasi.',
+    rawAdjustment:sum, appliedAdjustment:capped, expectedPrice:expectedPrice };
+}
+
+function _ralatCsvCell(value) {
+  if (typeof value === 'number' && isFinite(value)) return String(value).replace('.', ',');
+  var raw = String(value == null ? '' : value).replace(/[\r\n]+/g, ' ');
+  // Data nama/tag OSM dapat dimulai rumus spreadsheet; paksa tampil sebagai teks.
+  if (/^\s*[=+\-@]/.test(raw)) raw = "'" + raw;
+  return '"' + raw.replace(/"/g, '""') + '"';
+}
+
+function _ralatBuildAuditCsv(rows, model) {
+  var header = ['Wilayah','Versi model','ID pembanding','Status variabel','Baris Model_Regresi','Variabel','Label sheet','Jenis rumus',
+    'Nilai aset','Nilai pembanding','Nilai aset dipakai','Nilai pembanding dipakai','Satuan nilai','Koefisien beta','Delta','Kontribusi proporsi',
+    'Sumber aset','Sumber pembanding','Alasan dilewati','Harga awal per m2','Harga setelah waktu per m2',
+    'Jumlah kontribusi mentah','Penyesuaian diterapkan','Harga setelah RaLAT per m2','Cek aritmetika'];
+  var lines = ['sep=;', header.map(_ralatCsvCell).join(';')];
+  (rows || []).forEach(function(d) {
+    if (!d.coverage) return;
+    var check = _ralatCheckArithmetic(d);
+    function shared() { return [model.region || '', model.version || '', d.id || '']; }
+    (d.breakdown || []).forEach(function(b) {
+      var unit = b.tipe === 'ln' ? 'meter sebelum ln' : b.tipe === 'numerik_ln' ? 'ln(m2)' :
+        b.tipe === 'poi_count' ? 'jumlah' : b.tipe === 'marking' ? 'penanda 0/1' : 'sesuai variabel';
+      lines.push(shared().concat(['terhitung',b.sheetRow || '',b.var,b.label || '',b.tipe,b.asetVal,b.compVal,
+        b.asetUsed != null ? b.asetUsed : b.asetVal,b.compUsed != null ? b.compUsed : b.compVal,unit,b.koef,b.delta,b.kontribPct,
+        _ralatTraceSource(b.asetTrace),_ralatTraceSource(b.compTrace),'',d.priceObserved,d.priceAfterTime,d.rawAdjPct,d.adjPct,d.price,check.status]).map(_ralatCsvCell).join(';'));
+    });
+    (d.coverage.skipped || []).forEach(function(s) {
+      lines.push(shared().concat(['dilewati',s.sheetRow || '',s.name,s.label || '','','','','','','','','','','','',s.reason || '',
+        d.priceObserved,d.priceAfterTime,d.rawAdjPct,d.adjPct,d.price,check.status]).map(_ralatCsvCell).join(';'));
+    });
+  });
+  return '\ufeff' + lines.join('\r\n') + '\r\n';
+}
+
+function downloadRalatAuditCSV() {
+  if (!_avmRawData.some(function(d) { return !!d.coverage; }) || !_ralatLastRun.region || !_ralatLastRun.version) {
+    toast('Jalankan Analisa & RaLAT sebelum mengunduh data pemeriksaan.', 'error');
+    return;
+  }
+  var csv = _ralatBuildAuditCsv(_avmRawData, _ralatLastRun);
+  var url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Audit_RaLAT_' + String(_ralatLastRun.region).replace(/[^a-z0-9_-]/gi, '_') + '_' +
+    String(_ralatLastRun.version).replace(/[^a-z0-9_-]/gi, '_') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
 function _ralatRenderVariableTrace(d) {
   if (!d || !d.breakdown || !d.breakdown.length) return '';
+  var check = _ralatCheckArithmetic(d);
+  var priceLine = isFinite(d.priceAfterTime) && isFinite(d.price)
+    ? '<div>Harga setelah waktu ' + formatRupiah(Math.round(d.priceAfterTime)) +
+      ' × (1 + ' + (d.adjPct * 100).toFixed(3) + '%) = ' + formatRupiah(Math.round(d.price)) +
+      ' per m². Jumlah kontribusi sebelum batas ±50%: ' + (d.rawAdjPct * 100).toFixed(3) + '%.</div>' : '';
   var rows = d.breakdown.map(function(b) {
     var formula = b.tipe === 'ln' ? 'β × [ln(max(jarak aset, 50 m)) − ln(max(jarak pembanding, 50 m))]'
       : b.tipe === 'numerik_ln' ? 'β × [ln(luas aset) − ln(luas pembanding)]'
@@ -5300,7 +5410,9 @@ function _ralatRenderVariableTrace(d) {
       '<div class="ralat-trace-source">Pembanding: ' + _ralatEscapeHtml(_ralatTraceSource(b.compTrace)) + '</div></div>';
   }).join('');
   return '<details class="ralat-trace"><summary>Rincian rumus &amp; sumber ' + d.breakdown.length + ' variabel</summary>' +
-    '<div>Kontribusi dijumlahkan lalu totalnya dibatasi ±50%. Definisi dan konversi koefisien model asli belum diverifikasi.</div>' + rows + '</details>';
+    '<div>Kontribusi dijumlahkan lalu totalnya dibatasi ±50%. Definisi dan konversi koefisien model asli belum diverifikasi.</div>' +
+    priceLine + '<div><strong>Cek hitung aplikasi: ' + _ralatEscapeHtml(check.status) + '.</strong> ' +
+    _ralatEscapeHtml(check.reason) + '</div>' + rows + '</details>';
 }
 
 function renderRalatAuditSummary() {
@@ -5327,6 +5439,9 @@ function renderRalatAuditSummary() {
     var minimum = Math.min.apply(null, coverage.map(function(d) { return d.coverage.used; }));
     var total = coverage[0].coverage.total;
     html += '<div>' + coverage.length + ' pembanding diproses · minimal ' + minimum + '/' + total + ' variabel terhitung per pembanding.</div>';
+    var disagreements = coverage.filter(function(d) { return _ralatCheckArithmetic(d).status === 'selisih'; });
+    if (disagreements.length) html += '<div><strong>Perhatian:</strong> ' + disagreements.length +
+      ' pembanding memiliki selisih hitung internal. Periksa rinciannya sebelum memakai hasil.</div>';
   }
   if (issueNames.length) {
     html += '<details><summary>' + issueNames.length + ' variabel belum terhitung (lihat alasan)</summary><ul style="padding-left:18px;">' +
@@ -5418,8 +5533,12 @@ function _ralatRenderPDFBreakdown() {
 
     return '<div style="margin-top:14px; border:1px solid #e2e8f0; border-radius:4px;">' +
            '<div style="background:#f8fafc; padding:6px 10px; font-weight:700; font-size:11px; color:#1e3a5f; border-bottom:1px solid #e2e8f0;">' +
-           '📍 ' + d.id + ' · Total: <span style="color:' + (d.adjPct >= 0 ? '#15803d' : '#dc2626') + ';">' + totalPct + '</span>' + capWarn + grossTxt +
+           '📍 ' + _ralatEscapeHtml(d.id) + ' · Total: <span style="color:' + (d.adjPct >= 0 ? '#15803d' : '#dc2626') + ';">' + totalPct + '</span>' + capWarn + grossTxt +
            '</div>' +
+           '<div style="padding:6px 10px; font-size:9px; color:#475569;">Harga setelah waktu ' +
+           formatRupiah(Math.round(d.priceAfterTime)) + ' × (1 + ' + (d.adjPct * 100).toFixed(3) + '%) = ' +
+           formatRupiah(Math.round(d.price)) + ' per m² · cek hitung aplikasi: ' +
+           _ralatEscapeHtml(_ralatCheckArithmetic(d).status) + ' (model asli belum tervalidasi).</div>' +
            '<table style="width:100%; border-collapse:collapse;">' +
            '<thead><tr style="background:#fafafa;">' +
            '<th style="padding:5px 6px; border-bottom:1px solid #e2e8f0; text-align:left; font-size:10px;">Variabel</th>' +

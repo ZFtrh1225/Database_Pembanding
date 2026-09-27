@@ -60,7 +60,8 @@ for (const name of [
   'ralatNormalizeModels', '_ralatFixVarTypes', 'ralatPickLatestVersion',
   'ralatClassifyVar', '_ralatNorm', '_ralatHaversine', '_ralatElCoord', '_ralatMinDistance',
   'ralatFeatureIssue', 'ralatBuildFeatures', '_ralatIsKomersial', 'ralatEngineV2', '_ralatEscapeHtml',
-  '_ralatTraceSource', '_ralatRenderMissing', '_ralatRenderVariableTrace', 'renderRalatAuditSummary',
+  '_ralatTraceSource', '_ralatCheckArithmetic', '_ralatCsvCell', '_ralatBuildAuditCsv',
+  '_ralatRenderMissing', '_ralatRenderVariableTrace', 'renderRalatAuditSummary',
   'invalidateMonteCarlo', 'markAnalysisStale'
 ]) {
   // The HTML escaping helper contains quote characters inside regular expressions;
@@ -76,7 +77,7 @@ for (const name of [
 const queryRegistry = html.slice(html.indexOf('var RALAT_QUERY_TAGS ='), html.indexOf('function _ralatV2CacheKey('));
 vm.runInContext(queryRegistry, context);
 vm.runInContext(html.slice(html.indexOf('var RALAT_TAG_MATCHERS ='), html.indexOf('function ralatFeatureIssue(')), context);
-for (const name of ['_ralatV2CacheKey', '_ralatV2CacheGet', '_ralatV2CacheSet', '_ralatV2Fetch', '_overpassQuery', '_poiKind', '_poiResults']) {
+for (const name of ['_ralatV2CacheKey', '_ralatV2CacheGet', '_ralatV2CacheSet', '_ralatV2Fetch', '_overpassQuery', '_poiKind', '_poiResults', '_poiEntryHtml', '_poiSubtypeHtml']) {
   vm.runInContext(extractFunction(html, name), context);
 }
 
@@ -164,6 +165,32 @@ assert.ok(Math.abs(audit.breakdown.find(b => b.var === 'ln_distance_to_road').ko
 assert.ok(Math.abs(audit.breakdown.find(b => b.var === 'lebar_jalan_di_depan_adj').kontribPct - 0.08004727646) < 1e-12);
 assert.ok(Math.abs(Math.expm1(expected) - expected) > 0.006, 'Konversi exp(Δ)−1 berbeda dari implementasi saat ini; perlu spesifikasi model');
 assert.ok(Math.abs(1000000 * (1 + audit.adjPct) - 1108467.3) < 1);
+// Angka yang tampak pada Audit Sumatra: cocokkan dua kontribusi yang terlihat
+// dengan koefisien baris 586 dan 592, tanpa menganggap model asli tervalidasi.
+const observedAudit = context.ralatEngineV2({
+  ln_distance_to_big_city: { tipe:'ln', koefisien:-0.2380993745 },
+  ln_luas_tanah: { tipe:'ln', koefisien:-0.1339430666 }
+}, { ln_distance_to_big_city:2306.2023, ln_luas_tanah:5.8579332 },
+   { ln_distance_to_big_city:750.40943, ln_luas_tanah:6.6995003 });
+assert.ok(Math.abs(observedAudit.breakdown.find(b => b.var === 'ln_distance_to_big_city').kontribPct + 0.26732) < 0.00002);
+assert.ok(Math.abs(observedAudit.breakdown.find(b => b.var === 'ln_luas_tanah').kontribPct - 0.11272) < 0.00002);
+const manualPair = Object.assign({}, audit, { priceObserved:1000000, priceAfterTime:1000000,
+  price:1000000 * (1 + audit.adjPct), id:'DP-1' });
+assert.equal(context._ralatCheckArithmetic(manualPair).status, 'sesuai');
+assert.equal(context._ralatCheckArithmetic(Object.assign({}, manualPair, { price:1100000 })).status, 'selisih');
+assert.equal(context._ralatCheckArithmetic(Object.assign({}, manualPair, { rawAdjPct:audit.rawAdjPct + 0.01 })).status, 'selisih');
+const reviewCsv = context._ralatBuildAuditCsv([Object.assign({}, manualPair, { coverage:{
+  used:2, total:3, skipped:[{ name:'POI_retail_1000m', label:'retail', sheetRow:460,
+    reason:'Definisi; belum tersedia' }] } })], { region:'Sumatra', version:'20241213' });
+assert.match(reviewCsv, /^\ufeffsep=;/);
+assert.equal((reviewCsv.match(/\r\n/g) || []).length, 5, 'Header, dua variabel terhitung dan satu dilewati');
+assert.match(reviewCsv, /"POI_retail_1000m"/);
+assert.match(reviewCsv, /"Definisi; belum tersedia"/);
+assert.match(reviewCsv, /"sesuai"/);
+const reviewRows = reviewCsv.slice(1).split('\r\n').slice(1, -1);
+const countFields = line => (line.match(/(?:^|;)(?:"(?:[^"]|"")*"|[^;]*)/g) || []).length;
+assert.deepEqual(reviewRows.map(countFields), [25, 25, 25, 25], 'Setiap baris CSV mengikuti 25 kolom header');
+assert.match(context._ralatCsvCell('=HYPERLINK("https://x")'), /^"'=HYPERLINK\(""https:\/\/x""\)"$/);
 assert.ok(Math.abs(audit.breakdown.find(b => b.var === 'ln_distance_to_road').delta - Math.log(0.5)) < 1e-12);
 const floor = context.ralatEngineV2({ ln_distance_to_road: { tipe: 'ln', koefisien: betaRoad } },
   { ln_distance_to_road: 5 }, { ln_distance_to_road: 50 });
@@ -298,6 +325,19 @@ assert.equal(poiGroups.Kesehatan['Puskesmas (berdasarkan nama)'].length, 1);
 assert.equal(poiGroups.Kesehatan['Rumah sakit'].length, 2);
 assert.equal(poiGroups.Peribadatan.Pura[0].type, 'way');
 assert.equal(poiGroups.Peribadatan.Pura[0].approximate, true);
+const manyHospitals = Array.from({ length: 5 }, (_, n) => ({
+  type:'node', id:100 + n, lat:-6.2, lon:106.801 + n * 0.001,
+  tags:{ amenity:'hospital', name: n === 4 ? '<img src=x onerror=alert(1)>' : 'RS Nomor ' + n }
+}));
+const allHospitals = context._poiResults(manyHospitals, -6.2, 106.8, 2500).Kesehatan['Rumah sakit'];
+const expandedList = context._poiSubtypeHtml('Rumah sakit', allHospitals);
+assert.match(expandedList, /Rumah sakit \(5\)/);
+assert.match(expandedList, /Tampilkan 2 fasilitas lainnya/);
+assert.equal((expandedList.match(/class="poi-entry"/g) || []).length, 5, 'Seluruh hasil POI dapat ditampilkan');
+assert.ok(expandedList.indexOf('RS Nomor 0') < expandedList.indexOf('RS Nomor 3'));
+assert.match(expandedList, /&lt;img src=x onerror=alert\(1\)&gt;/);
+assert.doesNotMatch(expandedList, /<img src=x/);
+assert.doesNotMatch(context._poiSubtypeHtml('Rumah sakit', allHospitals.slice(0, 3)), /poi-more/);
 assert.ok(Object.keys(context.RALAT_TAG_MATCHERS).every(k => !!context.RALAT_QUERY_TAGS[k]),
   'Setiap matcher jarak berbasis OSM harus memiliki definisi query');
 
