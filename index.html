@@ -2577,6 +2577,7 @@ function initAVMAnalysis() {
 
     return Promise.all(compPromises).then(function(results) {
       if (runToken !== _analysisRunToken) return;
+      var prepared = [];
       results.forEach(function(slot) {
         if (!slot) return;
         var item = slot.item;
@@ -2596,6 +2597,20 @@ function initAVMAnalysis() {
         var compGeocode = { bestCity: item.row.kota || '', city: item.row.kota || '', state: item.row.provinsi || '' };
         var compTrace = {};
         var compFeats = ralatBuildFeatures(item.coordComp, compMeta, opRes, compGeocode, activeModel, compTrace, 'pembanding');
+        prepared.push({ item:item, compFeats:compFeats, compTrace:compTrace });
+      });
+
+      // Periksa semua titik terpilih sebelum satu pun harga RaLAT dihitung.
+      // Bila satu node memiliki dua koordinat, jangan memilih salah satunya
+      // secara diam-diam: tahan variabel itu pada seluruh pasangan di run ini.
+      var conflictInfo = _ralatFindOSMConflicts([asetTrace].concat(prepared.map(function(p) { return p.compTrace; })));
+      _ralatLastRun.osmConflicts = conflictInfo.conflicts;
+      _ralatHoldConflictingFeatures(asetFeats, asetTrace, prepared, conflictInfo);
+
+      prepared.forEach(function(slot) {
+        var item = slot.item;
+        var compFeats = slot.compFeats;
+        var compTrace = slot.compTrace;
         var engineRes = ralatEngineV2(activeModel, asetFeats, compFeats, asetTrace, compTrace);
         var adjustedPrice = item.priceTimeAdj * (1 + engineRes.adjPct);
 
@@ -4623,7 +4638,9 @@ var RALAT_POI_QUERY_TAGS = {
   historical: ['node["historic"]'], historic: ['node["historic"]'],
   entertainment: ['node["amenity"="theatre"]', 'node["amenity"="cinema"]', 'node["amenity"="nightclub"]']
 };
-var RALAT_QUERY_SCHEMA = 'model-tags-v1';
+// Versi cache baru menyimpan waktu basis data Overpass per respons RaLAT.
+// Cache POI lingkungan memiliki key sendiri dan tidak ikut berubah.
+var RALAT_QUERY_SCHEMA = 'model-tags-v2-provenance';
 
 function _ralatV2QueryParts(activeModel) {
   var parts = { near: [], far: [] };
@@ -4663,15 +4680,17 @@ function _ralatV2CacheGet(lat, lng, radius, kind, modelKey, tags) {
     var raw = localStorage.getItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags));
     if (!raw) return null;
     var obj = JSON.parse(raw);
-    if (!obj || !obj.t || !obj.d) return null;
-    if ((Date.now() - obj.t) > OVERPASS_CACHE_TTL_MS) return null;
-    return obj.d;
+    var cachedAt = obj && Number(obj.t);
+    if (!obj || !isFinite(cachedAt) || cachedAt <= 0 || !Array.isArray(obj.d)) return null;
+    if (cachedAt > Date.now() || (Date.now() - cachedAt) > OVERPASS_CACHE_TTL_MS) return null;
+    return { elements:obj.d, osmTimestamp:obj.osmTimestamp || '', fetchedAt:cachedAt, fromCache:true };
   } catch (e) { return null; }
 }
 
-function _ralatV2CacheSet(lat, lng, radius, kind, modelKey, tags, data) {
+function _ralatV2CacheSet(lat, lng, radius, kind, modelKey, tags, data, osmTimestamp, fetchedAt) {
+  var cached = { t:fetchedAt, d:data, osmTimestamp:osmTimestamp || '' };
   try {
-    localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags), JSON.stringify({ t: Date.now(), d: data }));
+    localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags), JSON.stringify(cached));
   } catch (e) {
     // Quota full → bersihkan cache ralat2 lama
     try {
@@ -4679,7 +4698,7 @@ function _ralatV2CacheSet(lat, lng, radius, kind, modelKey, tags, data) {
         var k = localStorage.key(i);
         if (k && k.indexOf('ralat2:') === 0) localStorage.removeItem(k);
       }
-      localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags), JSON.stringify({ t: Date.now(), d: data }));
+      localStorage.setItem(_ralatV2CacheKey(lat, lng, radius, kind, modelKey, tags), JSON.stringify(cached));
     } catch (e2) {}
   }
 }
@@ -4691,28 +4710,34 @@ function _ralatV2Fetch(lat, lng, activeModel, modelKey) {
   var nearCached = parts.near.length && _ralatV2CacheGet(lat, lng, nearR, 'near', modelKey, parts.near);
   var farCached  = parts.far.length && _ralatV2CacheGet(lat, lng, farR, 'far', modelKey, parts.far);
 
-  var nearP = !parts.near.length ? Promise.resolve([]) : nearCached
+  var empty = { elements:[], osmTimestamp:'', fetchedAt:null, fromCache:false };
+  var nearP = !parts.near.length ? Promise.resolve(empty) : nearCached
     ? Promise.resolve(nearCached)
     : _overpassFetchWithFallback(_ralatV2Query(lat, lng, nearR, parts.near))
         .then(function(d) {
           var els = (d && d.elements) ? d.elements : [];
-          _ralatV2CacheSet(lat, lng, nearR, 'near', modelKey, parts.near, els);
-          return els;
+          var timestamp = d && d.osm3s && d.osm3s.timestamp_osm_base || '';
+          var fetchedAt = Date.now();
+          _ralatV2CacheSet(lat, lng, nearR, 'near', modelKey, parts.near, els, timestamp, fetchedAt);
+          return { elements:els, osmTimestamp:timestamp, fetchedAt:fetchedAt, fromCache:false };
         }).catch(function(){ return null; });
 
-  var farP = !parts.far.length ? Promise.resolve([]) : farCached
+  var farP = !parts.far.length ? Promise.resolve(empty) : farCached
     ? Promise.resolve(farCached)
     : _overpassFetchWithFallback(_ralatV2Query(lat, lng, farR, parts.far))
         .then(function(d) {
           var els = (d && d.elements) ? d.elements : [];
-          _ralatV2CacheSet(lat, lng, farR, 'far', modelKey, parts.far, els);
-          return els;
+          var timestamp = d && d.osm3s && d.osm3s.timestamp_osm_base || '';
+          var fetchedAt = Date.now();
+          _ralatV2CacheSet(lat, lng, farR, 'far', modelKey, parts.far, els, timestamp, fetchedAt);
+          return { elements:els, osmTimestamp:timestamp, fetchedAt:fetchedAt, fromCache:false };
         }).catch(function(){ return null; });
 
   return Promise.all([nearP, farP]).then(function(arr) {
     return {
-      near: arr[0] || [], far: arr[1] || [],
-      nearAvailable: arr[0] !== null, farAvailable: arr[1] !== null
+      near: arr[0] ? arr[0].elements : [], far: arr[1] ? arr[1].elements : [],
+      nearAvailable: arr[0] !== null, farAvailable: arr[1] !== null,
+      nearMeta:arr[0], farMeta:arr[1]
     };
   });
 }
@@ -4923,13 +4948,17 @@ function ralatBuildFeatures(coord, meta, overpassRes, geocodeRes, activeModel, t
           feats[varName] = d;
           var element = nearest.element;
           var inNear = (overpassRes.near || []).indexOf(element) !== -1;
+          var sourceMeta = inNear ? overpassRes.nearMeta : overpassRes.farMeta;
           var tagNames = ['highway', 'shop', 'place', 'amenity', 'railway', 'aeroway', 'office', 'natural', 'waterway', 'landuse', 'tourism', 'historic', 'harbour', 'station', 'line'];
           var tag = tagNames.map(function(k) { return element.tags && element.tags[k] ? k + '=' + element.tags[k] : ''; }).filter(Boolean).join(', ');
           traceOut[varName] = {
             source: 'OpenStreetMap via Overpass', osmType: element.type || '', osmId: element.id || '', tag: tag,
             method: element.center ? 'Garis lurus ke titik tengah fitur' : 'Garis lurus ke titik fitur',
             queryRadiusM: inNear ? 5000 : 20000, distanceM: d,
-            queryLat: coord.lat, queryLng: coord.lng, featureLat: nearest.coord.lat, featureLng: nearest.coord.lng
+            queryLat: coord.lat, queryLng: coord.lng, featureLat: nearest.coord.lat, featureLng: nearest.coord.lng,
+            osmTimestamp:sourceMeta && sourceMeta.osmTimestamp || '',
+            fetchedAt:sourceMeta && sourceMeta.fetchedAt || null,
+            fromCache:!!(sourceMeta && sourceMeta.fromCache)
           };
         } else {
           var farFeature = ['ln_distance_to_big_city', 'ln_distance_to_small_city', 'ln_distance_to_airport', 'ln_distance_to_lrt'].indexOf(varName.toLowerCase()) !== -1;
@@ -5073,6 +5102,55 @@ function _ralatIsHook(meta) {
   var pos = String(meta.posisi || '').toLowerCase();
   return pos.indexOf('hoek') !== -1 || pos.indexOf('hook') !== -1 ||
          pos.indexOf('sudut') !== -1 || pos.indexOf('pojok') !== -1;
+}
+
+// Satu ID node OSM tidak boleh mewakili dua titik yang berjauhan dalam
+// analisis yang sama. Bandingkan fitur jarak yang benar-benar terpilih, bukan
+// semua hasil query (yang mungkin tidak pernah digunakan oleh model).
+function _ralatFindOSMConflicts(traces) {
+  var byNode = {}, conflicts = [], variables = {};
+  (traces || []).forEach(function(trace) {
+    Object.keys(trace || {}).forEach(function(name) {
+      var t = trace[name];
+      if (!t || t.osmType !== 'node' || !t.osmId ||
+          typeof t.featureLat !== 'number' || typeof t.featureLng !== 'number' ||
+          !isFinite(t.featureLat) || !isFinite(t.featureLng)) return;
+      var key = 'node/' + t.osmId;
+      var record = byNode[key] || (byNode[key] = { id:key, points:[], names:{} });
+      record.names[name] = true;
+      var point = { lat:Number(t.featureLat), lng:Number(t.featureLng),
+        osmTimestamp:t.osmTimestamp || '' };
+      if (!record.points.some(function(p) {
+        return _ralatHaversine(p.lat, p.lng, point.lat, point.lng) <= 1;
+      })) record.points.push(point);
+    });
+  });
+  Object.keys(byNode).forEach(function(key) {
+    var record = byNode[key];
+    if (record.points.length < 2) return;
+    var a = record.points[0], b = record.points[1];
+    var distance = Math.round(_ralatHaversine(a.lat, a.lng, b.lat, b.lng));
+    function describe(p) {
+      return p.lat.toFixed(6) + ',' + p.lng.toFixed(6) +
+        ' (basis OSM ' + (p.osmTimestamp || 'tidak tercatat') + ')';
+    }
+    var reason = 'Konflik titik OSM ' + key + ': ' + describe(a) + ' dan ' + describe(b) +
+      ' terpisah sekitar ' + distance + ' m. Variabel jarak ditahan sampai sumber peta diperiksa.';
+    Object.keys(record.names).forEach(function(name) { variables[name] = reason; });
+    conflicts.push({ id:key, names:Object.keys(record.names), reason:reason });
+  });
+  return { variables:variables, conflicts:conflicts };
+}
+
+function _ralatHoldConflictingFeatures(asetFeats, asetTrace, prepared, conflictInfo) {
+  Object.keys(conflictInfo.variables || {}).forEach(function(name) {
+    delete asetFeats[name];
+    asetTrace[name] = Object.assign({}, asetTrace[name], { missingReason:conflictInfo.variables[name] });
+    (prepared || []).forEach(function(p) {
+      delete p.compFeats[name];
+      p.compTrace[name] = Object.assign({}, p.compTrace[name], { missingReason:conflictInfo.variables[name] });
+    });
+  });
 }
 
 /* ------- [H] RaLAT engine v2 ------- */
@@ -5298,6 +5376,11 @@ function _ralatTraceSource(t) {
     info.push('dari ' + Number(t.queryLat).toFixed(6) + ',' + Number(t.queryLng).toFixed(6) +
       ' ke ' + Number(t.featureLat).toFixed(6) + ',' + Number(t.featureLng).toFixed(6));
   }
+  if (t.osmType && t.osmId) {
+    info.push('basis OSM ' + (t.osmTimestamp || 'tidak tercatat'));
+    if (t.fetchedAt) info.push('respons diambil ' + new Date(t.fetchedAt).toISOString() +
+      (t.fromCache ? ' (cache RaLAT)' : ''));
+  }
   return info.join(' · ');
 }
 
@@ -5357,8 +5440,14 @@ function _ralatBuildAuditCsv(rows, model) {
         _ralatTraceSource(b.asetTrace),_ralatTraceSource(b.compTrace),'',d.priceObserved,d.priceAfterTime,d.rawAdjPct,d.adjPct,d.price,check.status]).map(_ralatCsvCell).join(';'));
     });
     (d.coverage.skipped || []).forEach(function(s) {
-      lines.push(shared().concat(['dilewati',s.sheetRow || '',s.name,s.label || '','','','','','','','','','','','',s.reason || '',
-        d.priceObserved,d.priceAfterTime,d.rawAdjPct,d.adjPct,d.price,check.status]).map(_ralatCsvCell).join(';'));
+      var cells = shared().concat(['dilewati',s.sheetRow || '',s.name,s.label || '']);
+      while (cells.length < 16) cells.push('');
+      var assetSource = d.asetTrace && d.asetTrace[s.name];
+      var compSource = d.compTrace && d.compTrace[s.name];
+      cells.push(assetSource && assetSource.osmType ? _ralatTraceSource(assetSource) : '',
+        compSource && compSource.osmType ? _ralatTraceSource(compSource) : '',s.reason || '',
+        d.priceObserved,d.priceAfterTime,d.rawAdjPct,d.adjPct,d.price,check.status);
+      lines.push(cells.map(_ralatCsvCell).join(';'));
     });
   });
   return '\ufeff' + lines.join('\r\n') + '\r\n';
@@ -5435,6 +5524,12 @@ function renderRalatAuditSummary() {
   html += '<div><strong>Status: rumus koefisien dan definisi fitur model asli belum tervalidasi.</strong> ' +
     'Angka RaLAT adalah hasil implementasi aplikasi untuk ditelaah penilai.</div>';
   if (info.status) html += '<div>' + _ralatEscapeHtml(info.status) + '</div>';
+  if (info.osmConflicts && info.osmConflicts.length) {
+    html += '<details open><summary><strong>Perhatian sumber peta RaLAT: ' + info.osmConflicts.length +
+      ' ID node memiliki koordinat berbeda. Variabel jarak terdampak tidak dipakai.</strong></summary><ul style="padding-left:18px;">' +
+      info.osmConflicts.map(function(c) { return '<li>' + _ralatEscapeHtml(c.reason) + '</li>'; }).join('') +
+      '</ul></details>';
+  }
   if (coverage.length) {
     var minimum = Math.min.apply(null, coverage.map(function(d) { return d.coverage.used; }));
     var total = coverage[0].coverage.total;

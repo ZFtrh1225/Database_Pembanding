@@ -64,6 +64,14 @@ Contoh uji aritmetika dengan koefisien Sumatra versi `20241213`: jarak ke jalan 
 
 Untuk `ln_distance_to_road`, aplikasi saat ini memilih fitur OSM terdekat dengan tag `highway=primary`, `trunk`, atau `motorway` pada hasil Overpass. Jarak diukur sebagai **garis lurus ke titik tengah way** yang dikembalikan OSM, bukan jarak ke sisi jalan atau jarak tempuh. Jejak menampilkan way, tag, koordinat, dan radius yang dipakai. Definisi “jalan utama”, geometri jarak, dan cakupan radius harus dibandingkan dengan definisi variabel yang dipakai saat pelatihan model.
 
+### Konsistensi koordinat node OSM pada satu analisis
+
+RaLAT meminta peta untuk aset dan tiap pembanding secara terpisah, dengan cache RaLAT per koordinat yang berlaku hingga tujuh hari. Waktu basis data OSM (`osm3s.timestamp_osm_base`), waktu respons diambil, dan tanda cache sekarang mengikuti sumber tiap fitur jarak pada Audit/PDF dan CSV. Cache RaLAT lama dibedakan dengan versi key baru; cache POI lingkungan dan query POI tidak berubah.
+
+Sebelum menghitung satu pun harga RaLAT, aplikasi membandingkan **ID dan koordinat node OSM yang benar-benar terpilih** untuk variabel jarak pada seluruh pasangan. Jika satu ID node muncul pada titik yang berbeda lebih dari 1 m dalam analisis yang sama, Audit menyebut ID, dua titik, waktu basis OSM, serta variabel yang terdampak. Batas 1 m adalah toleransi teknis pemeriksaan konsistensi koordinat, **bukan ketentuan SPI/IVS atau perubahan rumus regresi**. Variabel terdampak ditahan untuk seluruh pembanding dalam analisis itu dan tercatat `dilewati` pada CSV beserta sumber kedua titik. Variabel lainnya tetap dihitung; jika variabel jarak nanti dapat dibuktikan konsisten, analisis dapat dijalankan kembali. Waktu basis yang berbeda saja belum membuktikan perbedaan titik; pemeriksaan memerlukan ID sama **dan** perbedaan lokasi.
+
+Dalam CSV Audit Sumatra `20241213` yang diuji, `node/544519673` muncul di `-5.429386,105.262617` dan `-5.446071,105.264374` (sekitar 1.865 m). Jika hanya kontribusi `ln_distance_to_big_city` dari contoh tersebut yang ditahan dan variabel lainnya tetap, lima pembanding berubah dari cakupan 23/25 menjadi 22/25; median contoh berubah dari Rp2.329.740/m² menjadi sekitar **Rp2.290.342/m²**. Angka ini hasil uji terhadap CSV yang telah diunduh, bukan hasil pasti dari permintaan peta baru. Jalankan ulang Analisa, lalu SBM dan Monte Carlo, setelah pembaruan frontend untuk memperoleh hasil dari sumber peta saat itu. Penamaan `DP1`, `DP2`, dan seterusnya berasal dari data pembanding dan tidak perlu dibuat unik.
+
 ### Pemeriksaan dari contoh Audit Sumatra
 
 Pada satu tangkapan layar Analisa Sumatra `20241213`, Audit menunjukkan 12 pembanding, minimal 22 dari 25 variabel terhitung. Ini adalah **cakupan data**, bukan tingkat akurasi model. Untuk satu pembanding yang terlihat:

@@ -59,7 +59,8 @@ for (const name of ['_modelVersionFromId', '_groupRegressionRows']) {
 for (const name of [
   'ralatNormalizeModels', '_ralatFixVarTypes', 'ralatPickLatestVersion',
   'ralatClassifyVar', '_ralatNorm', '_ralatHaversine', '_ralatElCoord', '_ralatMinDistance',
-  'ralatFeatureIssue', 'ralatBuildFeatures', '_ralatIsKomersial', 'ralatEngineV2', '_ralatEscapeHtml',
+  'ralatFeatureIssue', 'ralatBuildFeatures', '_ralatIsKomersial', '_ralatFindOSMConflicts',
+  '_ralatHoldConflictingFeatures', 'ralatEngineV2', '_ralatEscapeHtml',
   '_ralatTraceSource', '_ralatCheckArithmetic', '_ralatCsvCell', '_ralatBuildAuditCsv',
   '_ralatRenderMissing', '_ralatRenderVariableTrace', 'renderRalatAuditSummary',
   'invalidateMonteCarlo', 'markAnalysisStale'
@@ -213,13 +214,69 @@ context.RALAT_TAG_MATCHERS.ln_distance_to_road = t => ['primary', 'trunk', 'moto
 const trace = {};
 const roadFeatures = context.ralatBuildFeatures({ lat: -6.2, lng: 106.8 }, {}, {
   near: [{ type: 'way', id: 423, tags: { highway: 'primary' }, center: { lat: -6.2, lon: 106.801 } }],
-  far: [], nearAvailable: true, farAvailable: true
+  far: [], nearAvailable: true, farAvailable: true,
+  nearMeta:{ osmTimestamp:'2026-09-27T02:00:00Z',fetchedAt:Date.UTC(2026,8,27),fromCache:true }
 }, {}, { ln_distance_to_road: { tipe: 'ln', koefisien: betaRoad } }, trace, 'aset');
 assert.ok(roadFeatures.ln_distance_to_road > 0);
 assert.equal(trace.ln_distance_to_road.osmId, 423);
 assert.match(context._ralatTraceSource(trace.ln_distance_to_road), /OSM way\/423/);
 assert.match(context._ralatTraceSource(trace.ln_distance_to_road), /highway=primary/);
 assert.match(context._ralatTraceSource(trace.ln_distance_to_road), /ke -6\.200000,106\.801000/);
+assert.match(context._ralatTraceSource(trace.ln_distance_to_road), /basis OSM 2026-09-27T02:00:00Z/);
+assert.match(context._ralatTraceSource(trace.ln_distance_to_road), /cache RaLAT/);
+// Satu node kota dari dua cache berbeda: jangan memilih koordinat yang kebetulan datang dahulu.
+const cityModel = { ln_distance_to_big_city:{ tipe:'ln', koefisien:-0.2380993745 },
+  lebar_jalan_di_depan_adj:{ tipe:'numerik', koefisien:betaRow } };
+function cityTrace(lat, lng, stamp) {
+  return { source:'OpenStreetMap via Overpass',osmType:'node',osmId:544519673,
+    featureLat:lat,featureLng:lng,osmTimestamp:stamp,fetchedAt:Date.UTC(2026,8,27),fromCache:true };
+}
+const assetTrace = { ln_distance_to_big_city:cityTrace(-5.429386,105.262617,'2026-09-27T01:00:00Z') };
+const compareTrace = { ln_distance_to_big_city:cityTrace(-5.446071,105.264374,'2026-09-27T02:00:00Z') };
+const consistentTrace = { ln_distance_to_big_city:cityTrace(-5.429386,105.262617,'2026-09-27T01:00:00Z') };
+assert.equal(context._ralatFindOSMConflicts([assetTrace,consistentTrace]).conflicts.length,0);
+const anotherCity = { ln_distance_to_big_city:Object.assign({},compareTrace.ln_distance_to_big_city,{osmId:77}) };
+assert.equal(context._ralatFindOSMConflicts([assetTrace,anotherCity]).conflicts.length,0,
+  'Dua kota berbeda boleh memiliki koordinat berbeda');
+const conflict = context._ralatFindOSMConflicts([assetTrace,compareTrace,consistentTrace]);
+assert.equal(conflict.conflicts.length,1);
+assert.match(conflict.variables.ln_distance_to_big_city,/node\/544519673/);
+assert.match(conflict.variables.ln_distance_to_big_city,/1865 m/);
+const assetFeats = { ln_distance_to_big_city:4740.3461, lebar_jalan_di_depan_adj:9 };
+const prepped = [
+  { compFeats:{ ln_distance_to_big_city:6173.6618, lebar_jalan_di_depan_adj:6 }, compTrace:compareTrace },
+  { compFeats:{ ln_distance_to_big_city:4743.8239, lebar_jalan_di_depan_adj:6 }, compTrace:consistentTrace }
+];
+context._ralatHoldConflictingFeatures(assetFeats,assetTrace,prepped,conflict);
+assert.equal(assetFeats.ln_distance_to_big_city,undefined);
+assert.ok(prepped.every(p => p.compFeats.ln_distance_to_big_city === undefined));
+const held = context.ralatEngineV2(cityModel,assetFeats,prepped[0].compFeats,assetTrace,prepped[0].compTrace);
+assert.equal(held.coverage.used,1);
+assert.equal(held.coverage.total,2);
+assert.match(held.coverage.skipped[0].reason,/Konflik titik OSM/);
+assert.match(context._ralatRenderMissing({coverage:held.coverage}),/Konflik titik OSM/);
+assert.ok(Math.abs(held.adjPct - betaRow*3)<1e-12);
+const heldCsv = context._ralatBuildAuditCsv([{ id:'DP1',priceObserved:1000000,priceAfterTime:1000000,
+  price:1000000*(1+held.adjPct),rawAdjPct:held.rawAdjPct,adjPct:held.adjPct,
+  capped:false,breakdown:held.breakdown,coverage:held.coverage,asetTrace:assetTrace,
+  compTrace:prepped[0].compTrace }],{region:'Sumatra',version:'20241213'});
+assert.match(heldCsv,/"dilewati";"";"ln_distance_to_big_city"/);
+assert.match(heldCsv,/basis OSM 2026-09-27T02:00:00Z/);
+assert.match(heldCsv,/"Konflik titik OSM node\/544519673/);
+assert.deepEqual(heldCsv.slice(1).split('\r\n').slice(1,-1).map(line =>
+  (line.match(/(?:^|;)(?:"(?:[^"]|"")*"|[^;]*)/g)||[]).length),[25,25,25]);
+// Lima pembanding dari contoh Audit Sumatra: bila node kota bertentangan,
+// seluruh kontribusi kota ditahan dan median mengikuti harga baru.
+const observedFive = [
+  [1274042.21767317, .16199181131205015, .06290156728210107],
+  [1022191.25352134, .05584852126273851, .08041863916374646],
+  [1922039.352345919, .25833396130978303, .06671294067978259],
+  [2022334.9857512214, .15200500120950805, .0001746168559977283],
+  [1910128.5657013597, .2969449700718857, .07654366409329821]
+];
+const afterHold = observedFive.map(([timePrice, oldAdjustment, cityContribution]) =>
+  Math.round(timePrice * (1 + oldAdjustment - cityContribution))).sort((a,b)=>a-b);
+assert.equal(afterHold[2],2290342,'Median contoh berubah ketika fitur kota yang bertentangan ditahan');
 assert.match(context._ralatEscapeHtml('<img src=x onerror="x">'), /&lt;img src=x onerror=&quot;x&quot;&gt;/);
 const missingTrace = {};
 context.ralatBuildFeatures({ lat: -6.2, lng: 106.8 }, {},
@@ -352,7 +409,10 @@ context.localStorage = {
 };
 context._overpassFetchWithFallback = query => {
   requested.push(query);
-  return Promise.resolve({ elements:[] });
+  return Promise.resolve({ osm3s:{timestamp_osm_base:'2026-09-27T02:00:00Z'},
+    elements:query.includes('place"="city')
+      ? [{ type:'node',id:544519673,lat:-5.429386,lon:105.262617,tags:{place:'city'} }]
+      : [] });
 };
 (async () => {
   await context._ralatV2Fetch(-6.2, 106.8, { ln_luas_tanah: {} }, 'Sumatra:20241213');
@@ -363,8 +423,15 @@ context._overpassFetchWithFallback = query => {
   assert.doesNotMatch(requested[0], /amenity"="clinic/);
   await context._ralatV2Fetch(-6.2, 106.8, { POI_hospital_1000m: {} }, 'Sumatra:20241213');
   assert.equal(requested.length, 1, 'Query identik memakai cache');
-  await context._ralatV2Fetch(-6.2, 106.8, { ln_distance_to_big_city: {} }, 'Sumatra:20241213');
+  const freshCity = await context._ralatV2Fetch(-6.2, 106.8, { ln_distance_to_big_city: {} }, 'Sumatra:20241213');
   assert.equal(requested.length, 2);
   assert.match(requested[1], /around:20000/);
+  assert.equal(freshCity.farMeta.osmTimestamp,'2026-09-27T02:00:00Z');
+  assert.equal(freshCity.farMeta.fromCache,false);
+  assert.equal(freshCity.far[0].id,544519673);
+  const cachedCity = await context._ralatV2Fetch(-6.2, 106.8, { ln_distance_to_big_city: {} }, 'Sumatra:20241213');
+  assert.equal(requested.length,2,'Data dengan waktu basis OSM tetap menggunakan cache RaLAT');
+  assert.equal(cachedCity.farMeta.osmTimestamp,freshCity.farMeta.osmTimestamp);
+  assert.equal(cachedCity.farMeta.fromCache,true);
   console.log('POI terpisah, query RaLAT per model, cache, rumus manual, dan audit: OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });
