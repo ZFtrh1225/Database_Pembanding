@@ -488,9 +488,11 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 
 .mmap-topbar {
   position: absolute; top: 12px; left: 12px; z-index: 500;
-  display: flex; gap: 8px; align-items: center; pointer-events: none;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  max-width: calc(100% - 24px); pointer-events: none;
 }
 .mmap-topbar > * { pointer-events: all; }
+.mmap-mobile-label, .mmap-mode-short { display: none; }
 
 .mmap-btn {
   background: rgba(20,40,72,.88); color: #FFD966;
@@ -509,6 +511,23 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   backdrop-filter: blur(8px); transition: all .2s;
 }
 .mmap-close:hover { background: rgba(153,27,27,.95); }
+.mmap-lines {
+  background: rgba(20,40,72,.9); color: #fff;
+  border: 1px solid rgba(255,255,255,.35); border-radius: 8px;
+  padding: 7px 12px; font-size: 12px; font-family: var(--font);
+  font-weight: 600; cursor: pointer; display: flex; align-items: center;
+  gap: 6px; white-space: nowrap; backdrop-filter: blur(8px);
+}
+.mmap-lines:hover, .mmap-lines.active { border-color: #ffd966; color: #ffd966; }
+.mmap-zoom { display: flex; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.mmap-zoom button {
+  width: 40px; min-height: 40px; border: 1px solid #cbd5e1;
+  background: #fff; color: #1e3a5f; font: 700 23px/1 var(--font);
+  cursor: pointer; touch-action: manipulation;
+}
+.mmap-zoom button + button { border-left: 0; }
+.mmap-zoom button:hover { background: #f0f4f8; }
+.mmap-zoom button:focus-visible, .mmap-topbar button:focus-visible { outline: 3px solid #ffd966; outline-offset: 2px; }
 
 body.mmode-picking #measureMap, body.mmode-picking #measureMap * { cursor: crosshair !important; }
 
@@ -607,8 +626,15 @@ body.mmode-picking .mpick-hint { display: flex; }
 #measureOsmMap .leaflet-popup-content-wrapper { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
 #measureOsmMap .leaflet-popup-content { margin: 0; padding: 0; width: auto !important; }
 
-/* Garis lurus OSM measurement — fallback warna kontras (jika tanpa inline) */
-.measure-osm-line { stroke: #e60023; stroke-width: 6; stroke-dasharray: 14 8; }
+/* Satu siklus 22px (14px garis + 8px sela), searah OBJ → pembanding. */
+#measureOsmMap .measure-osm-line {
+  stroke-dasharray: 14 8;
+  animation: measureDashFlow 1.1s linear infinite;
+}
+@keyframes measureDashFlow { to { stroke-dashoffset: -22px; } }
+@media (prefers-reduced-motion: reduce) {
+  #measureOsmMap .measure-osm-line { animation: none; }
+}
 
 /* =========================================================================
    ===  MOBILE-FIRST RESPONSIVE REVAMP (PHASES 1–5)                    ===
@@ -1091,7 +1117,7 @@ body.mmode-picking .mpick-hint { display: flex; }
     position: fixed !important;
     left: 0; right: 0; bottom: 0; top: auto;
     width: 100% !important; min-width: 0 !important;
-    height: 60vh; max-height: 60vh;
+    height: min(52vh, 480px); max-height: min(52vh, 480px);
     border-radius: 18px 18px 0 0;
     border-right: none;
     box-shadow: 0 -10px 40px rgba(0,0,0,.4);
@@ -1100,9 +1126,11 @@ body.mmode-picking .mpick-hint { display: flex; }
     z-index: 30; padding: 0;
   }
   .measure-sidebar.collapsed,
+  .measure-sidebar.hidden,
   .measure-sidebar[style*="display: none"] {
     display: flex !important;
     transform: translateY(calc(100% - 56px));
+    opacity: 1;
   }
   .measure-sidebar::before {
     content: ''; display: block;
@@ -1110,15 +1138,21 @@ body.mmode-picking .mpick-hint { display: flex; }
     background: rgba(255,255,255,.4);
     margin: 8px auto 4px; flex-shrink: 0;
   }
-  .measure-map-wrap { flex: 1; min-height: 40vh; }
+  .measure-map-wrap { flex: 1; min-height: 48vh; }
   .mmap-topbar {
-    flex-wrap: wrap; gap: 6px;
-    padding: 8px;
-    padding-top: max(8px, env(safe-area-inset-top, 0));
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px; left: 8px; right: 8px; top: max(8px, env(safe-area-inset-top, 0px));
+    padding: 0; max-width: none;
   }
-  .mmap-btn, .mmap-close, .mmap-osm-toggle {
-    min-height: 40px; padding: 8px 12px; font-size: 12px;
+  .mmap-btn, .mmap-close, .mmap-osm-toggle, .mmap-lines {
+    min-height: 44px; min-width: 0; justify-content: center;
+    padding: 7px 5px; font-size: 11px;
   }
+  .mmap-topbar .mmap-mobile-label, .mmap-mode-short { display: inline; }
+  .mmap-topbar .mmap-desktop-label, .mmap-mode-full { display: none; }
+  .mmap-zoom { grid-column: span 2; }
+  .mmap-zoom button { flex: 1; min-height: 44px; }
+  #measureMap .gm-style-mtc { display: none; }
 
   /* ---------- AVM RaLAT panel grid ---------- */
   #ralatAsetBody { grid-template-columns: 1fr !important; }
@@ -1972,18 +2006,26 @@ body.mmode-picking .mpick-hint { display: flex; }
     </div>
 
     <div class="mmap-topbar">
-      <button class="mmap-btn" onclick="toggleMSidebar()">
+      <button class="mmap-btn" id="mSidebarToggle" type="button" onclick="toggleMSidebar()" aria-controls="measureSidebar" aria-expanded="true" aria-label="Sembunyikan panel titik">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-        <span id="mSidebarBtnTxt">Sembunyikan Panel</span>
+        <span class="mmap-desktop-label" id="mSidebarBtnTxt">Sembunyikan Panel</span><span class="mmap-mobile-label">Panel</span>
       </button>
       <button class="mmap-close" onclick="closeMeasurement()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         Tutup
       </button>
-      <button class="mmap-osm-toggle active" id="btnMeasureOsm" onclick="toggleMeasureOSM()">
+      <button class="mmap-osm-toggle active" id="btnMeasureOsm" type="button" onclick="toggleMeasureOSM()" aria-label="Beralih ke Google Maps">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        Google Maps
+        <span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>
       </button>
+      <button class="mmap-lines active" id="mLinesToggle" type="button" onclick="toggleMeasurementLines()" aria-pressed="true" aria-label="Sembunyikan garis pengukuran" title="Sembunyikan garis; pin dan jarak tetap terlihat">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17L9 11L14 14L21 7" stroke-dasharray="3 2"/><circle cx="3" cy="17" r="1"/><circle cx="21" cy="7" r="1"/></svg>
+        <span class="mmap-desktop-label" id="mLinesBtnTxt">Sembunyikan Garis</span><span class="mmap-mobile-label">Garis</span>
+      </button>
+      <div class="mmap-zoom" role="group" aria-label="Zoom peta pengukuran">
+        <button type="button" onclick="mZoomMeasurement(1)" aria-label="Perbesar peta" title="Perbesar">+</button>
+        <button type="button" onclick="mZoomMeasurement(-1)" aria-label="Perkecil peta" title="Perkecil">−</button>
+      </div>
     </div>
 
     <div class="mpick-hint" id="mpickHint">
@@ -6126,14 +6168,97 @@ function toast(msg, type) {
 var _mMap = null, _mMapInited = false, _mPickTarget = null;
 var _mSbVisible = true;
 var _mMks = {}, _mLbls = {};            // markers, labels
-var _mRoutes = {};                       // DirectionsRenderer per DP id
+var _mRoutes = {};                       // Google Maps dashed polylines per DP id
 var _mDirSvc = null;                     // DirectionsService instance
 var _mDpIds  = ['1','2','3','4','5','6'];
+var _mLinesVisible = true;
+var _mDashFrame = null, _mDashLast = 0, _mDashOffset = 0;
+var _mRouteRunId = 0;
 
 // Warna pin & rute per ID — warna lebih kontras & tebal agar terlihat jelas
 var _mColors = { obj:'#db4437','1':'#db4437','2':'#db4437','3':'#db4437','4':'#db4437','5':'#db4437','6':'#db4437' };
 // Warna garis rute (Google Maps) & garis putus-putus (OSM) — saturasi tinggi & kontras tinggi
 var _mRouteColors = { '1':'#e60023','2':'#0066ff','3':'#ff6600','4':'#9c00ff','5':'#00a020','6':'#ff0088' };
+
+function _mStopDashAnimation() {
+  if (_mDashFrame !== null) cancelAnimationFrame(_mDashFrame);
+  _mDashFrame = null;
+  _mDashLast = 0;
+}
+
+function _mDashTick(time) {
+  _mDashFrame = null;
+  if (!_mLinesVisible || _mOsmActive || !document.getElementById('measureOverlay').classList.contains('open') ||
+      document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    _mDashLast = 0;
+    return;
+  }
+  if (_mDashLast && time - _mDashLast < 30) {
+    _mDashFrame = requestAnimationFrame(_mDashTick);
+    return;
+  }
+  var elapsed = _mDashLast ? Math.min(time - _mDashLast, 64) : 0;
+  _mDashLast = time;
+  _mDashOffset = (_mDashOffset + elapsed * 0.02) % 22;
+  Object.keys(_mRoutes).forEach(function(id) {
+    var line = _mRoutes[id];
+    if (line && line.get && line.set) {
+      var icons = line.get('icons');
+      if (icons && icons[0]) line.set('icons', [{ icon: icons[0].icon, offset: _mDashOffset + 'px', repeat: '22px' }]);
+    }
+  });
+  if (Object.keys(_mRoutes).length) _mDashFrame = requestAnimationFrame(_mDashTick);
+}
+
+function _mSyncLineVisibility() {
+  Object.keys(_mRoutes).forEach(function(id) {
+    if (_mRoutes[id]) _mRoutes[id].setMap(_mLinesVisible && !_mOsmActive ? _mMap : null);
+  });
+  _mOsmLines.forEach(function(line) {
+    if (!_mOsmMap) return;
+    if (_mLinesVisible && !_mOsmMap.hasLayer(line)) line.addTo(_mOsmMap);
+    if (!_mLinesVisible && _mOsmMap.hasLayer(line)) _mOsmMap.removeLayer(line);
+  });
+  _mStopDashAnimation();
+  if (_mLinesVisible && !_mOsmActive && Object.keys(_mRoutes).length &&
+      document.getElementById('measureOverlay').classList.contains('open') &&
+      !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    _mDashFrame = requestAnimationFrame(_mDashTick);
+  }
+}
+
+function toggleMeasurementLines() {
+  _mLinesVisible = !_mLinesVisible;
+  var btn = document.getElementById('mLinesToggle');
+  btn.classList.toggle('active', _mLinesVisible);
+  btn.setAttribute('aria-pressed', String(_mLinesVisible));
+  btn.setAttribute('aria-label', _mLinesVisible ? 'Sembunyikan garis pengukuran' : 'Tampilkan garis pengukuran');
+  btn.title = _mLinesVisible ? 'Sembunyikan garis; pin dan jarak tetap terlihat' : 'Tampilkan garis pengukuran';
+  document.getElementById('mLinesBtnTxt').textContent = _mLinesVisible ? 'Sembunyikan Garis' : 'Tampilkan Garis';
+  _mSyncLineVisibility();
+}
+
+function mZoomMeasurement(direction) {
+  if (_mOsmActive) {
+    if (_mOsmMap) { if (direction > 0) _mOsmMap.zoomIn(); else _mOsmMap.zoomOut(); }
+  } else if (_mMap) {
+    _mMap.setZoom(_mMap.getZoom() + (direction > 0 ? 1 : -1));
+  }
+}
+
+function _mCreateDashedPolyline(path, color) {
+  return new google.maps.Polyline({
+    path: path, map: _mLinesVisible ? _mMap : null,
+    strokeOpacity: 0, clickable: false, zIndex: 30,
+    icons: [{ icon: { path: 'M 0,-7 0,7', strokeColor: color, strokeOpacity: 1, strokeWeight: 6 },
+      offset: _mDashOffset + 'px', repeat: '22px' }]
+  });
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) _mStopDashAnimation();
+  else if (_mMap && !_mOsmActive) _mSyncLineVisibility();
+});
 
 function openMeasurement() {
   document.getElementById('measureOverlay').classList.add('open');
@@ -6144,6 +6269,8 @@ function openMeasurement() {
   }, 150);
 }
 function closeMeasurement() {
+  ++_mRouteRunId;
+  _mStopDashAnimation();
   mCancelPick();
   document.getElementById('measureOverlay').classList.remove('open');
   document.body.style.overflow = '';
@@ -6152,8 +6279,12 @@ function toggleMSidebar() {
   _mSbVisible = !_mSbVisible;
   document.getElementById('measureSidebar').classList.toggle('hidden', !_mSbVisible);
   document.getElementById('mSidebarBtnTxt').textContent = _mSbVisible ? 'Sembunyikan Panel' : 'Tampilkan Panel';
+  var btn = document.getElementById('mSidebarToggle');
+  btn.setAttribute('aria-expanded', String(_mSbVisible));
+  btn.setAttribute('aria-label', _mSbVisible ? 'Sembunyikan panel titik' : 'Tampilkan panel titik');
   setTimeout(function(){
     if (_mMap) google.maps.event.trigger(_mMap, 'resize');
+    if (_mOsmMap && _mOsmActive) _mOsmMap.invalidateSize();
   }, 320);
 }
 
@@ -6166,12 +6297,13 @@ function _mInitMap() {
     center: { lat: -6.2, lng: 106.816 },
     zoom: 14,
     mapTypeId: 'roadmap',
+    zoomControl: false,
     mapTypeControl: true,
     streetViewControl: false,
     fullscreenControl: false,
     mapTypeControlOptions: {
       style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-      position: google.maps.ControlPosition.TOP_RIGHT,
+      position: google.maps.ControlPosition.BOTTOM_LEFT,
       mapTypeIds: ['roadmap', 'satellite', 'hybrid']
     },
     gestureHandling: 'greedy'
@@ -6256,6 +6388,8 @@ function _mParse(val) {
 
 // ── BERSIHKAN LAYER LAMA ──────────────────────────────────
 function _mClearLayers() {
+  ++_mRouteRunId;
+  _mStopDashAnimation();
   Object.keys(_mMks).forEach(function(k){ if(_mMks[k]) _mMks[k].setMap(null); });
   Object.keys(_mLbls).forEach(function(k){ if(_mLbls[k]) _mLbls[k].setMap(null); });
   Object.keys(_mRoutes).forEach(function(k){ if(_mRoutes[k]) _mRoutes[k].setMap(null); });
@@ -6347,6 +6481,7 @@ function _mRedraw() {
   if (!_mMap || !window.google || !google.maps) return;
 
   _mClearLayers();
+  var routeRunId = _mRouteRunId;
   var sumEl = document.getElementById('mSummary');
   var sumRows = document.getElementById('mSummaryRows');
   if (sumRows) sumRows.innerHTML = '';
@@ -6392,28 +6527,29 @@ function _mRedraw() {
         travelMode: google.maps.TravelMode.DRIVING,
         unitSystem: google.maps.UnitSystem.METRIC
       }, function(res, status){
+        if (routeRunId !== _mRouteRunId || _mOsmActive ||
+            !document.getElementById('measureOverlay').classList.contains('open')) return;
         var ds, meters;
         if (status === google.maps.DirectionsStatus.OK && res && res.routes && res.routes[0]) {
           var leg = res.routes[0].legs[0];
           meters = leg.distance.value;
           ds = leg.distance.text;
 
-          // Render rute dengan garis solid — warna kontras & tebal
-          var renderer = new google.maps.DirectionsRenderer({
-            map: _mMap,
-            directions: res,
-            suppressMarkers: true,    // pin OBJ/DP kita sendiri yang menampilkan
-            preserveViewport: true,
-            polylineOptions: {
-              strokeColor: _mRouteColors[dp.id] || '#0033ff',
-              strokeOpacity: 1,
-              strokeWeight: 7
-            }
-          });
-          _mRoutes[dp.id] = renderer;
+          // Ikuti geometri jalan dari Directions; hanya garisnya yang dianimasikan.
+          var path = res.routes[0].overview_path || [];
+          if (!path.length && leg.steps) {
+            leg.steps.forEach(function(step) {
+              if (step.path) step.path.forEach(function(point) { path.push(point); });
+            });
+          }
+          if (!path.length) {
+            path = [cObj, dp.coord];
+            ds += ' (jalur peta tidak tersedia)';
+          }
+          _mRoutes[dp.id] = _mCreateDashedPolyline(path, _mRouteColors[dp.id] || '#0033ff');
+          _mSyncLineVisibility();
 
           // Perluas bounds ke seluruh rute
-          var path = res.routes[0].overview_path || [];
           path.forEach(function(p){ bounds.extend(p); });
           hasBounds = true;
         } else {
@@ -6421,15 +6557,9 @@ function _mRedraw() {
           var km = _mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng);
           meters = km * 1000;
           ds = _mFmtDist(km) + ' (lurus)';
-          // Tampilkan polyline lurus kontras sebagai indikator fallback
-          var poly = new google.maps.Polyline({
-            path: [cObj, dp.coord],
-            strokeColor: _mRouteColors[dp.id] || '#0033ff',
-            strokeOpacity: 1,
-            strokeWeight: 5,
-            map: _mMap
-          });
-          _mRoutes[dp.id] = poly;
+          // Tetap putus-putus bergerak saat Directions gagal; label menandai "lurus".
+          _mRoutes[dp.id] = _mCreateDashedPolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
+          _mSyncLineVisibility();
         }
 
         if (dp.distEl) dp.distEl.textContent = ds;
@@ -6481,9 +6611,11 @@ function toggleMeasureOSM() {
   if (_mOsmActive) {
     // Switch ke OSM
     btn.classList.add('active');
-    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Google Maps';
+    btn.setAttribute('aria-label', 'Beralih ke Google Maps');
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>';
     gMap.style.display = 'none';
     oMap.classList.add('active');
+    _mStopDashAnimation();
 
     if (!_mOsmInited) {
       _mInitMeasureOsm();
@@ -6492,10 +6624,12 @@ function toggleMeasureOSM() {
       _mOsmMap.invalidateSize();
     }
     _mOsmRedraw();
+    _mSyncLineVisibility();
   } else {
     // Switch kembali ke Google Maps
     btn.classList.remove('active');
-    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> OpenStreetMap';
+    btn.setAttribute('aria-label', 'Beralih ke OpenStreetMap');
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">OpenStreetMap</span><span class="mmap-mode-short">OSM</span>';
     oMap.classList.remove('active');
     gMap.style.display = '';
 
@@ -6518,7 +6652,7 @@ function _mInitMeasureOsm() {
   _mOsmMap = L.map(el, {
     center: [-6.2, 106.816],
     zoom: 14,
-    zoomControl: true
+    zoomControl: false
   });
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -6625,8 +6759,11 @@ function _mOsmRedraw() {
         color: color,
         weight: 6,
         opacity: 1,
-        dashArray: '14 8'
-      }).addTo(_mOsmMap);
+        dashArray: '14 8',
+        className: 'measure-osm-line',
+        interactive: false
+      });
+      if (_mLinesVisible) line.addTo(_mOsmMap);
       _mOsmLines.push(line);
 
       // Label jarak di ATAS pin DP (bukan tengah garis) dengan keterangan "Data X"
@@ -6714,6 +6851,7 @@ openMeasurement = function() {
     } else {
       if (!_mMapInited) { _mInitMap(); _mMapInited = true; }
       else if (_mMap) { google.maps.event.trigger(_mMap, 'resize'); }
+      _mSyncLineVisibility();
     }
   }, 150);
 };
