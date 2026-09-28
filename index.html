@@ -626,14 +626,19 @@ body.mmode-picking .mpick-hint { display: flex; }
 #measureOsmMap .leaflet-popup-content-wrapper { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
 #measureOsmMap .leaflet-popup-content { margin: 0; padding: 0; width: auto !important; }
 
-/* Satu siklus 22px (14px garis + 8px sela), searah OBJ → pembanding. */
+/* Satu siklus tepat 22px (14px garis + 8px sela), searah OBJ → pembanding. */
 #measureOsmMap .measure-osm-line {
   stroke-dasharray: 14 8;
+}
+.measure-overlay.open #measureOsmMap.active .measure-osm-line {
   animation: measureDashFlow 1.1s linear infinite;
 }
-@keyframes measureDashFlow { to { stroke-dashoffset: -22px; } }
+@keyframes measureDashFlow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -22px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  #measureOsmMap .measure-osm-line { animation: none; }
+  .measure-overlay.open #measureOsmMap.active .measure-osm-line { animation: none; }
 }
 
 /* =========================================================================
@@ -6168,47 +6173,16 @@ function toast(msg, type) {
 var _mMap = null, _mMapInited = false, _mPickTarget = null;
 var _mSbVisible = true;
 var _mMks = {}, _mLbls = {};            // markers, labels
-var _mRoutes = {};                       // Google Maps dashed polylines per DP id
+var _mRoutes = {};                       // Google Maps static dashed polylines per DP id
 var _mDirSvc = null;                     // DirectionsService instance
 var _mDpIds  = ['1','2','3','4','5','6'];
 var _mLinesVisible = true;
-var _mDashFrame = null, _mDashLast = 0, _mDashOffset = 0;
 var _mRouteRunId = 0;
 
 // Warna pin & rute per ID — warna lebih kontras & tebal agar terlihat jelas
 var _mColors = { obj:'#db4437','1':'#db4437','2':'#db4437','3':'#db4437','4':'#db4437','5':'#db4437','6':'#db4437' };
 // Warna garis rute (Google Maps) & garis putus-putus (OSM) — saturasi tinggi & kontras tinggi
 var _mRouteColors = { '1':'#e60023','2':'#0066ff','3':'#ff6600','4':'#9c00ff','5':'#00a020','6':'#ff0088' };
-
-function _mStopDashAnimation() {
-  if (_mDashFrame !== null) cancelAnimationFrame(_mDashFrame);
-  _mDashFrame = null;
-  _mDashLast = 0;
-}
-
-function _mDashTick(time) {
-  _mDashFrame = null;
-  if (!_mLinesVisible || _mOsmActive || !document.getElementById('measureOverlay').classList.contains('open') ||
-      document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    _mDashLast = 0;
-    return;
-  }
-  if (_mDashLast && time - _mDashLast < 30) {
-    _mDashFrame = requestAnimationFrame(_mDashTick);
-    return;
-  }
-  var elapsed = _mDashLast ? Math.min(time - _mDashLast, 64) : 0;
-  _mDashLast = time;
-  _mDashOffset = (_mDashOffset + elapsed * 0.02) % 22;
-  Object.keys(_mRoutes).forEach(function(id) {
-    var line = _mRoutes[id];
-    if (line && line.get && line.set) {
-      var icons = line.get('icons');
-      if (icons && icons[0]) line.set('icons', [{ icon: icons[0].icon, offset: _mDashOffset + 'px', repeat: '22px' }]);
-    }
-  });
-  if (Object.keys(_mRoutes).length) _mDashFrame = requestAnimationFrame(_mDashTick);
-}
 
 function _mSyncLineVisibility() {
   Object.keys(_mRoutes).forEach(function(id) {
@@ -6219,12 +6193,6 @@ function _mSyncLineVisibility() {
     if (_mLinesVisible && !_mOsmMap.hasLayer(line)) line.addTo(_mOsmMap);
     if (!_mLinesVisible && _mOsmMap.hasLayer(line)) _mOsmMap.removeLayer(line);
   });
-  _mStopDashAnimation();
-  if (_mLinesVisible && !_mOsmActive && Object.keys(_mRoutes).length &&
-      document.getElementById('measureOverlay').classList.contains('open') &&
-      !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    _mDashFrame = requestAnimationFrame(_mDashTick);
-  }
 }
 
 function toggleMeasurementLines() {
@@ -6251,14 +6219,9 @@ function _mCreateDashedPolyline(path, color) {
     path: path, map: _mLinesVisible ? _mMap : null,
     strokeOpacity: 0, clickable: false, zIndex: 30,
     icons: [{ icon: { path: 'M 0,-7 0,7', strokeColor: color, strokeOpacity: 1, strokeWeight: 6 },
-      offset: _mDashOffset + 'px', repeat: '22px' }]
+      offset: '0px', repeat: '22px' }]
   });
 }
-
-document.addEventListener('visibilitychange', function() {
-  if (document.hidden) _mStopDashAnimation();
-  else if (_mMap && !_mOsmActive) _mSyncLineVisibility();
-});
 
 function openMeasurement() {
   document.getElementById('measureOverlay').classList.add('open');
@@ -6270,7 +6233,6 @@ function openMeasurement() {
 }
 function closeMeasurement() {
   ++_mRouteRunId;
-  _mStopDashAnimation();
   mCancelPick();
   document.getElementById('measureOverlay').classList.remove('open');
   document.body.style.overflow = '';
@@ -6389,7 +6351,6 @@ function _mParse(val) {
 // ── BERSIHKAN LAYER LAMA ──────────────────────────────────
 function _mClearLayers() {
   ++_mRouteRunId;
-  _mStopDashAnimation();
   Object.keys(_mMks).forEach(function(k){ if(_mMks[k]) _mMks[k].setMap(null); });
   Object.keys(_mLbls).forEach(function(k){ if(_mLbls[k]) _mLbls[k].setMap(null); });
   Object.keys(_mRoutes).forEach(function(k){ if(_mRoutes[k]) _mRoutes[k].setMap(null); });
@@ -6535,7 +6496,7 @@ function _mRedraw() {
           meters = leg.distance.value;
           ds = leg.distance.text;
 
-          // Ikuti geometri jalan dari Directions; hanya garisnya yang dianimasikan.
+          // Ikuti geometri jalan dari Directions dengan garis putus-putus statis.
           var path = res.routes[0].overview_path || [];
           if (!path.length && leg.steps) {
             leg.steps.forEach(function(step) {
@@ -6557,7 +6518,7 @@ function _mRedraw() {
           var km = _mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng);
           meters = km * 1000;
           ds = _mFmtDist(km) + ' (lurus)';
-          // Tetap putus-putus bergerak saat Directions gagal; label menandai "lurus".
+          // Garis cadangan tetap putus-putus statis; label menandai "lurus".
           _mRoutes[dp.id] = _mCreateDashedPolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
           _mSyncLineVisibility();
         }
@@ -6615,7 +6576,6 @@ function toggleMeasureOSM() {
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>';
     gMap.style.display = 'none';
     oMap.classList.add('active');
-    _mStopDashAnimation();
 
     if (!_mOsmInited) {
       _mInitMeasureOsm();
