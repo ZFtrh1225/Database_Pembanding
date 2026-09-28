@@ -42,14 +42,10 @@ function node(id) {
   });
   return nodes.get(id);
 }
-let nextFrame = 0, stoppedFrame = 0;
 const c = vm.createContext({
   document: { getElementById: node, hidden: false },
-  window: { matchMedia: () => ({ matches: false }) },
-  requestAnimationFrame: () => ++nextFrame,
-  cancelAnimationFrame: handle => { stoppedFrame = handle; },
+  window: {},
   _mLinesVisible: true, _mOsmActive: false,
-  _mDashFrame: null, _mDashLast: 0, _mDashOffset: 0,
   _mRoutes: {}, _mMks: {}, _mLbls: {}, _mRouteRunId: 0,
   _mOsmLines: [], _mOsmMarkers: [], _mOsmLabels: [],
   _mDpIds: ['1', '2', '3', '4', '5', '6'],
@@ -70,7 +66,7 @@ c.google = { maps: {
 } };
 c.window.google = c.google;
 for (const name of [
-  '_mStopDashAnimation', '_mDashTick', '_mSyncLineVisibility',
+  '_mSyncLineVisibility',
   'toggleMeasurementLines', 'mZoomMeasurement', '_mCreateDashedPolyline',
   '_mParse', '_mHaversine', '_mFmtDist', '_mFmtMeters',
   '_mClearLayers', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon', '_mOsmRedraw'
@@ -89,18 +85,16 @@ c._mDirSvc = { route(request, done) {
 c._mRedraw();
 assert.equal(c._mRoutes['1'].opts.path, road);
 assert.equal(c._mRoutes['1'].opts.icons[0].repeat, '22px');
+assert.equal(c._mRoutes['1'].opts.icons[0].offset, '0px', 'Garis Google tetap diam');
 assert.equal(c._mRoutes['1'].opts.strokeOpacity, 0);
 assert.equal(node('mDist_1').textContent, '790 m');
-c._mDashTick(1000);
-c._mDashTick(1034);
-assert.ok(parseFloat(c._mRoutes['1'].icons[0].offset) > 0, 'Dashed Google bergerak bertahap');
 c.mZoomMeasurement(1);
 assert.equal(c._mMap.getZoom(), 15);
 
 c._mDirSvc.route = (request, done) => done(null, 'ZERO_RESULTS');
 c._mRedraw();
 assert.match(node('mDist_1').textContent, /lurus/);
-assert.equal(c._mRoutes['1'].opts.icons[0].repeat, '22px', 'Garis cadangan Google juga bergerak');
+assert.equal(c._mRoutes['1'].opts.icons[0].offset, '0px', 'Garis cadangan Google tetap diam');
 assert.equal(c._mRoutes['1'].opts.path.length, 2);
 c._mDirSvc.route = (request, done) => done({ routes: [{
   legs: [{ distance: { value: 790, text: '790 m' } }], overview_path: road
@@ -111,7 +105,6 @@ c.toggleMeasurementLines();
 assert.equal(c._mRoutes['1'].map, null);
 assert.equal(node('mDist_1').textContent, '790 m', 'Menyembunyikan garis tidak menghapus jarak');
 assert.equal(node('mLinesToggle').attributes['aria-pressed'], 'false');
-assert.ok(stoppedFrame > 0, 'Animasi berhenti saat garis disembunyikan');
 c._mRedraw();
 assert.equal(c._mRoutes['1'].map, null, 'Garis baru juga tersembunyi saat data berubah');
 
@@ -149,6 +142,9 @@ c._mClearLayers();
 delayed({ routes: [{ legs: [{ distance: { value: 790, text: '790 m' } }], overview_path: road }] }, 'OK');
 assert.equal(Object.keys(c._mRoutes).length, 0);
 
-assert.match(html, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?#measureOsmMap \.measure-osm-line \{ animation: none;/);
+assert.match(html, /\.measure-overlay\.open #measureOsmMap\.active \.measure-osm-line \{\s*animation: measureDashFlow 1\.1s linear infinite;/);
+assert.match(html, /@keyframes measureDashFlow \{\s*from \{ stroke-dashoffset: 0; \}\s*to \{ stroke-dashoffset: -22px; \}/);
+assert.match(html, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.measure-overlay\.open #measureOsmMap\.active \.measure-osm-line \{ animation: none;/);
+assert.doesNotMatch(html, /requestAnimationFrame\(_mDashTick\)/);
 assert.match(html, /\.mmap-zoom \{ grid-column: span 2; \}/);
-console.log('Measurement: rute Google, garis OSM, toggle, zoom, animasi, dan respons terlambat OK');
+console.log('Measurement: rute Google statis, animasi OSM, toggle, zoom, dan respons terlambat OK');
