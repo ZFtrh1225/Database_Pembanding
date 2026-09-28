@@ -8,9 +8,9 @@
 
 ## Arti garis dan gerakannya
 
-Garis putus-putus berjalan dari objek menuju tiap data pembanding. **OpenStreetMap** memakai garis lurus dan jarak lurus (haversine), tetap diberi label `(lurus)`. **Google Maps** memakai bentuk jalan dan jarak berkendara dari Directions ketika tersedia. Jika permintaan Directions gagal, garis lurus dipakai dan jarak ditandai `(lurus)`. Jika jarak rute tersedia tetapi geometri jalannya tidak ada, label menyatakan jalur peta tidak tersedia. Animasi hanya mengubah tampilan garis; koordinat, jarak, dan sumber perhitungan tidak berubah.
+Garis putus-putus berjalan dari objek menuju tiap data pembanding **hanya pada OpenStreetMap**. Mode ini memakai garis lurus dan jarak lurus (haversine), tetap diberi label `(lurus)`. **Google Maps** menampilkan garis putus-putus yang diam, mengikuti bentuk jalan dan jarak berkendara dari Directions ketika tersedia. Jika permintaan Directions gagal, garis lurus dipakai dan jarak ditandai `(lurus)`. Jika jarak rute tersedia tetapi geometri jalannya tidak ada, label menyatakan jalur peta tidak tersedia. Animasi hanya mengubah tampilan garis; koordinat, jarak, dan sumber perhitungan tidak berubah.
 
-OSM menggeser pola putus-putus pada jalur SVG. Google Maps menampilkan simbol garis berulang pada polyline dan memperbarui posisi simbol sekitar 30 kali per detik. Animasi Google berhenti ketika Measurement ditutup, garis disembunyikan, mode berpindah, tab browser tidak terlihat, atau perangkat meminta pengurangan gerak; OSM menghormati pengaturan pengurangan gerak melalui CSS. Respons rute lama diabaikan setelah input atau tampilan berubah.
+OSM menggeser pola putus-putus pada jalur SVG secara linear. Satu putaran menempuh 22 piksel, tepat sepanjang satu garis dan satu sela, sehingga sambungannya mulus. Animasi hanya aktif ketika Measurement terbuka dan mode OSM tampil; pengaturan pengurangan gerak perangkat menghentikannya. Google Maps memakai simbol garis berulang dengan posisi tetap. Respons rute lama diabaikan setelah input atau tampilan berubah.
 
 ## Pemasangan dan pemeriksaan
 
