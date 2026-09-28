@@ -626,9 +626,12 @@ body.mmode-picking .mpick-hint { display: flex; }
 #measureOsmMap .leaflet-popup-content-wrapper { padding: 0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
 #measureOsmMap .leaflet-popup-content { margin: 0; padding: 0; width: auto !important; }
 
-/* Satu siklus tepat 22px (14px garis + 8px sela), searah OBJ → pembanding. */
+/* Garis panduan redup dan potongan terang yang bergerak di atasnya. */
+#measureOsmMap .measure-osm-guide { stroke-linecap: round; }
 #measureOsmMap .measure-osm-line {
-  stroke-dasharray: 14 8;
+  stroke-dasharray: 14 12;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,.9));
 }
 
 /* =========================================================================
@@ -6178,6 +6181,11 @@ function _mSyncLineVisibility() {
   Object.keys(_mRoutes).forEach(function(id) {
     if (_mRoutes[id]) _mRoutes[id].setMap(_mLinesVisible && !_mOsmActive ? _mMap : null);
   });
+  _mOsmGuides.forEach(function(guide) {
+    if (!_mOsmMap) return;
+    if (_mLinesVisible && !_mOsmMap.hasLayer(guide)) guide.addTo(_mOsmMap);
+    if (!_mLinesVisible && _mOsmMap.hasLayer(guide)) _mOsmMap.removeLayer(guide);
+  });
   _mOsmLines.forEach(function(line) {
     if (!_mOsmMap) return;
     if (_mLinesVisible && !_mOsmMap.hasLayer(line)) line.addTo(_mOsmMap);
@@ -6553,6 +6561,7 @@ var _mOsmMap = null;           // Instance Leaflet map
 var _mOsmInited = false;       // Sudah init?
 var _mOsmMarkers = [];         // Leaflet markers
 var _mOsmLines = [];           // Leaflet polylines (garis lurus)
+var _mOsmGuides = [];          // Garis dasar redup di bawah animasi
 var _mOsmLabels = [];          // Leaflet label popups
 var _mOsmDashFrame = null, _mOsmDashLast = 0, _mOsmDashOffset = 0;
 
@@ -6565,18 +6574,18 @@ function _mOsmStopDashAnimation() {
 function _mOsmDashTick(time) {
   _mOsmDashFrame = null;
   if (!_mOsmActive || !_mLinesVisible || !document.getElementById('measureOverlay').classList.contains('open') ||
-      document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.hidden) {
     _mOsmDashLast = 0;
     return;
   }
   var elapsed = _mOsmDashLast ? Math.min(time - _mOsmDashLast, 64) : 0;
   _mOsmDashLast = time;
-  _mOsmDashOffset = (_mOsmDashOffset + elapsed * 0.02) % 22;
+  _mOsmDashOffset = (_mOsmDashOffset + elapsed * 0.12) % 26;
   var hasPath = false;
   _mOsmLines.forEach(function(line) {
     var path = line.getElement && line.getElement();
     if (path) {
-      path.style.strokeDashoffset = -_mOsmDashOffset + 'px';
+      path.setAttribute('stroke-dashoffset', -_mOsmDashOffset);
       hasPath = true;
     }
   });
@@ -6587,7 +6596,7 @@ function _mOsmSyncDashAnimation() {
   _mOsmStopDashAnimation();
   if (_mOsmActive && _mLinesVisible && _mOsmLines.length &&
       document.getElementById('measureOverlay').classList.contains('open') &&
-      !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      !document.hidden) {
     _mOsmDashFrame = requestAnimationFrame(_mOsmDashTick);
   }
 }
@@ -6674,9 +6683,11 @@ function _mOsmClearLayers() {
   _mOsmStopDashAnimation();
   _mOsmMarkers.forEach(function(m) { if (_mOsmMap) _mOsmMap.removeLayer(m); });
   _mOsmLines.forEach(function(l) { if (_mOsmMap) _mOsmMap.removeLayer(l); });
+  _mOsmGuides.forEach(function(g) { if (_mOsmMap) _mOsmMap.removeLayer(g); });
   _mOsmLabels.forEach(function(l) { if (_mOsmMap) _mOsmMap.removeLayer(l); });
   _mOsmMarkers = [];
   _mOsmLines = [];
+  _mOsmGuides = [];
   _mOsmLabels = [];
 }
 
@@ -6751,16 +6762,25 @@ function _mOsmRedraw() {
       var ds = _mFmtDist(km);
       if (distEl) distEl.textContent = ds + ' (lurus)';
 
-      // Gambar garis lurus (polyline dashed) — warna lebih kontras & tebal
-      var line = L.polyline([[cObj.lat, cObj.lng], [coord.lat, coord.lng]], {
+      // Garis redup menjadi acuan; potongan terang berjalan dari OBJ ke data.
+      var points = [[cObj.lat, cObj.lng], [coord.lat, coord.lng]];
+      var guide = L.polyline(points, {
         color: color,
-        weight: 6,
+        weight: 7,
+        opacity: .28,
+        className: 'measure-osm-guide',
+        interactive: false
+      });
+      var line = L.polyline(points, {
+        color: color,
+        weight: 5,
         opacity: 1,
-        dashArray: '14 8',
+        dashArray: '14 12',
         className: 'measure-osm-line',
         interactive: false
       });
-      if (_mLinesVisible) line.addTo(_mOsmMap);
+      if (_mLinesVisible) { guide.addTo(_mOsmMap); line.addTo(_mOsmMap); }
+      _mOsmGuides.push(guide);
       _mOsmLines.push(line);
 
       // Label jarak di ATAS pin DP (bukan tengah garis) dengan keterangan "Data X"
