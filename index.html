@@ -6205,12 +6205,12 @@ function mZoomMeasurement(direction) {
   }
 }
 
-function _mCreateDashedPolyline(path, color) {
+function _mCreateRoutePolyline(path, color) {
   return new google.maps.Polyline({
     path: path, map: _mLinesVisible ? _mMap : null,
-    strokeOpacity: 0, clickable: false, zIndex: 30,
-    icons: [{ icon: { path: 'M 0,-7 0,7', strokeColor: color, strokeOpacity: 1, strokeWeight: 6 },
-      offset: '0px', repeat: '22px' }]
+    // Repeated symbols protrude past both path endpoints; draw the path itself.
+    strokeColor: color, strokeOpacity: 1, strokeWeight: 6,
+    clickable: false, zIndex: 30
   });
 }
 
@@ -6381,7 +6381,8 @@ function _mMakePin(coord, color, label, isObj) {
     icon: {
       url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
       scaledSize: new google.maps.Size(s, s+8),
-      anchor: new google.maps.Point(hs, s+8)
+      // The pin tip is at y=s; the remaining 8px is only the SVG shadow.
+      anchor: new google.maps.Point(hs, s)
     },
     title: label,
     zIndex: isObj ? 1000 : 500
@@ -6513,7 +6514,7 @@ function _mRedraw() {
             ds += ' (jalur peta tidak tersedia)';
           }
           path = _mRoutePathToPins(path, cObj, dp.coord);
-          _mRoutes[dp.id] = _mCreateDashedPolyline(path, _mRouteColors[dp.id] || '#0033ff');
+          _mRoutes[dp.id] = _mCreateRoutePolyline(path, _mRouteColors[dp.id] || '#0033ff');
           _mSyncLineVisibility();
 
           // Perluas bounds ke seluruh rute
@@ -6525,7 +6526,7 @@ function _mRedraw() {
           meters = km * 1000;
           ds = _mFmtDist(km) + ' (lurus)';
           // Garis cadangan lurus; label menandai "lurus".
-          _mRoutes[dp.id] = _mCreateDashedPolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
+          _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
           _mSyncLineVisibility();
         }
 
