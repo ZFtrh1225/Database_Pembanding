@@ -630,16 +630,6 @@ body.mmode-picking .mpick-hint { display: flex; }
 #measureOsmMap .measure-osm-line {
   stroke-dasharray: 14 8;
 }
-.measure-overlay.open #measureOsmMap.active .measure-osm-line {
-  animation: measureDashFlow 1.1s linear infinite;
-}
-@keyframes measureDashFlow {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: -22px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .measure-overlay.open #measureOsmMap.active .measure-osm-line { animation: none; }
-}
 
 /* =========================================================================
    ===  MOBILE-FIRST RESPONSIVE REVAMP (PHASES 1–5)                    ===
@@ -6193,6 +6183,7 @@ function _mSyncLineVisibility() {
     if (_mLinesVisible && !_mOsmMap.hasLayer(line)) line.addTo(_mOsmMap);
     if (!_mLinesVisible && _mOsmMap.hasLayer(line)) _mOsmMap.removeLayer(line);
   });
+  _mOsmSyncDashAnimation();
 }
 
 function toggleMeasurementLines() {
@@ -6233,6 +6224,7 @@ function openMeasurement() {
 }
 function closeMeasurement() {
   ++_mRouteRunId;
+  _mOsmStopDashAnimation();
   mCancelPick();
   document.getElementById('measureOverlay').classList.remove('open');
   document.body.style.overflow = '';
@@ -6562,6 +6554,48 @@ var _mOsmInited = false;       // Sudah init?
 var _mOsmMarkers = [];         // Leaflet markers
 var _mOsmLines = [];           // Leaflet polylines (garis lurus)
 var _mOsmLabels = [];          // Leaflet label popups
+var _mOsmDashFrame = null, _mOsmDashLast = 0, _mOsmDashOffset = 0;
+
+function _mOsmStopDashAnimation() {
+  if (_mOsmDashFrame !== null) cancelAnimationFrame(_mOsmDashFrame);
+  _mOsmDashFrame = null;
+  _mOsmDashLast = 0;
+}
+
+function _mOsmDashTick(time) {
+  _mOsmDashFrame = null;
+  if (!_mOsmActive || !_mLinesVisible || !document.getElementById('measureOverlay').classList.contains('open') ||
+      document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    _mOsmDashLast = 0;
+    return;
+  }
+  var elapsed = _mOsmDashLast ? Math.min(time - _mOsmDashLast, 64) : 0;
+  _mOsmDashLast = time;
+  _mOsmDashOffset = (_mOsmDashOffset + elapsed * 0.02) % 22;
+  var hasPath = false;
+  _mOsmLines.forEach(function(line) {
+    var path = line.getElement && line.getElement();
+    if (path) {
+      path.style.strokeDashoffset = -_mOsmDashOffset + 'px';
+      hasPath = true;
+    }
+  });
+  if (hasPath) _mOsmDashFrame = requestAnimationFrame(_mOsmDashTick);
+}
+
+function _mOsmSyncDashAnimation() {
+  _mOsmStopDashAnimation();
+  if (_mOsmActive && _mLinesVisible && _mOsmLines.length &&
+      document.getElementById('measureOverlay').classList.contains('open') &&
+      !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    _mOsmDashFrame = requestAnimationFrame(_mOsmDashTick);
+  }
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) _mOsmStopDashAnimation();
+  else _mOsmSyncDashAnimation();
+});
 
 function toggleMeasureOSM() {
   _mOsmActive = !_mOsmActive;
@@ -6587,6 +6621,7 @@ function toggleMeasureOSM() {
     _mSyncLineVisibility();
   } else {
     // Switch kembali ke Google Maps
+    _mOsmStopDashAnimation();
     btn.classList.remove('active');
     btn.setAttribute('aria-label', 'Beralih ke OpenStreetMap');
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">OpenStreetMap</span><span class="mmap-mode-short">OSM</span>';
@@ -6612,7 +6647,8 @@ function _mInitMeasureOsm() {
   _mOsmMap = L.map(el, {
     center: [-6.2, 106.816],
     zoom: 14,
-    zoomControl: false
+    zoomControl: false,
+    renderer: L.svg()
   });
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -6635,6 +6671,7 @@ function _mInitMeasureOsm() {
 
 // Bersihkan semua layer OSM measurement
 function _mOsmClearLayers() {
+  _mOsmStopDashAnimation();
   _mOsmMarkers.forEach(function(m) { if (_mOsmMap) _mOsmMap.removeLayer(m); });
   _mOsmLines.forEach(function(l) { if (_mOsmMap) _mOsmMap.removeLayer(l); });
   _mOsmLabels.forEach(function(l) { if (_mOsmMap) _mOsmMap.removeLayer(l); });
@@ -6764,6 +6801,7 @@ function _mOsmRedraw() {
   } else if (bounds.length === 1) {
     _mOsmMap.setView(bounds[0], 17);
   }
+  _mOsmSyncDashAnimation();
 }
 
 // Override _mRedraw asli agar juga redraw OSM ketika input berubah
