@@ -42,16 +42,16 @@ function node(id) {
   });
   return nodes.get(id);
 }
-let nextFrame = 0, cancelledFrame = 0, reduceMotion = false;
+let nextFrame = 0, cancelledFrame = 0;
 const c = vm.createContext({
   document: { getElementById: node, hidden: false },
-  window: { matchMedia: () => ({ matches: reduceMotion }) },
+  window: {},
   requestAnimationFrame: () => ++nextFrame,
   cancelAnimationFrame: handle => { cancelledFrame = handle; },
   _mLinesVisible: true, _mOsmActive: false,
   _mOsmDashFrame: null, _mOsmDashLast: 0, _mOsmDashOffset: 0,
   _mRoutes: {}, _mMks: {}, _mLbls: {}, _mRouteRunId: 0,
-  _mOsmLines: [], _mOsmMarkers: [], _mOsmLabels: [],
+  _mOsmLines: [], _mOsmGuides: [], _mOsmMarkers: [], _mOsmLabels: [],
   _mDpIds: ['1', '2', '3', '4', '5', '6'],
   _mRouteColors: { '1': '#e60023' },
   _mMap: { zoom: 14, getZoom() { return this.zoom; }, setZoom(z) { this.zoom = z; }, fitBounds() {} },
@@ -123,7 +123,9 @@ c.L = {
   divIcon: data => data,
   marker: () => ({ addTo(map) { osmLayers.add(this); return this; } }),
   polyline: (points, opts) => ({
-    points, options: opts, path: { style: {} },
+    points, options: opts, path: {
+      attributes: {}, setAttribute(key, value) { this.attributes[key] = value; }
+    },
     getElement() { return osmLayers.has(this) ? this.path : null; },
     addTo(map) { osmLayers.add(this); return this; }
   })
@@ -131,24 +133,30 @@ c.L = {
 c._mOsmActive = true;
 c._mOsmRedraw();
 assert.equal(c._mOsmLines.length, 1);
+assert.equal(c._mOsmGuides.length, 1);
+assert.equal(c._mOsmGuides[0].options.opacity, .28);
 assert.equal(c._mOsmLines[0].options.className, 'measure-osm-line');
+assert.equal(c._mOsmLines[0].options.dashArray, '14 12');
 assert.equal(osmLayers.has(c._mOsmLines[0]), false);
 assert.ok(c._mOsmMarkers.length > 0 && c._mOsmLabels.length > 0);
 assert.match(node('mDist_1').textContent, /lurus/);
 c.toggleMeasurementLines();
 assert.equal(osmLayers.has(c._mOsmLines[0]), true);
+assert.equal(osmLayers.has(c._mOsmGuides[0]), true);
 assert.ok(c._mOsmDashFrame !== null, 'Animasi mulai ketika garis OSM ditampilkan');
 c._mOsmDashTick(1000);
 c._mOsmDashTick(1034);
-assert.equal(c._mOsmLines[0].path.style.strokeDashoffset, '-0.68px', 'Jalur SVG bergerak per frame');
+assert.ok(Math.abs(c._mOsmLines[0].path.attributes['stroke-dashoffset'] + 4.08) < .001,
+  'Potongan terang bergeser 4,08 px dalam 34 ms');
 c.toggleMeasurementLines();
 assert.equal(c._mOsmDashFrame, null, 'Animasi berhenti ketika garis disembunyikan');
+assert.equal(osmLayers.has(c._mOsmGuides[0]), false, 'Garis dasar ikut disembunyikan');
 assert.ok(cancelledFrame > 0);
 c.toggleMeasurementLines();
-reduceMotion = true;
+c._mOsmActive = false;
 c._mOsmSyncDashAnimation();
-assert.equal(c._mOsmDashFrame, null, 'Pengaturan kurangi gerakan dihormati');
-reduceMotion = false;
+assert.equal(c._mOsmDashFrame, null, 'Animasi berhenti saat berpindah ke Google Maps');
+c._mOsmActive = true;
 c._mOsmSyncDashAnimation();
 c.mZoomMeasurement(-1);
 assert.equal(c._mOsmMap.zoom, 13);
