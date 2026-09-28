@@ -71,7 +71,7 @@ c.google = { maps: {
 c.window.google = c.google;
 for (const name of [
   '_mOsmStopDashAnimation', '_mOsmDashTick', '_mOsmSyncDashAnimation', '_mSyncLineVisibility',
-  'toggleMeasurementLines', 'mZoomMeasurement', '_mCreateDashedPolyline',
+  'toggleMeasurementLines', 'mZoomMeasurement', '_mCreateDashedPolyline', '_mRoutePathToPins',
   '_mParse', '_mHaversine', '_mFmtDist', '_mFmtMeters',
   '_mClearLayers', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon', '_mOsmRedraw'
 ]) vm.runInContext(extract(name), c);
@@ -81,13 +81,22 @@ node('mCoord_obj').value = '-5.380964, 105.284946';
 node('mCoord_1').value = '-5.382664, 105.280162';
 c._mMakePin = () => ({ setMap() {} });
 c._mMakeObjLabel = c._mMakeLabel = () => ({ setMap() {} });
-const road = [{ lat: -5.380964, lng: 105.284946 }, { lat: -5.3814, lng: 105.283 }, { lat: -5.382664, lng: 105.280162 }];
+const road = [{ lat: -5.381, lng: 105.2848 }, { lat: -5.3814, lng: 105.283 }, { lat: -5.3825, lng: 105.2803 }];
 c._mDirSvc = { route(request, done) {
   assert.equal(request.travelMode, 'DRIVING');
   done({ routes: [{ legs: [{ distance: { value: 790, text: '790 m' } }], overview_path: road }] }, 'OK');
 } };
 c._mRedraw();
-assert.equal(c._mRoutes['1'].opts.path, road);
+assert.equal(c._mRoutes['1'].opts.path[0].lat, -5.380964, 'Rute dimulai tepat pada pin OBJ');
+assert.equal(c._mRoutes['1'].opts.path.at(-1).lat, -5.382664, 'Rute berakhir tepat pada pin DP');
+assert.equal(c._mRoutes['1'].opts.path[1], road[0], 'Geometri jalan Directions dipertahankan');
+assert.equal(c._mRoutes['1'].opts.path.at(-2), road.at(-1));
+assert.equal(road.length, 3, 'Geometri Directions tidak dimutasi');
+const exact = c._mRoutePathToPins([
+  { lat: () => -5.380964, lng: () => 105.284946 },
+  { lat: () => -5.382664, lng: () => 105.280162 }
+], { lat: -5.380964, lng: 105.284946 }, { lat: -5.382664, lng: 105.280162 });
+assert.equal(exact.length, 2, 'Titik pin yang sudah tepat tidak digandakan');
 assert.equal(c._mRoutes['1'].opts.icons[0].repeat, '22px');
 assert.equal(c._mRoutes['1'].opts.icons[0].offset, '0px', 'Garis Google tetap diam');
 assert.equal(c._mRoutes['1'].opts.strokeOpacity, 0);
@@ -138,17 +147,21 @@ assert.match(node('mDist_1').textContent, /lurus/);
 c.toggleMeasurementLines();
 assert.equal(osmLayers.has(c._mOsmLines[0]), true);
 assert.ok(c._mOsmDashFrame !== null, 'Animasi mulai ketika garis OSM ditampilkan');
+reduceMotion = true; // Laptop Windows dapat menyalakan pengaturan ini.
+c._mOsmSyncDashAnimation();
+assert.ok(c._mOsmDashFrame !== null, 'Measurement yang diminta tetap bergerak di laptop');
+c._mOsmLines[0].getElement = () => null;
+c._mOsmDashTick(900);
+assert.ok(c._mOsmDashFrame !== null, 'Animasi menunggu SVG Leaflet yang belum dipasang');
+c._mOsmLines[0].getElement = () => c._mOsmLines[0].path;
 c._mOsmDashTick(1000);
 c._mOsmDashTick(1034);
-assert.equal(c._mOsmLines[0].path.style.strokeDashoffset, '-0.68px', 'Jalur SVG bergerak per frame');
+assert.ok(Math.abs(parseFloat(c._mOsmLines[0].path.style.strokeDashoffset) + 11.76) < 0.001,
+  'Jalur SVG bergerak jelas per frame setelah path tersedia');
 c.toggleMeasurementLines();
 assert.equal(c._mOsmDashFrame, null, 'Animasi berhenti ketika garis disembunyikan');
 assert.ok(cancelledFrame > 0);
 c.toggleMeasurementLines();
-reduceMotion = true;
-c._mOsmSyncDashAnimation();
-assert.equal(c._mOsmDashFrame, null, 'Pengaturan kurangi gerakan dihormati');
-reduceMotion = false;
 c._mOsmSyncDashAnimation();
 c.mZoomMeasurement(-1);
 assert.equal(c._mOsmMap.zoom, 13);
@@ -166,4 +179,4 @@ assert.equal(Object.keys(c._mRoutes).length, 0);
 assert.match(html, /renderer: L\.svg\(\)/, 'Leaflet memakai jalur SVG');
 assert.doesNotMatch(html, /requestAnimationFrame\(_mDashTick\)/);
 assert.match(html, /\.mmap-zoom \{ grid-column: span 2; \}/);
-console.log('Measurement: rute Google statis, animasi OSM, toggle, zoom, dan respons terlambat OK');
+console.log('Measurement: rute Google ke pin, animasi OSM desktop, toggle, zoom, dan respons terlambat OK');
