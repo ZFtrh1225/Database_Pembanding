@@ -6163,7 +6163,7 @@ function toast(msg, type) {
 var _mMap = null, _mMapInited = false, _mPickTarget = null;
 var _mSbVisible = true;
 var _mMks = {}, _mLbls = {};            // markers, labels
-var _mRoutes = {};                       // Google Maps static dashed polylines per DP id
+var _mRoutes = {};                       // Google Maps dashed polylines per DP id
 var _mDirSvc = null;                     // DirectionsService instance
 var _mDpIds  = ['1','2','3','4','5','6'];
 var _mLinesVisible = true;
@@ -6212,6 +6212,19 @@ function _mCreateDashedPolyline(path, color) {
     icons: [{ icon: { path: 'M 0,-7 0,7', strokeColor: color, strokeOpacity: 1, strokeWeight: 6 },
       offset: '0px', repeat: '22px' }]
   });
+}
+
+// Directions berhenti di jalan terdekat; hubungkan geometri ke koordinat pin sebenarnya.
+function _mRoutePathToPins(path, origin, destination) {
+  var points = path.slice();
+  function samePoint(a, b) {
+    var lat = typeof a.lat === 'function' ? a.lat() : a.lat;
+    var lng = typeof a.lng === 'function' ? a.lng() : a.lng;
+    return Math.abs(lat - b.lat) < 1e-7 && Math.abs(lng - b.lng) < 1e-7;
+  }
+  if (!points.length || !samePoint(points[0], origin)) points.unshift(origin);
+  if (!samePoint(points[points.length - 1], destination)) points.push(destination);
+  return points;
 }
 
 function openMeasurement() {
@@ -6488,7 +6501,7 @@ function _mRedraw() {
           meters = leg.distance.value;
           ds = leg.distance.text;
 
-          // Ikuti geometri jalan dari Directions dengan garis putus-putus statis.
+          // Ikuti geometri jalan dari Directions hingga tepat ke titik pin.
           var path = res.routes[0].overview_path || [];
           if (!path.length && leg.steps) {
             leg.steps.forEach(function(step) {
@@ -6499,6 +6512,7 @@ function _mRedraw() {
             path = [cObj, dp.coord];
             ds += ' (jalur peta tidak tersedia)';
           }
+          path = _mRoutePathToPins(path, cObj, dp.coord);
           _mRoutes[dp.id] = _mCreateDashedPolyline(path, _mRouteColors[dp.id] || '#0033ff');
           _mSyncLineVisibility();
 
@@ -6510,7 +6524,7 @@ function _mRedraw() {
           var km = _mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng);
           meters = km * 1000;
           ds = _mFmtDist(km) + ' (lurus)';
-          // Garis cadangan tetap putus-putus statis; label menandai "lurus".
+          // Garis cadangan lurus; label menandai "lurus".
           _mRoutes[dp.id] = _mCreateDashedPolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
           _mSyncLineVisibility();
         }
@@ -6565,29 +6579,29 @@ function _mOsmStopDashAnimation() {
 function _mOsmDashTick(time) {
   _mOsmDashFrame = null;
   if (!_mOsmActive || !_mLinesVisible || !document.getElementById('measureOverlay').classList.contains('open') ||
-      document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.hidden) {
     _mOsmDashLast = 0;
     return;
   }
   var elapsed = _mOsmDashLast ? Math.min(time - _mOsmDashLast, 64) : 0;
   _mOsmDashLast = time;
-  _mOsmDashOffset = (_mOsmDashOffset + elapsed * 0.02) % 22;
-  var hasPath = false;
+  _mOsmDashOffset = (_mOsmDashOffset + elapsed * 0.12) % 22;
   _mOsmLines.forEach(function(line) {
     var path = line.getElement && line.getElement();
     if (path) {
       path.style.strokeDashoffset = -_mOsmDashOffset + 'px';
-      hasPath = true;
     }
   });
-  if (hasPath) _mOsmDashFrame = requestAnimationFrame(_mOsmDashTick);
+  // Leaflet bisa memasang SVG setelah frame pertama, terutama di peta desktop.
+  // Tetap tunggu selama garis aktif agar animasi pulih begitu path tersedia.
+  if (_mOsmLines.length) _mOsmDashFrame = requestAnimationFrame(_mOsmDashTick);
 }
 
 function _mOsmSyncDashAnimation() {
   _mOsmStopDashAnimation();
   if (_mOsmActive && _mLinesVisible && _mOsmLines.length &&
       document.getElementById('measureOverlay').classList.contains('open') &&
-      !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      !document.hidden) {
     _mOsmDashFrame = requestAnimationFrame(_mOsmDashTick);
   }
 }
