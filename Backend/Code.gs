@@ -271,6 +271,43 @@ function getRegressionModels() {
 }
 // =========================================================================
 
+// Status kelengkapan dihitung dari 26 kolom input pengguna (B:AA).
+// ID pada kolom A tidak dihitung karena dibuat oleh sistem.
+// Minimal 70% berarti sekurang-kurangnya 19 dari 26 input harus terisi.
+const DATA_COMPLETENESS_RATIO = 0.70;
+
+function _hasDataInputValue_(value) {
+  if (value === null || value === undefined) return false;
+  if (value instanceof Date) return !isNaN(value.getTime());
+  return String(value).trim() !== "";
+}
+
+function _getDataCompleteness_(row) {
+  var coord = _parseCoord(row[3], row[4]);
+  var offset = (coord && coord.shifted) ? 1 : 0;
+
+  // Sumber, HP, dan Koordinat. Koordinat lama yang terpisah di D/E tetap dihitung sebagai satu input.
+  var inputValues = [row[1], row[2], coord ? coord.raw : row[3]];
+
+  // Alamat sampai Foto: 23 input berikutnya. Offset menjaga kompatibilitas format koordinat lama.
+  for (var columnIndex = 4; columnIndex <= 26; columnIndex++) {
+    inputValues.push(row[columnIndex + offset]);
+  }
+
+  var filled = inputValues.reduce(function(total, value) {
+    return total + (_hasDataInputValue_(value) ? 1 : 0);
+  }, 0);
+  var minimumFilled = Math.ceil(inputValues.length * DATA_COMPLETENESS_RATIO);
+
+  return {
+    filled: filled,
+    total: inputValues.length,
+    minimumFilled: minimumFilled,
+    ratio: inputValues.length ? filled / inputValues.length : 0,
+    isComplete: filled >= minimumFilled
+  };
+}
+
 function searchData(params) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
@@ -292,9 +329,9 @@ function searchData(params) {
       if (params.tahun && params.tahun.length > 0) if (!params.tahun.includes(String(row[22]).substring(0, 4))) return false;
       if (params.rowJalan && params.rowJalan !== "") if ((parseFloat(row[19]) || 0) < parseFloat(params.rowJalan)) return false;
       if (params.statusData) {
-        let isLengkap = String(row[3]||'').trim()!=="" && String(row[5]||'').trim()!=="" && String(row[6]||'').trim()!=="" && String(row[7]||'').trim()!=="" && String(row[8]||'').trim()!=="" && String(row[10]||'').trim()!=="" && String(row[13]||'').trim()!=="";
-        if (params.statusData === "Lengkap" && !isLengkap) return false;
-        if (params.statusData === "Tidak Lengkap" && isLengkap) return false;
+        const completeness = _getDataCompleteness_(row);
+        if (params.statusData === "Lengkap" && !completeness.isComplete) return false;
+        if (params.statusData === "Tidak Lengkap" && completeness.isComplete) return false;
       }
       return true;
     });
