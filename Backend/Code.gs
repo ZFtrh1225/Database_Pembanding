@@ -105,7 +105,6 @@ function _apiBridgeHtml_(nonce) {
   ].join('');
 }
 
-
 function _defaultMasterParameters_() {
   return [
     ["JENIS_PROPERTI", "Tanah Bangunan", "Tanah Bangunan", true, 1],
