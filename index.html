@@ -6,13 +6,12 @@
 <title>Database Pembanding</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<!-- Google Maps loaded via script tag below -->
+<!-- Google Maps dimuat saat runtime setelah key diambil dari Apps Script. -->
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7nYCTJ4fNSCXQFqH243xg9ff7pSLrtrg&libraries=geometry,visualization,marker&loading=async"></script>
 
 <style>
 :root {
@@ -2059,7 +2058,138 @@ body.mmode-picking .mpick-hint { display: flex; }
 // --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxAUrMNayXXj3pobc3RVEJO2haOeDNaaQH2lcl4uhcVJ5P00lg40qIfs9dGiAHPzSvg/exec";
 
-// PERBAIKAN UTAMA: Gunakan nama 'GAS' agar tidak tabrakan dengan google.maps
+// Jembatan iframe Apps Script menghindari fetch lintas-domain dan redirect
+// ContentService yang sebelumnya memicu "Failed to fetch" / respons HTML.
+var GAS_BRIDGE_READY_TIMEOUT_MS = 20000;
+var GAS_REQUEST_TIMEOUT_MS = 60000;
+var _gasBridgeState = {
+  iframe: null,
+  targetWindow: null,
+  nonce: '',
+  ready: false,
+  readyPromise: null,
+  readyResolve: null,
+  readyReject: null,
+  readyTimer: null,
+  sequence: 0,
+  pending: {}
+};
+
+function _isTrustedGasBridgeOrigin(origin) {
+  try {
+    var url = new URL(origin);
+    return url.protocol === 'https:' && (
+      url.hostname === 'script.google.com' ||
+      url.hostname === 'script.googleusercontent.com' ||
+      url.hostname.endsWith('.googleusercontent.com')
+    );
+  } catch (e) { return false; }
+}
+
+function _gasBridgeMessage(event) {
+  var state = _gasBridgeState;
+  if (!state.iframe) return;
+  if (!_isTrustedGasBridgeOrigin(event.origin)) return;
+  var message = event.data || {};
+  if (message.source !== 'database-pembanding-bridge') return;
+  if (!state.nonce || message.nonce !== state.nonce) return;
+
+  if (message.type === 'ready') {
+    state.targetWindow = event.source;
+    state.ready = true;
+    if (state.readyTimer) clearTimeout(state.readyTimer);
+    if (state.readyResolve) state.readyResolve();
+    state.readyResolve = null;
+    state.readyReject = null;
+    return;
+  }
+
+  if (event.source !== state.targetWindow) return;
+  if (message.type !== 'response' || !message.id) return;
+  var pending = state.pending[message.id];
+  if (!pending) return;
+  delete state.pending[message.id];
+  clearTimeout(pending.timer);
+  if (message.ok) pending.resolve(message.result);
+  else pending.reject(new Error(message.error || 'Backend Apps Script gagal memproses permintaan.'));
+}
+window.addEventListener('message', _gasBridgeMessage);
+
+function _newGasBridgeNonce() {
+  if (window.crypto && window.crypto.getRandomValues) {
+    var values = new Uint32Array(4);
+    window.crypto.getRandomValues(values);
+    return Array.from(values).map(function(value) {
+      return ('00000000' + value.toString(16)).slice(-8);
+    }).join('');
+  }
+  return 'fallback_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+}
+
+function _ensureGasBridge() {
+  var state = _gasBridgeState;
+  if (state.ready) return Promise.resolve();
+  if (state.readyPromise) return state.readyPromise;
+
+  state.readyPromise = new Promise(function(resolve, reject) {
+    state.readyResolve = resolve;
+    state.readyReject = reject;
+
+    function mountBridge() {
+      if (!document.body) { setTimeout(mountBridge, 25); return; }
+      var iframe = document.getElementById('gasApiBridge');
+      if (!iframe) {
+        state.nonce = _newGasBridgeNonce();
+        iframe = document.createElement('iframe');
+        iframe.id = 'gasApiBridge';
+        iframe.title = 'Koneksi aman ke database';
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.tabIndex = -1;
+        iframe.style.cssText = 'position:absolute;width:1px;height:1px;border:0;opacity:0;pointer-events:none;left:-9999px;';
+        iframe.src = SCRIPT_URL + '?mode=bridge&v=1&nonce=' + encodeURIComponent(state.nonce);
+        document.body.appendChild(iframe);
+      }
+      state.iframe = iframe;
+    }
+
+    state.readyTimer = setTimeout(function() {
+      if (state.iframe && state.iframe.parentNode) state.iframe.parentNode.removeChild(state.iframe);
+      state.iframe = null;
+      state.targetWindow = null;
+      state.nonce = '';
+      state.readyPromise = null;
+      state.readyResolve = null;
+      state.readyReject = null;
+      reject(new Error('API Bridge tidak merespons. Perbarui Code.gs dan deploy sebagai versi baru dengan akses Anyone.'));
+    }, GAS_BRIDGE_READY_TIMEOUT_MS);
+    mountBridge();
+  });
+  return state.readyPromise;
+}
+
+function _gasBridgeCall(action, args) {
+  return _ensureGasBridge().then(function() {
+    return new Promise(function(resolve, reject) {
+      var state = _gasBridgeState;
+      var id = 'req_' + Date.now() + '_' + (++state.sequence);
+      var timer = setTimeout(function() {
+        delete state.pending[id];
+        reject(new Error('Waktu permintaan ke server habis. Silakan coba lagi.'));
+      }, GAS_REQUEST_TIMEOUT_MS);
+      state.pending[id] = { resolve: resolve, reject: reject, timer: timer };
+      state.targetWindow.postMessage({
+        source: 'database-pembanding-client',
+        type: 'request',
+        nonce: state.nonce,
+        id: id,
+        action: action,
+        args: Array.isArray(args) ? args : []
+      }, '*');
+    });
+  });
+}
+
+// Gunakan nama 'GAS' agar tetap kompatibel dengan seluruh kode lama.
 const GAS = { script: { get run() { return new GasRunner(); } } };
 
 class GasRunner {
@@ -2067,16 +2197,47 @@ class GasRunner {
   withSuccessHandler(cb) { this._success = cb; return this; }
   withFailureHandler(cb) { this._failure = cb; return this; }
 
-  _post(action, args) {
-    fetch(SCRIPT_URL, { redirect: "follow", method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: action, args: args }) })
-    .then(response => response.json()).then(data => this._success(data)).catch(error => this._failure(error));
+  _call(action, args) {
+    var success = this._success, failure = this._failure;
+    _gasBridgeCall(action, args).then(success).catch(failure);
   }
-  checkLogin(u, p) { this._post('checkLogin', [u, p]); }
-  searchData(params) { this._post('searchData', [params]); }
-  addData(rowData, user) { this._post('addData', [rowData, user]); }
-  editData(rowData, user, originalCoord) { this._post('editData', [rowData, user, originalCoord]); }
-  uploadFoto(dataUrl, filename) { this._post('uploadFoto', [dataUrl, filename]); }
-  updateFoto(koordinat, fotoUrl) { this._post('updateFoto', [koordinat, fotoUrl]); }
+  checkLogin(u, p) { this._call('checkLogin', [u, p]); }
+  searchData(params) { this._call('searchData', [params]); }
+  addData(rowData, user) { this._call('addData', [rowData, user]); }
+  editData(rowData, user, originalCoord) { this._call('editData', [rowData, user, originalCoord]); }
+  uploadFoto(dataUrl, filename) { this._call('uploadFoto', [dataUrl, filename]); }
+  updateFoto(koordinat, fotoUrl) { this._call('updateFoto', [koordinat, fotoUrl]); }
+}
+
+var _googleMapsLoadPromise = null;
+function loadGoogleMapsApi() {
+  if (window.google && google.maps) return Promise.resolve();
+  if (_googleMapsLoadPromise) return _googleMapsLoadPromise;
+
+  _googleMapsLoadPromise = _gasBridgeCall('getPublicConfig', []).then(function(config) {
+    if (!config || !config.success || !config.mapsApiKey) {
+      throw new Error((config && config.error) || 'Google Maps API key belum tersedia.');
+    }
+    return new Promise(function(resolve, reject) {
+      if (window.google && google.maps) { resolve(); return; }
+      window.__databasePembandingMapsReady = function() {
+        resolve();
+        try { delete window.__databasePembandingMapsReady; } catch (e) {}
+      };
+      var script = document.createElement('script');
+      script.id = 'googleMapsRuntime';
+      script.async = true;
+      script.defer = true;
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(config.mapsApiKey) +
+        '&libraries=geometry,visualization,marker&loading=async&callback=__databasePembandingMapsReady';
+      script.onerror = function() { reject(new Error('Google Maps gagal dimuat. Periksa pembatasan domain/API pada key.')); };
+      document.head.appendChild(script);
+    });
+  }).catch(function(error) {
+    _googleMapsLoadPromise = null;
+    throw error;
+  });
+  return _googleMapsLoadPromise;
 }
 
 var ENABLE_GPS = true; 
@@ -6872,15 +7033,21 @@ openMeasurement = function() {
 // ═══════════════════════════════════════════════════════════
 
 var _mapInited = false;
+var _mapInitPromise = null;
 function safeInitMap() {
   if (_mapInited) return;
-  if (!window.google || !google.maps) { setTimeout(safeInitMap, 200); return; }
-  if (!document.getElementById('map')) { setTimeout(safeInitMap, 200); return; }
-  _mapInited = true;
-  try { initMap(); } catch (err) {
+  if (_mapInitPromise) return;
+  if (!document.getElementById('map')) { setTimeout(safeInitMap, 100); return; }
+  _mapInitPromise = loadGoogleMapsApi().then(function() {
+    if (_mapInited) return;
+    _mapInited = true;
+    initMap();
+  }).catch(function(err) {
+    _mapInitPromise = null;
     var el = document.getElementById('mapLoading');
     if (el) el.innerHTML = '<div style="text-align:center;color:#dc2626;padding:30px"><div style="font-size:28px">⚠️</div><div style="margin-top:10px;font-size:12px">Error: ' + err.message + '</div></div>';
-  }
+    toast('Koneksi peta gagal: ' + err.message, 'error');
+  });
 }
   
 // =========================================================================
