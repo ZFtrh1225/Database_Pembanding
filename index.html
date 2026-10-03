@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Database Pembanding</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -34,7 +34,48 @@
   --mono:      'DM Mono', monospace;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
+html, body { width: 100%; overflow-x: hidden; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; min-height: 100dvh; font-size: 13px; }
+
+button, input, select, textarea { touch-action: manipulation; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible { outline: 3px solid rgba(45,107,228,.35); outline-offset: 2px; }
+.sr-only { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
+
+/* Login berdiri sendiri agar tidak mewarisi layout modal operasional. */
+.login-overlay {
+  display: none; position: fixed; inset: 0; z-index: 99999;
+  place-items: center; overflow-y: auto;
+  padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: radial-gradient(circle at 50% 18%, #315985 0, #1e3a5f 42%, #142b48 100%);
+}
+.login-overlay.open { display: grid; }
+.login-card {
+  width: min(100%, 400px); max-height: calc(100dvh - 32px); overflow-y: auto;
+  background: #fff; border: 1px solid rgba(255,255,255,.55); border-radius: 18px;
+  padding: 30px; box-shadow: 0 24px 70px rgba(8,24,44,.38);
+}
+.login-brand { text-align: center; margin-bottom: 24px; }
+.login-brand-icon { width: 52px; height: 52px; margin: 0 auto 12px; display:grid; place-items:center; border-radius: 15px; background:#FFD966; color:var(--navy); font-size:25px; box-shadow:0 8px 20px rgba(30,58,95,.16); }
+.login-title { color: var(--navy); font-size: 21px; font-weight: 800; letter-spacing: -.25px; }
+.login-subtitle { margin-top: 6px; color: var(--text-sub); font-size: 12px; line-height: 1.5; }
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+.login-form .form-label { font-size: 12px; margin-bottom: 7px; }
+.login-form .form-input { min-height: 48px; padding: 12px 14px; background:#fff; font-size: 16px; }
+.login-password-wrap { position: relative; }
+.login-password-wrap .form-input { padding-right: 52px; }
+.login-password-toggle { position:absolute; top:50%; right:5px; transform:translateY(-50%); width:42px; height:42px; border:0; border-radius:9px; background:transparent; color:var(--text-sub); cursor:pointer; font-size:17px; }
+.login-password-toggle:hover { background:var(--sky); color:var(--blue); }
+.login-submit { min-height: 50px; margin-top: 2px; font-size: 15px; }
+.login-message { display:none; padding:10px 12px; border-radius:9px; background:#fee2e2; border:1px solid #fecaca; color:#991b1b; font-size:12px; line-height:1.45; }
+.login-message.show { display:block; }
+.login-footnote { margin-top: 18px; text-align:center; color:var(--text-xs); font-size:10.5px; line-height:1.5; }
+
+.mobile-bottom-nav { display: none; }
+.filter-active-summary { display:none; margin-top:8px; font-size:11px; font-weight:700; color:var(--navy); }
+.form-wizard { display:none; }
+.form-step { display: contents; }
+.mobile-form-action { display:none; }
 
 button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !important; pointer-events: none !important; filter: grayscale(1); }
 
@@ -146,6 +187,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .badge-ruko           { background: #fce7f3; color: #be185d; }
 .badge-office         { background: #fef3c7; color: #b45309; }
 .harga-cell { font-family: var(--font); font-size: 11px; color: var(--green); font-weight: 600; }
+.data-completeness { display:none; }
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-sub); }
 
 /* TABEL DETAIL DATA (modal Lihat Data) */
@@ -357,33 +399,6 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   .mc-scenario-grid { grid-template-columns:1fr; }
   #mcResultWrap > div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns:repeat(2,1fr) !important; }
   #mcResultWrap > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
-}
-
-/* =========================================================
-   📱 RESPONSIVE MOBILE TWEAKS
-   ========================================================= */
-@media (max-width: 768px) {
-  .topbar { padding: 0 10px; }
-  .topbar-brand span { display: none; } 
-  .btn-top { padding: 6px 8px; font-size: 11px; }
-  .panel-filter { position: absolute; top: 0; left: 0; bottom: 0; width: 100% !important; max-width: 100% !important; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.3); }
-  .panel-filter.collapsed { display: none; } 
-  .map-toolbar { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
-  .map-search-wrap { width: 100%; }
-  .legend-wrap { display: none; } 
-  .view-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; width: 100%; }
-  .view-toggle .btn-view { justify-content: center; padding: 8px 5px; font-size: 11px; width: 100%; }
-  .view-toggle .mode-dropdown-wrap { width: 100%; }
-  .view-toggle .mode-dropdown-wrap .btn-view { width: 100%; }
-  .view-toggle .mode-dropdown-menu { left: 0; right: 0; min-width: 100% !important; }
-  .btn-add { width: 100%; justify-content: center; padding: 9px; font-size: 12px; margin-top: 2px;}
-  .modal { width: 95%; padding: 15px; margin: 10px; }
-  .modal-grid { grid-template-columns: 1fr; }
-  .modal-grid .span-2 { grid-column: span 1; }
-  .iw-wrap { width: 240px; }
-  .compare-bar { width: 90%; justify-content: space-between; padding: 10px; font-size: 11px; bottom: 10px;}
-  .compare-bar button { padding: 6px 10px;}
-  .sbm-grid { grid-template-columns: 1fr; }
 }
 
 /* --- FITUR MEASUREMENT CSS --- */
@@ -980,9 +995,13 @@ body.mmode-picking .mpick-hint { display: flex; }
     font-family: var(--mono); font-size: 11px; color: var(--text-sub);
     justify-content: flex-start;
   }
+  .data-table td[data-label="ID"] { grid-column:1 / -1; width:100%; gap:8px; }
   .data-table td[data-label="ID"]::before { display: none; }
+  .data-completeness { display:inline-flex; margin-left:auto; padding:3px 7px; border-radius:12px; font-family:var(--font); font-size:9.5px; font-weight:800; white-space:nowrap; }
+  .data-completeness.complete { color:#166534; background:#dcfce7; border:1px solid #86efac; }
+  .data-completeness.incomplete { color:#9a3412; background:#ffedd5; border:1px solid #fdba74; }
   .data-table td[data-label="Aksi"] {
-    grid-column: 2 / 3; grid-row: 1;
+    grid-column: 1 / -1;
     padding: 0 0 4px 0; border-bottom: 1px dashed #e2e8f0; margin-bottom: 4px;
     justify-content: flex-end; gap: 4px;
   }
@@ -1185,6 +1204,107 @@ body.mmode-picking .mpick-hint { display: flex; }
 }
 
 /* =========================================================================
+   ===  MOBILE UX REVAMP — stable viewport, navigation & form flow     ===
+   ========================================================================= */
+@media (max-width: 768px) {
+  :root { --mobile-topbar: calc(56px + env(safe-area-inset-top, 0px)); --mobile-nav: calc(68px + env(safe-area-inset-bottom, 0px)); }
+  body { min-height: 100dvh; padding: 0; overscroll-behavior: none; }
+
+  .topbar { height: var(--mobile-topbar); padding-top: env(safe-area-inset-top, 0px); }
+  .topbar-actions > .btn-top:first-child { display:none !important; }
+  .layout { height: calc(100dvh - var(--mobile-topbar) - var(--mobile-nav)); }
+
+  .mobile-bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1200;
+    height: var(--mobile-nav); display: grid; grid-template-columns: repeat(4, 1fr);
+    align-items: start; padding: 6px max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(8px, env(safe-area-inset-left, 0px));
+    border-top: 1px solid var(--border); background: rgba(255,255,255,.96);
+    box-shadow: 0 -8px 28px rgba(30,58,95,.12); backdrop-filter: blur(14px);
+  }
+  .mobile-nav-btn {
+    position:relative; min-width:0; min-height:54px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px; border:0; border-radius:11px;
+    background:transparent; color:var(--text-sub); font-family:var(--font); cursor:pointer;
+  }
+  .mobile-nav-btn > span { font-size:19px; line-height:1.1; }
+  .mobile-nav-btn small { font-size:10px; font-weight:700; }
+  .mobile-nav-btn.active { color:var(--blue); background:var(--sky); }
+  .mobile-nav-btn.mobile-nav-primary { color:#fff; background:var(--blue); margin:0 4px; box-shadow:0 5px 14px rgba(45,107,228,.28); }
+  .mobile-nav-icon-wrap { position:relative; }
+  #mobileFilterBadge { display:none; position:absolute; right:-10px; top:-8px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--red); color:#fff; font:700 9px/17px var(--font); }
+  #mobileFilterBadge.show { display:block; }
+
+  .filter-backdrop { inset: var(--mobile-topbar) 0 var(--mobile-nav) 0; }
+  .panel-filter {
+    bottom: var(--mobile-nav); height:min(82dvh, 720px); max-height:calc(100dvh - var(--mobile-topbar) - var(--mobile-nav));
+  }
+  .filter-active-summary { display:block; }
+  .filter-group-label[role="button"] { display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+  .filter-group-label[role="button"]::after { content:'⌄'; color:var(--navy); font-size:15px; transition:transform .18s ease; }
+  .filter-group.collapsed-group .filter-group-label[role="button"]::after { transform:rotate(-90deg); }
+  .filter-group.collapsed-group .filter-group-content { display:none; }
+  .filter-actions { padding-bottom:14px; }
+  .filter-actions > div { display:grid !important; grid-template-columns:minmax(0,2fr) minmax(105px,1fr); }
+
+  .map-toolbar { min-height:62px; }
+  .view-toggle #btnViewMap, .view-toggle #btnViewTable { display:none !important; }
+  .btn-add { display:none !important; }
+  .view-toggle { top:64px; right:10px; gap:7px; }
+  .view-toggle .btn-view, .view-toggle .mode-dropdown-wrap, .view-toggle .mode-dropdown-wrap .btn-view { width:42px !important; height:42px; }
+
+  .table-view { padding:10px 10px 16px; }
+  .data-table tbody { gap:9px; }
+  .data-table tr { padding:12px; }
+  .data-table td[data-label="Kota"],
+  .data-table td[data-label="ROW Jalan (m)"],
+  .data-table td.is-empty { display:none; }
+
+  .modal { min-height:0; height:100dvh; max-height:100dvh; }
+  #modalOverlay .modal-footer > .btn-reset:first-child { display:none; }
+  .form-wizard { display:block; margin:-2px 0 16px; }
+  .form-wizard-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; color:var(--text-sub); font-size:11px; }
+  .form-wizard-meta strong { color:var(--navy); font-size:13px; }
+  .form-wizard-track { height:5px; margin:8px 0 10px; overflow:hidden; border-radius:4px; background:#e2e8f0; }
+  .form-wizard-track span { display:block; height:100%; width:20%; border-radius:inherit; background:var(--blue); transition:width .2s ease; }
+  .form-wizard-tabs { display:flex; gap:6px; overflow-x:auto; padding:1px 1px 5px; scrollbar-width:none; }
+  .form-wizard-tabs::-webkit-scrollbar { display:none; }
+  .form-wizard-tab { flex:none; min-height:36px; padding:7px 10px; border:1px solid var(--border); border-radius:18px; background:#fff; color:var(--text-sub); font:700 11px var(--font); }
+  .form-wizard-tab.active { border-color:var(--blue); background:var(--sky); color:var(--blue); }
+  .form-step { display:none; grid-column:1 / -1; grid-template-columns:1fr; gap:12px; }
+  .form-step.active { display:grid; }
+  .form-step .span-2 { grid-column:span 1; }
+  .mobile-form-action { display:inline-flex; align-items:center; justify-content:center; }
+  .mobile-form-action[hidden] { display:none !important; }
+  #modalOverlay .modal-footer { display:grid; grid-template-columns:1fr 1fr; }
+  #modalOverlay:not(.wizard-last) .modal-footer #btnSubmit { display:none; }
+  #modalOverlay.wizard-last .modal-footer #btnSubmit { grid-column:2; }
+
+  .login-overlay { padding: max(18px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px)); align-items:center; }
+  .login-card { width:min(100%, 420px); max-height:calc(100dvh - 28px); padding:24px 20px; border-radius:16px; }
+  .login-brand { margin-bottom:20px; }
+  .login-brand-icon { width:48px; height:48px; margin-bottom:10px; }
+  .login-title { font-size:20px; }
+
+  .compare-bar { bottom:calc(var(--mobile-nav) + 10px); }
+  #compareOverlay .modal-body { overflow:auto !important; padding:12px !important; }
+  #compareOverlay .compare-table { min-width:720px; }
+  #compareOverlay .compare-table th { position:sticky; left:0; z-index:2; min-width:118px; box-shadow:2px 0 5px rgba(30,58,95,.08); }
+  #compareOverlay .compare-table td { min-width:145px; }
+  .toast-container { bottom:calc(var(--mobile-nav) + 10px); }
+  .measure-sidebar { height:min(46dvh, 430px); max-height:min(46dvh, 430px); padding-bottom:env(safe-area-inset-bottom, 0px); }
+  .measure-map-wrap { min-height:54dvh; }
+  .iw-wrap { width:min(280px, calc(100vw - 56px)); min-width:0; }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .login-card { max-height:calc(100dvh - 16px); padding:18px 22px; }
+  .login-brand { margin-bottom:12px; }
+  .login-brand-icon { display:none; }
+  .login-form { gap:10px; }
+  .panel-filter { height:calc(100dvh - var(--mobile-topbar) - var(--mobile-nav)); }
+}
+
+/* =========================================================================
    ===  SMALL MOBILE BREAKPOINT (≤ 380px) — extra compact              ===
    ========================================================================= */
 @media (max-width: 380px) {
@@ -1240,19 +1360,30 @@ body.mmode-picking .mpick-hint { display: flex; }
 </head>
 <body>
 
-<div id="loginOverlay" class="modal-overlay" style="z-index: 99999; background: var(--navy);">
-  <div class="modal" style="max-width: 320px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
-    <div style="text-align:center; font-size:18px; font-weight:800; color:var(--navy); margin-bottom:20px;">🏠 Sistem Login</div>
-    <div class="form-group" style="margin-bottom:12px;">
-      <label class="form-label">Username</label>
-      <input id="inUser" class="form-input" style="background:#fff;" placeholder="Masukkan username" onkeydown="if(event.key==='Enter')doLogin()"/>
+<div id="loginOverlay" class="login-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <main class="login-card">
+    <div class="login-brand">
+      <div class="login-brand-icon" aria-hidden="true">🏠</div>
+      <h1 class="login-title" id="loginTitle">Database Pembanding</h1>
+      <p class="login-subtitle">Masuk untuk mengelola dan menganalisis data properti.</p>
     </div>
-    <div class="form-group" style="margin-bottom:20px;">
-      <label class="form-label">Password</label>
-      <input id="inPass" class="form-input" style="background:#fff;" type="password" placeholder="Masukkan password" onkeydown="if(event.key==='Enter')doLogin()"/>
-    </div>
-    <button id="btnLoginAction" class="btn-search" style="width:100%;" onclick="doLogin()">Login</button>
-  </div>
+    <form class="login-form" id="loginForm" onsubmit="event.preventDefault(); doLogin();" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="inUser">Username</label>
+        <input id="inUser" name="username" class="form-input" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Masukkan username"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="inPass">Password</label>
+        <div class="login-password-wrap">
+          <input id="inPass" name="password" class="form-input" type="password" autocomplete="current-password" placeholder="Masukkan password"/>
+          <button class="login-password-toggle" id="btnTogglePassword" type="button" onclick="togglePasswordVisibility()" aria-label="Tampilkan password" aria-pressed="false">👁</button>
+        </div>
+      </div>
+      <div class="login-message" id="loginMessage" role="alert" aria-live="polite"></div>
+      <button id="btnLoginAction" class="btn-search login-submit" type="submit">Masuk</button>
+    </form>
+    <p class="login-footnote">Akses dibatasi untuk pengguna yang telah terdaftar.</p>
+  </main>
 </div>
 
 <header class="topbar">
@@ -1292,6 +1423,7 @@ body.mmode-picking .mpick-hint { display: flex; }
       <div>
         <div class="filter-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Cari Data Pembanding</div>
         <div class="filter-sub">Filter data properti dari database</div>
+        <div class="filter-active-summary" id="filterActiveSummary" aria-live="polite">Belum ada filter khusus</div>
       </div>
       <button onclick="toggleSidebar()" class="close-mobile-filter" style="background:none; border:none; font-size:18px; font-weight:bold; color:var(--navy); cursor:pointer;">✕</button>
     </div>
@@ -1372,7 +1504,7 @@ body.mmode-picking .mpick-hint { display: flex; }
 
       <div class="filter-actions">
         <div style="display: flex; gap: 8px;">
-          <button class="btn-search" id="btnCari" onclick="doSearch()" style="flex: 2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari</button>
+          <button class="btn-search" id="btnCari" onclick="doSearch()" style="flex: 2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> <span id="btnCariLabel">Cari</span></button>
           <button class="btn-search" id="btnAnalisa" onclick="initAVMAnalysis()" style="flex: 1; background: var(--blue); color: white; border:none;" title="Analisa Statistik Radius" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="18" y="3" width="4" height="18"></rect><rect x="10" y="8" width="4" height="13"></rect><rect x="2" y="13" width="4" height="8"></rect></svg> Analisa</button>
         </div>
         <button class="btn-reset" onclick="resetFilter()">↺ Reset Filter</button>
@@ -1470,6 +1602,13 @@ body.mmode-picking .mpick-hint { display: flex; }
     </div>
   </div>
 </div>
+
+<nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navigasi utama">
+  <button class="mobile-nav-btn active" id="mobileNavMap" type="button" onclick="mobileSetView('map')" aria-label="Tampilkan peta" aria-current="page"><span aria-hidden="true">🗺️</span><small>Peta</small></button>
+  <button class="mobile-nav-btn" id="mobileNavTable" type="button" onclick="mobileSetView('table')" aria-label="Tampilkan daftar data"><span aria-hidden="true">☰</span><small>Data</small></button>
+  <button class="mobile-nav-btn" id="mobileNavFilter" type="button" onclick="toggleSidebar()" aria-label="Buka filter"><span class="mobile-nav-icon-wrap" aria-hidden="true">⌁<b id="mobileFilterBadge"></b></span><small>Filter</small></button>
+  <button class="mobile-nav-btn mobile-nav-primary" id="mobileNavAdd" type="button" onclick="openModalNew()" aria-label="Tambah data baru"><span aria-hidden="true">＋</span><small>Tambah</small></button>
+</nav>
 
 <div class="modal-overlay" id="analyticsOverlay" onclick="if(event.target===this)closeAnalyticsModal()">
   <div class="modal" style="max-width: 820px;">
@@ -1870,7 +2009,12 @@ body.mmode-picking .mpick-hint { display: flex; }
       <button class="btn-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div class="modal-grid">
+      <div class="form-wizard" id="dataFormWizard" aria-label="Tahapan formulir">
+        <div class="form-wizard-meta"><span id="formStepCounter">Langkah 1 dari 5</span><strong id="formStepTitle">Identitas</strong></div>
+        <div class="form-wizard-track" aria-hidden="true"><span id="formStepProgress"></span></div>
+        <div class="form-wizard-tabs" id="formWizardTabs"></div>
+      </div>
+      <div class="modal-grid" id="dataFormGrid">
         <div class="form-group"><label class="form-label">ID (DP / Objek)</label><input id="f_id" class="form-input" placeholder="DP atau Objek"/></div>
         <div class="form-group"><label class="form-label">Sumber</label><input id="f_sumber" class="form-input" placeholder="cth: Bapak Fulan - Pemilik"/></div>
         <div class="form-group"><label class="form-label">No. HP</label><input id="f_hp" class="form-input" type="text" inputmode="numeric" placeholder="08xxxxxxxxxx"/></div>
@@ -1914,6 +2058,8 @@ body.mmode-picking .mpick-hint { display: flex; }
     </div>
     <div class="modal-footer">
       <button class="btn-reset" style="width:auto;padding:8px 20px; margin-top:0;" onclick="closeModal()">Batal</button>
+      <button class="btn-reset mobile-form-action" id="btnFormBack" type="button" onclick="changeFormStep(-1)">← Kembali</button>
+      <button class="btn-submit mobile-form-action" id="btnFormNext" type="button" onclick="changeFormStep(1)">Lanjut →</button>
       <button class="btn-submit" id="btnSubmit" onclick="submitData()">💾 Simpan Data</button>
     </div>
   </div>
@@ -2433,21 +2579,46 @@ document.addEventListener("DOMContentLoaded", function() {
 if (!sessionStorage.getItem('isLoggedIn')) { document.getElementById('loginOverlay').classList.add('open'); } 
 else { document.getElementById('loginOverlay').classList.remove('open'); setTimeout(function() { applyPermissions(activeRole); loadFilterOptions(); safeInitMap(); }, 300); }
 
+function setLoginMessage(message) {
+  var el = document.getElementById('loginMessage');
+  if (!el) return;
+  el.textContent = message || '';
+  el.classList.toggle('show', !!message);
+}
+
+function togglePasswordVisibility() {
+  var input = document.getElementById('inPass'), btn = document.getElementById('btnTogglePassword');
+  if (!input || !btn) return;
+  var show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.textContent = show ? '🙈' : '👁';
+  btn.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+  btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+  input.focus();
+}
+
 function doLogin() {
   var u = document.getElementById('inUser').value.trim(), p = document.getElementById('inPass').value.trim();
-  if (!u || !p) { toast('Harap isi username & password', 'error'); return; }
-  var btn = document.getElementById('btnLoginAction'); btn.textContent = 'Memverifikasi...'; btn.disabled = true;
+  setLoginMessage('');
+  if (!u || !p) {
+    setLoginMessage('Username dan password wajib diisi.');
+    document.getElementById(!u ? 'inUser' : 'inPass').focus();
+    return;
+  }
+  var btn = document.getElementById('btnLoginAction');
+  btn.textContent = 'Memverifikasi…'; btn.disabled = true; btn.setAttribute('aria-busy', 'true');
 
   GAS.script.run
     .withSuccessHandler(function(res) {
-      btn.textContent = 'Login'; btn.disabled = false;
+      btn.textContent = 'Masuk'; btn.disabled = false; btn.removeAttribute('aria-busy');
       if (res.success) {
         sessionStorage.setItem('isLoggedIn', 'true'); sessionStorage.setItem('userRole', res.role); sessionStorage.setItem('userName', res.username);
         activeRole = res.role; activeUsername = res.username;
+        setLoginMessage('');
         document.getElementById('loginOverlay').classList.remove('open'); applyPermissions(res.role); loadFilterOptions(); toast('Login berhasil, ' + res.username + '!', 'success'); safeInitMap();
-      } else { toast(res.error, 'error'); }
+      } else { setLoginMessage(res.error || 'Username atau password tidak sesuai.'); }
     })
-    .withFailureHandler(function(e) { btn.textContent = 'Login'; btn.disabled = false; toast('Error: ' + e.message, 'error'); })
+    .withFailureHandler(function(e) { btn.textContent = 'Masuk'; btn.disabled = false; btn.removeAttribute('aria-busy'); setLoginMessage('Tidak dapat terhubung ke server. ' + e.message); })
     .checkLogin(u, p);
 }
 
@@ -2747,7 +2918,16 @@ function startDrawingPolygon() {
   if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
 }
 
-function toggleSidebar() { document.querySelector('.panel-filter').classList.toggle('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
+function toggleSidebar() {
+  var panel = document.querySelector('.panel-filter');
+  if (!panel) return;
+  var open = panel.classList.toggle('collapsed') === false;
+  document.querySelectorAll('[onclick="toggleSidebar()"], #mobileNavFilter').forEach(function(btn) { btn.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+  setTimeout(function() {
+    if (gMap) google.maps.event.trigger(gMap, 'resize');
+    if (_osmMap) _osmMap.invalidateSize();
+  }, 350);
+}
 
 function toggle3D() {
   // Legacy — replaced by switchMapMode
@@ -4545,13 +4725,24 @@ function collectParams() {
 }
 
 // ── SISTEM PENCARIAN & UPDATE MODEL REGRESI ──────────────────────────────────────────
+function setSearchButtonLoading(isLoading) {
+  var btn = document.getElementById('btnCari');
+  if (!btn) return;
+  btn.classList.toggle('loading', isLoading);
+  btn.disabled = isLoading;
+  btn.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+  btn.innerHTML = isLoading
+    ? '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> <span id="btnCariLabel">Terapkan Filter</span>';
+}
+
 function doSearch() {
   var btn = document.getElementById('btnCari');
-  btn.classList.add('loading'); btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin-bottom:0;"></div> Mencari…';
+  setSearchButtonLoading(true);
   var params = collectParams();
 
   if (params.radiusKm === 'polygon' && (!params.polygon || params.polygon.length < 3)) {
-      btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
+      setSearchButtonLoading(false);
       toast('Area belum digambar atau tidak valid (butuh min 3 titik).', 'error'); return;
   }
 
@@ -4560,7 +4751,7 @@ function doSearch() {
 
   GAS.script.run
     .withSuccessHandler(function (res) {
-      btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari';
+      setSearchButtonLoading(false);
       if (res.success) {
         
         // TAMBAHAN: Menyimpan Model Ekonometrika dari Server ke Memori Browser
@@ -4589,7 +4780,7 @@ function doSearch() {
         if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
       } else { toast('Error: ' + res.error, 'error'); }
     })
-    .withFailureHandler(function (err) { btn.classList.remove('loading'); btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Cari'; toast('Gagal memuat data dari server: ' + err.message, 'error'); })
+    .withFailureHandler(function (err) { setSearchButtonLoading(false); toast('Gagal memuat data dari server: ' + err.message, 'error'); })
     .searchData(params);
 }
 
@@ -6280,7 +6471,12 @@ function renderTable(data) {
   if (!data.length) { tbody.innerHTML = '<tr><td colspan="14" class="empty-state"><p>Tidak ada data sesuai filter</p></td></tr>'; return; }
   function bc(obj) { if (obj === 'Tanah Bangunan') return 'badge-tanah-bangunan'; if (obj === 'Tanah Kosong') return 'badge-tanah-kosong'; if (obj === 'Ruko') return 'badge-ruko'; return 'badge-office'; }
   function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
-  tbody.innerHTML = data.map(function (row) { return '<tr><td>' + f(row.id) + '</td><td style="white-space:nowrap;"><button onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;margin-right:4px;">⚖️</button><button onclick="openDetailModal(\'' + row._uid + '\')" title="Lihat Data" style="cursor:pointer;background:#1e3a5f;color:white;border:none;border-radius:4px;padding:4px 8px;">👁</button></td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>'; }).join('');
+  function completeness(row) {
+    var keys = ['sumber','hp','koordinat','alamat','kota','provinsi','objek','tipeBangunan','legalitas','luasTanah','luasBangunan','tahunBangun','harga','frontage','lokasi','posisi','bentuk','kontur','lebarJalanROW','elevasi','statusHarga','waktuData','tujuanPenilaian','peruntukan','indikasiNilai','foto'];
+    var filled = keys.reduce(function(total, key) { var value = row[key]; return total + (value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '–' ? 1 : 0); }, 0);
+    return { filled: filled, total: keys.length, complete: filled >= Math.ceil(keys.length * .70) };
+  }
+  tbody.innerHTML = data.map(function (row) { var cm = completeness(row); return '<tr><td><span>' + f(row.id) + '</span><span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + Math.round(cm.filled / cm.total * 100) + '%</span></td><td style="white-space:nowrap;"><button onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" aria-label="Bandingkan data" style="cursor:pointer;background:#8b5cf6;color:white;border:none;border-radius:4px;padding:4px 8px;margin-right:4px;">⚖️</button><button onclick="openDetailModal(\'' + row._uid + '\')" title="Lihat Data" aria-label="Lihat data" style="cursor:pointer;background:#1e3a5f;color:white;border:none;border-radius:4px;padding:4px 8px;">👁</button></td><td><span class="badge ' + bc(row.objek) + '">' + f(row.tipeBangunan) + '</span></td><td title="' + f(row.alamat) + '">' + f(row.alamat) + '</td><td>' + f(row.kota) + '</td><td>' + f(row.legalitas) + '</td><td>' + f(row.luasTanah) + '</td><td>' + f(row.luasBangunan) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + f(row.lebarJalanROW) + '</td><td>' + f(row.statusHarga) + '</td><td>' + f(row.waktuData) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + f(row.sumber) + ' / ' + f(row.hp) + '</td></tr>'; }).join('');
 }
 
 function geocodeLocation() {
@@ -6293,11 +6489,37 @@ function geocodeLocation() {
     .catch(function (e) { toast('Gagal geocode: ' + e.message, 'error'); });
 }
 
-function setView(v) { currentView = v; document.getElementById('btnViewMap').classList.toggle('active', v === 'map'); document.getElementById('btnViewTable').classList.toggle('active', v === 'table'); var mapEl = document.getElementById('map'), osmEl = document.getElementById('osmMap'), tableEl = document.getElementById('tableView'); if (v === 'map') { if (_currentMapMode === 'gmaps') { mapEl.style.display = 'block'; osmEl.style.display = 'none'; } else { mapEl.style.display = 'none'; osmEl.style.display = 'block'; } tableEl.classList.remove('active'); if (_currentMapMode === 'gmaps' && gMap) setTimeout(function () { google.maps.event.trigger(gMap, 'resize'); }, 50); if (_currentMapMode === 'osm' && _osmMap) setTimeout(function () { _osmMap.invalidateSize(); }, 50); } else { mapEl.style.display = 'none'; osmEl.style.display = 'none'; tableEl.classList.add('active'); } }
-function resetFilter() { markAnalysisStale(); document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Semua"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; toast('Filter direset', ''); }
+function setView(v) {
+  currentView = v;
+  document.getElementById('btnViewMap').classList.toggle('active', v === 'map');
+  document.getElementById('btnViewTable').classList.toggle('active', v === 'table');
+  var mapEl = document.getElementById('map'), osmEl = document.getElementById('osmMap'), tableEl = document.getElementById('tableView');
+  if (v === 'map') {
+    if (_currentMapMode === 'gmaps') { mapEl.style.display = 'block'; osmEl.style.display = 'none'; }
+    else { mapEl.style.display = 'none'; osmEl.style.display = 'block'; }
+    tableEl.classList.remove('active');
+    if (_currentMapMode === 'gmaps' && gMap) setTimeout(function () { google.maps.event.trigger(gMap, 'resize'); }, 50);
+    if (_currentMapMode === 'osm' && _osmMap) setTimeout(function () { _osmMap.invalidateSize(); }, 50);
+  } else {
+    mapEl.style.display = 'none'; osmEl.style.display = 'none'; tableEl.classList.add('active');
+  }
+  if (typeof syncMobileNav === 'function') syncMobileNav(v);
+}
+function resetFilter() { markAnalysisStale(); document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Semua"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; if (typeof updateFilterSummary === 'function') updateFilterSummary(); toast('Filter direset', ''); }
 
-function openModalNew() { _editingId = null; _editingFoto = ''; _originalKoordinat = null; document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding'; document.getElementById('f_id').disabled = false; document.getElementById('btnSubmit').textContent = '💾 Simpan Data'; document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; document.querySelectorAll('#modalOverlay .form-input, #modalOverlay .form-select').forEach(function(i) { i.value = ''; }); var statusSelect = document.getElementById('f_statusHarga'); if (statusSelect && statusSelect.options.length) statusSelect.selectedIndex = 0; removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
-function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; _setDynamicSelectValue_('f_objek', row.objek); document.getElementById('f_tipe').value = row.tipeBangunan; _setDynamicSelectValue_('f_legalitas', row.legalitas); document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; _setDynamicSelectValue_('f_statusHarga', row.statusHarga); document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); document.getElementById('modalOverlay').classList.add('open'); }
+function openModalNew() {
+  _editingId = null; _editingFoto = ''; _originalKoordinat = null;
+  document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding';
+  document.getElementById('f_id').disabled = false;
+  document.getElementById('btnSubmit').textContent = '💾 Simpan Data';
+  document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)';
+  document.querySelectorAll('#modalOverlay .form-input, #modalOverlay .form-select').forEach(function(i) { i.value = ''; });
+  var statusSelect = document.getElementById('f_statusHarga');
+  if (statusSelect && statusSelect.options.length) statusSelect.selectedIndex = 0;
+  removeFoto(); resetDataFormWizard();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; _setDynamicSelectValue_('f_objek', row.objek); document.getElementById('f_tipe').value = row.tipeBangunan; _setDynamicSelectValue_('f_legalitas', row.legalitas); document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; _setDynamicSelectValue_('f_statusHarga', row.statusHarga); document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); resetDataFormWizard(); document.getElementById('modalOverlay').classList.add('open'); }
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); removeFoto(); }
 
 /* ============== FITUR LIHAT DATA (DETAIL MODAL) ============== */
@@ -6360,8 +6582,15 @@ function closeDetailModal() {
 function submitData() {
   function g(id) { return document.getElementById(id).value.trim(); } function num(id) { var v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
   
-  if (!g('f_koordinat')){ toast('Koordinat wajib diisi!', 'error'); return; }
-  if (!_editingId && !_fotoDataUrl) { toast('Foto Properti wajib diupload untuk data awal!', 'error'); return; }
+  if (!g('f_koordinat')){
+    if (window.innerWidth <= 768) setDataFormStep(1);
+    document.getElementById('f_koordinat').focus();
+    toast('Koordinat wajib diisi!', 'error'); return;
+  }
+  if (!_editingId && !_fotoDataUrl) {
+    if (window.innerWidth <= 768) setDataFormStep(4);
+    toast('Foto Properti wajib diupload untuk data awal!', 'error'); return;
+  }
 
   var btn = document.getElementById('btnSubmit'); btn.disabled = true; btn.textContent = '⏳ Menyimpan…';
   
@@ -7376,6 +7605,117 @@ function safeInitMap() {
 }
   
 // =========================================================================
+// =====   MOBILE UX — navigation, filter summary & staged form       =====
+// =========================================================================
+var DATA_FORM_STEPS = [
+  { title: 'Identitas', ids: ['f_id', 'f_sumber', 'f_hp'] },
+  { title: 'Lokasi', ids: ['f_koordinat', 'f_alamat', 'f_kota', 'f_provinsi'] },
+  { title: 'Properti', ids: ['f_objek', 'f_tipe', 'f_legalitas', 'f_lt', 'f_lb', 'f_tahunBangun', 'f_frontage', 'f_row', 'f_lokasi', 'f_posisi', 'f_bentuk', 'f_kontur', 'f_elevasi'] },
+  { title: 'Nilai & Data', ids: ['f_harga', 'f_statusHarga', 'f_waktuData', 'f_tujuan', 'f_peruntukan', 'f_indikasi'] },
+  { title: 'Foto', ids: ['f_foto'] }
+];
+var _dataFormStep = 0;
+
+function setupDataFormWizard() {
+  var grid = document.getElementById('dataFormGrid'), tabs = document.getElementById('formWizardTabs');
+  if (!grid || !tabs || grid.dataset.wizardReady === 'true') return;
+  DATA_FORM_STEPS.forEach(function(step, index) {
+    var wrap = document.createElement('section');
+    wrap.className = 'form-step';
+    wrap.dataset.step = String(index);
+    wrap.setAttribute('aria-label', step.title);
+    step.ids.forEach(function(id) {
+      var field = document.getElementById(id), group = field && field.closest('.form-group');
+      if (group && !wrap.contains(group)) wrap.appendChild(group);
+    });
+    grid.appendChild(wrap);
+
+    var tab = document.createElement('button');
+    tab.type = 'button'; tab.className = 'form-wizard-tab';
+    tab.textContent = (index + 1) + '. ' + step.title;
+    tab.addEventListener('click', function() { setDataFormStep(index); });
+    tabs.appendChild(tab);
+  });
+  grid.dataset.wizardReady = 'true';
+  setDataFormStep(0);
+}
+
+function setDataFormStep(index) {
+  var max = DATA_FORM_STEPS.length - 1;
+  _dataFormStep = Math.max(0, Math.min(max, Number(index) || 0));
+  document.querySelectorAll('#dataFormGrid .form-step').forEach(function(step, i) { step.classList.toggle('active', i === _dataFormStep); });
+  document.querySelectorAll('#formWizardTabs .form-wizard-tab').forEach(function(tab, i) {
+    tab.classList.toggle('active', i === _dataFormStep);
+    tab.setAttribute('aria-current', i === _dataFormStep ? 'step' : 'false');
+  });
+  var counter = document.getElementById('formStepCounter'), title = document.getElementById('formStepTitle'), progress = document.getElementById('formStepProgress');
+  if (counter) counter.textContent = 'Langkah ' + (_dataFormStep + 1) + ' dari ' + DATA_FORM_STEPS.length;
+  if (title) title.textContent = DATA_FORM_STEPS[_dataFormStep].title;
+  if (progress) progress.style.width = (((_dataFormStep + 1) / DATA_FORM_STEPS.length) * 100) + '%';
+  var back = document.getElementById('btnFormBack'), next = document.getElementById('btnFormNext'), overlay = document.getElementById('modalOverlay');
+  if (back) back.hidden = _dataFormStep === 0;
+  if (next) next.hidden = _dataFormStep === max;
+  if (overlay) overlay.classList.toggle('wizard-last', _dataFormStep === max);
+  var body = overlay && overlay.querySelector('.modal-body');
+  if (body) body.scrollTop = 0;
+}
+
+function changeFormStep(direction) { setDataFormStep(_dataFormStep + Number(direction || 0)); }
+function resetDataFormWizard() { setupDataFormWizard(); setDataFormStep(0); }
+
+function syncMobileNav(view) {
+  var mapBtn = document.getElementById('mobileNavMap'), tableBtn = document.getElementById('mobileNavTable');
+  if (mapBtn) { mapBtn.classList.toggle('active', view === 'map'); mapBtn.setAttribute('aria-current', view === 'map' ? 'page' : 'false'); }
+  if (tableBtn) { tableBtn.classList.toggle('active', view === 'table'); tableBtn.setAttribute('aria-current', view === 'table' ? 'page' : 'false'); }
+}
+
+function mobileSetView(view) {
+  setView(view);
+  syncMobileNav(view);
+}
+
+function setupFilterAccordions() {
+  document.querySelectorAll('.filter-body > .filter-group').forEach(function(group, index) {
+    if (group.dataset.accordionReady === 'true') return;
+    var label = group.querySelector(':scope > .filter-group-label');
+    if (!label) return;
+    var content = document.createElement('div');
+    content.className = 'filter-group-content';
+    Array.from(group.children).forEach(function(child) { if (child !== label) content.appendChild(child); });
+    group.appendChild(content);
+    label.setAttribute('role', 'button'); label.setAttribute('tabindex', '0');
+    function toggleGroup() {
+      if (window.innerWidth > 768) return;
+      var collapsed = group.classList.toggle('collapsed-group');
+      label.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    label.addEventListener('click', toggleGroup);
+    label.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(); } });
+    var collapseInitially = window.innerWidth <= 768 && index > 1;
+    group.classList.toggle('collapsed-group', collapseInitially);
+    label.setAttribute('aria-expanded', collapseInitially ? 'false' : 'true');
+    group.dataset.accordionReady = 'true';
+  });
+}
+
+function getActiveFilterCount() {
+  var count = document.querySelectorAll('.cb-item.checked').length;
+  var status = document.querySelector('input[name="statusData"]:checked');
+  if (status && status.value !== 'Semua') count += 1;
+  if ((document.getElementById('rowJalan').value || '').trim()) count += 1;
+  if ((document.getElementById('radius').value || '') !== '1') count += 1;
+  return count;
+}
+
+function updateFilterSummary() {
+  var count = getActiveFilterCount();
+  var summary = document.getElementById('filterActiveSummary'), badge = document.getElementById('mobileFilterBadge'), label = document.getElementById('btnCariLabel');
+  if (summary) summary.textContent = count ? count + ' filter aktif' : 'Belum ada filter khusus';
+  if (badge) { badge.textContent = count; badge.classList.toggle('show', count > 0); }
+  if (label) label.textContent = count ? 'Terapkan (' + count + ')' : 'Terapkan Filter';
+}
+
+// =========================================================================
 // =====   MOBILE UI HELPERS — kebab menu, backdrop, card view         =====
 // =========================================================================
 (function () {
@@ -7383,6 +7723,24 @@ function safeInitMap() {
 
   var MOBILE_BP = 768;
   function isMobile() { return window.innerWidth <= MOBILE_BP; }
+
+  setupDataFormWizard();
+  setupFilterAccordions();
+  updateFilterSummary();
+  syncMobileNav(currentView || 'map');
+
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.cb-item, .rb-item')) setTimeout(updateFilterSummary, 0);
+  });
+  ['rowJalan', 'radius'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener(id === 'radius' ? 'change' : 'input', updateFilterSummary);
+  });
+  var filterBodyForSummary = document.querySelector('.filter-body');
+  if (filterBodyForSummary && 'MutationObserver' in window) {
+    new MutationObserver(function() { updateFilterSummary(); }).observe(filterBodyForSummary, { childList:true, subtree:true });
+  }
 
   // ----------- Topbar "More" kebab menu -----------
   window.toggleTopbarMore = function (ev) {
@@ -7521,6 +7879,9 @@ function safeInitMap() {
         if (!tds[i].hasAttribute('data-label')) {
           tds[i].setAttribute('data-label', COL_LABELS[i] || '');
         }
+        var raw = (tds[i].textContent || '').trim();
+        var label = tds[i].getAttribute('data-label');
+        tds[i].classList.toggle('is-empty', label !== 'ID' && label !== 'Aksi' && (raw === '' || raw === '–' || raw === '-'));
       }
     });
   }
