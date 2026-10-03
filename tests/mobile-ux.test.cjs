@@ -31,6 +31,21 @@ test('navigasi satu tangan dan ringkasan filter tersedia', () => {
   assert.match(html, /function setupFilterAccordions\(\)/);
 });
 
+test('observer filter tidak dapat memicu loop render tanpa henti', () => {
+  assert.match(html, /filterOptionContainers = \['cbJenisProprti', 'cbLegalitas', 'cbJenisData', 'cbTahun'\]/);
+  assert.match(html, /filterOptionsObserver\.observe\(container, \{ childList:true \}\)/);
+  assert.doesNotMatch(html, /observe\(filterBodyForSummary, \{ childList:true, subtree:true \}\)/);
+  assert.match(html, /label && label\.textContent !== buttonText/);
+});
+
+test('overlay login dilepas total setelah autentikasi', () => {
+  assert.match(html, /function closeLoginOverlay\(\)/);
+  assert.match(html, /overlay\.hidden = true/);
+  assert.match(html, /overlay\.setAttribute\('aria-hidden', 'true'\)/);
+  assert.match(html, /backdrop\.classList\.remove\('show'\)/);
+  assert.match(html, /closeLoginOverlay\(\); applyPermissions\(res\.role\)/);
+});
+
 test('form tambah dan edit dibagi menjadi lima tahap', () => {
   const stepDefinitions = html.match(/\{ title: '[^']+', ids: \[[^\]]+\] \}/g) || [];
   assert.equal(stepDefinitions.length, 5);

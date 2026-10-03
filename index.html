@@ -50,6 +50,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: radial-gradient(circle at 50% 18%, #315985 0, #1e3a5f 42%, #142b48 100%);
 }
 .login-overlay.open { display: grid; }
+.login-overlay[hidden] { display:none !important; pointer-events:none !important; }
 .login-card {
   width: min(100%, 400px); max-height: calc(100dvh - 32px); overflow-y: auto;
   background: #fff; border: 1px solid rgba(255,255,255,.55); border-radius: 18px;
@@ -2576,8 +2577,32 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 });
 
-if (!sessionStorage.getItem('isLoggedIn')) { document.getElementById('loginOverlay').classList.add('open'); } 
-else { document.getElementById('loginOverlay').classList.remove('open'); setTimeout(function() { applyPermissions(activeRole); loadFilterOptions(); safeInitMap(); }, 300); }
+function showLoginOverlay() {
+  var overlay = document.getElementById('loginOverlay');
+  if (!overlay) return;
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  overlay.classList.add('open');
+}
+
+function closeLoginOverlay() {
+  var overlay = document.getElementById('loginOverlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.hidden = true;
+  }
+  if (window.innerWidth <= 768) {
+    var panel = document.querySelector('.panel-filter');
+    var backdrop = document.getElementById('filterBackdrop');
+    if (panel) panel.classList.add('collapsed');
+    if (backdrop) backdrop.classList.remove('show');
+  }
+  document.body.style.overflow = '';
+}
+
+if (!sessionStorage.getItem('isLoggedIn')) { showLoginOverlay(); }
+else { closeLoginOverlay(); setTimeout(function() { applyPermissions(activeRole); loadFilterOptions(); safeInitMap(); }, 300); }
 
 function setLoginMessage(message) {
   var el = document.getElementById('loginMessage');
@@ -2615,7 +2640,7 @@ function doLogin() {
         sessionStorage.setItem('isLoggedIn', 'true'); sessionStorage.setItem('userRole', res.role); sessionStorage.setItem('userName', res.username);
         activeRole = res.role; activeUsername = res.username;
         setLoginMessage('');
-        document.getElementById('loginOverlay').classList.remove('open'); applyPermissions(res.role); loadFilterOptions(); toast('Login berhasil, ' + res.username + '!', 'success'); safeInitMap();
+        closeLoginOverlay(); applyPermissions(res.role); loadFilterOptions(); toast('Login berhasil, ' + res.username + '!', 'success'); safeInitMap();
       } else { setLoginMessage(res.error || 'Username atau password tidak sesuai.'); }
     })
     .withFailureHandler(function(e) { btn.textContent = 'Masuk'; btn.disabled = false; btn.removeAttribute('aria-busy'); setLoginMessage('Tidak dapat terhubung ke server. ' + e.message); })
@@ -7677,7 +7702,7 @@ function mobileSetView(view) {
 function setupFilterAccordions() {
   document.querySelectorAll('.filter-body > .filter-group').forEach(function(group, index) {
     if (group.dataset.accordionReady === 'true') return;
-    var label = group.querySelector(':scope > .filter-group-label');
+    var label = Array.from(group.children).find(function(child) { return child.classList && child.classList.contains('filter-group-label'); });
     if (!label) return;
     var content = document.createElement('div');
     content.className = 'filter-group-content';
@@ -7710,9 +7735,15 @@ function getActiveFilterCount() {
 function updateFilterSummary() {
   var count = getActiveFilterCount();
   var summary = document.getElementById('filterActiveSummary'), badge = document.getElementById('mobileFilterBadge'), label = document.getElementById('btnCariLabel');
-  if (summary) summary.textContent = count ? count + ' filter aktif' : 'Belum ada filter khusus';
-  if (badge) { badge.textContent = count; badge.classList.toggle('show', count > 0); }
-  if (label) label.textContent = count ? 'Terapkan (' + count + ')' : 'Terapkan Filter';
+  var summaryText = count ? count + ' filter aktif' : 'Belum ada filter khusus';
+  var buttonText = count ? 'Terapkan (' + count + ')' : 'Terapkan Filter';
+  if (summary && summary.textContent !== summaryText) summary.textContent = summaryText;
+  if (badge) {
+    var badgeText = count ? String(count) : '';
+    if (badge.textContent !== badgeText) badge.textContent = badgeText;
+    badge.classList.toggle('show', count > 0);
+  }
+  if (label && label.textContent !== buttonText) label.textContent = buttonText;
 }
 
 // =========================================================================
@@ -7737,9 +7768,11 @@ function updateFilterSummary() {
     if (!el) return;
     el.addEventListener(id === 'radius' ? 'change' : 'input', updateFilterSummary);
   });
-  var filterBodyForSummary = document.querySelector('.filter-body');
-  if (filterBodyForSummary && 'MutationObserver' in window) {
-    new MutationObserver(function() { updateFilterSummary(); }).observe(filterBodyForSummary, { childList:true, subtree:true });
+  var filterOptionContainers = ['cbJenisProprti', 'cbLegalitas', 'cbJenisData', 'cbTahun']
+    .map(function(id) { return document.getElementById(id); }).filter(Boolean);
+  if (filterOptionContainers.length && 'MutationObserver' in window) {
+    var filterOptionsObserver = new MutationObserver(function() { updateFilterSummary(); });
+    filterOptionContainers.forEach(function(container) { filterOptionsObserver.observe(container, { childList:true }); });
   }
 
   // ----------- Topbar "More" kebab menu -----------
