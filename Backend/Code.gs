@@ -6,26 +6,98 @@ const SHEET_NAME = "DataPembanding";
 const USERS_SHEET = "Users";
 const HISTORY_SHEET = "History";
 const MODEL_SHEET = "Model_Regresi"; // TAMBAHAN: Nama sheet database model
+const WEB_APP_ORIGIN = "https://zftrh1225.github.io";
+const MAPS_API_KEY_PROPERTY = "GOOGLE_MAPS_API_KEY";
+
+/**
+ * Halaman jembatan untuk GitHub Pages.
+ *
+ * GitHub Pages tidak dapat memakai google.script.run secara langsung. Sebelumnya
+ * aplikasi memakai fetch() lintas-domain ke ContentService. Respons ContentService
+ * melewati redirect googleusercontent sehingga pada sebagian jaringan/browser
+ * berakhir sebagai "Failed to fetch" atau halaman HTML yang gagal diparse sebagai
+ * JSON. Iframe HtmlService ini memakai google.script.run dari origin Apps Script,
+ * kemudian mengirim hasilnya kembali ke origin GitHub Pages yang diizinkan.
+ */
+function doGet(e) {
+  const nonce = e && e.parameter ? String(e.parameter.nonce || '') : '';
+  return HtmlService.createHtmlOutput(_apiBridgeHtml_(nonce))
+    .setTitle("Database Pembanding API Bridge")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
 
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
-    const action = body.action;
-    const args = body.args || [];
-    let result;
-
-    if (action === 'checkLogin') { result = checkLogin(args[0], args[1]); } 
-    else if (action === 'searchData') { result = searchData(args[0]); } 
-    else if (action === 'addData') { result = addData(args[0], args[1]); } 
-    else if (action === 'editData') { result = editData(args[0], args[1], args[2]); } 
-    else if (action === 'uploadFoto') { result = uploadFoto(args[0], args[1]); } 
-    else if (action === 'updateFoto') { result = updateFoto(args[0], args[1]); } 
-    else { result = { success: false, error: "Fungsi tidak ditemukan!" }; }
-
+    const result = _dispatchApiAction_(body.action, body.args || []);
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+/** Dipanggil oleh google.script.run di halaman jembatan. */
+function apiCall(action, args) {
+  return _dispatchApiAction_(action, Array.isArray(args) ? args : []);
+}
+
+function _dispatchApiAction_(action, args) {
+  if (action === 'checkLogin') return checkLogin(args[0], args[1]);
+  if (action === 'searchData') return searchData(args[0] || {});
+  if (action === 'addData') return addData(args[0], args[1]);
+  if (action === 'editData') return editData(args[0], args[1], args[2]);
+  if (action === 'uploadFoto') return uploadFoto(args[0], args[1]);
+  if (action === 'updateFoto') return updateFoto(args[0], args[1]);
+  if (action === 'getPublicConfig') return getPublicConfig();
+  if (action === 'health') return { success: true, service: 'Database Pembanding API', version: 'bridge-v1' };
+  return { success: false, error: "Fungsi tidak ditemukan!" };
+}
+
+/**
+ * Key tetap akan terlihat oleh browser karena Google Maps JavaScript API berjalan
+ * di sisi pengguna. Script Properties mengeluarkannya dari GitHub; keamanan riil
+ * tetap berasal dari HTTP referrer restriction dan API restriction di Google Cloud.
+ */
+function getPublicConfig() {
+  const mapsApiKey = PropertiesService.getScriptProperties().getProperty(MAPS_API_KEY_PROPERTY) || '';
+  if (!mapsApiKey) {
+    return {
+      success: false,
+      error: "Script Property GOOGLE_MAPS_API_KEY belum diatur pada deployment Apps Script."
+    };
+  }
+  return { success: true, mapsApiKey: mapsApiKey };
+}
+
+function _apiBridgeHtml_(nonce) {
+  const allowedOrigin = JSON.stringify(WEB_APP_ORIGIN);
+  const safeNonce = /^[A-Za-z0-9_-]{16,128}$/.test(nonce) ? nonce : '';
+  const serializedNonce = JSON.stringify(safeNonce);
+  return [
+    '<!doctype html><html><head><base target="_top"></head><body>',
+    '<script>',
+    '(function(){',
+    '"use strict";',
+    'var ALLOWED_ORIGIN=' + allowedOrigin + ',NONCE=' + serializedNonce + ';',
+    'function reply(target,origin,payload){target.postMessage(payload,origin);}',
+    'function ready(){reply(window.top,ALLOWED_ORIGIN,{source:"database-pembanding-bridge",type:"ready",version:"bridge-v1",nonce:NONCE});}',
+    'window.addEventListener("message",function(event){',
+    '  if(event.origin!==ALLOWED_ORIGIN||event.source!==window.top)return;',
+    '  var msg=event.data||{};',
+    '  if(msg.source!=="database-pembanding-client"||msg.nonce!==NONCE)return;',
+    '  if(msg.type==="ping"){ready();return;}',
+    '  if(msg.type!=="request"||!msg.id||!msg.action)return;',
+    '  var target=event.source,origin=event.origin,id=msg.id;',
+    '  google.script.run',
+    '    .withSuccessHandler(function(result){reply(target,origin,{source:"database-pembanding-bridge",type:"response",id:id,nonce:NONCE,ok:true,result:result});})',
+    '    .withFailureHandler(function(error){reply(target,origin,{source:"database-pembanding-bridge",type:"response",id:id,nonce:NONCE,ok:false,error:(error&&error.message)||String(error)});})',
+    '    .apiCall(msg.action,Array.isArray(msg.args)?msg.args:[]);',
+    '});',
+    'ready();setTimeout(ready,250);setTimeout(ready,1000);',
+    '})();',
+    '<\/script></body></html>'
+  ].join('');
 }
 
 function setupSpreadsheet() {
