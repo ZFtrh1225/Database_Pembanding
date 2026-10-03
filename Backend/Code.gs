@@ -6,6 +6,8 @@ const SHEET_NAME = "DataPembanding";
 const USERS_SHEET = "Users";
 const HISTORY_SHEET = "History";
 const MODEL_SHEET = "Model_Regresi"; // TAMBAHAN: Nama sheet database model
+const PARAMETER_SHEET = "Master_Parameter";
+const PARAMETER_CATEGORIES = ["JENIS_PROPERTI", "HAK_KEPEMILIKAN", "JENIS_DATA"];
 const WEB_APP_ORIGIN = "https://zftrh1225.github.io";
 const MAPS_API_KEY_PROPERTY = "GOOGLE_MAPS_API_KEY";
 
@@ -49,6 +51,9 @@ function _dispatchApiAction_(action, args) {
   if (action === 'editData') return editData(args[0], args[1], args[2]);
   if (action === 'uploadFoto') return uploadFoto(args[0], args[1]);
   if (action === 'updateFoto') return updateFoto(args[0], args[1]);
+  if (action === 'getFilterOptions') return getFilterOptions();
+  if (action === 'getMasterParameters') return getMasterParameters(args[0]);
+  if (action === 'saveMasterParameters') return saveMasterParameters(args[0], args[1]);
   if (action === 'getPublicConfig') return getPublicConfig();
   if (action === 'health') return { success: true, service: 'Database Pembanding API', version: 'bridge-v1' };
   return { success: false, error: "Fungsi tidak ditemukan!" };
@@ -100,6 +105,272 @@ function _apiBridgeHtml_(nonce) {
   ].join('');
 }
 
+
+function _defaultMasterParameters_() {
+  return [
+    ["JENIS_PROPERTI", "Tanah Bangunan", "Tanah Bangunan", true, 1],
+    ["JENIS_PROPERTI", "Tanah Kosong", "Tanah Kosong", true, 2],
+    ["JENIS_PROPERTI", "Office/Retail/Unit Apartemen", "Office/Retail/Unit Apartemen", true, 3],
+    ["JENIS_PROPERTI", "Ruko", "Ruko", true, 4],
+    ["HAK_KEPEMILIKAN", "SHM", "SHM", true, 1],
+    ["HAK_KEPEMILIKAN", "SHGB", "SHGB", true, 2],
+    ["HAK_KEPEMILIKAN", "HGU", "HGU", true, 3],
+    ["HAK_KEPEMILIKAN", "Hak Pakai", "Hak Pakai", true, 4],
+    ["HAK_KEPEMILIKAN", "HMSRS", "HMSRS", true, 5],
+    ["HAK_KEPEMILIKAN", "Girik", "Girik", true, 6],
+    ["HAK_KEPEMILIKAN", "AJB", "AJB", true, 7],
+    ["HAK_KEPEMILIKAN", "PPJB", "PPJB", true, 8],
+    ["HAK_KEPEMILIKAN", "Surat Hijau", "Surat Hijau", true, 9],
+    ["JENIS_DATA", "Penawaran", "Penawaran", true, 1],
+    ["JENIS_DATA", "Transaksi", "Transaksi", true, 2],
+    ["JENIS_DATA", "Sewa", "Sewa", true, 3]
+  ];
+}
+
+function _parameterIsActive_(value) {
+  if (value === true || value === 1) return true;
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  return ["true", "1", "ya", "yes", "aktif"].indexOf(normalized) !== -1;
+}
+
+function _normalizeMasterParameterRows_(rows) {
+  return (Array.isArray(rows) ? rows : []).map(function(item, index) {
+    const isArray = Array.isArray(item);
+    const category = String(isArray ? item[0] : item.category || "").trim().toUpperCase();
+    const value = String(isArray ? item[1] : item.value || "").trim();
+    const label = String(isArray ? item[2] : item.label || value).trim() || value;
+    const active = _parameterIsActive_(isArray ? item[3] : item.active);
+    const parsedOrder = parseInt(isArray ? item[4] : item.order, 10);
+    return {
+      category: category,
+      value: value,
+      label: label,
+      active: active,
+      order: isNaN(parsedOrder) || parsedOrder < 1 ? index + 1 : parsedOrder
+    };
+  }).filter(function(item) {
+    return PARAMETER_CATEGORIES.indexOf(item.category) !== -1 && item.value !== "";
+  });
+}
+
+function _ensureMasterParameterSheetUnlocked_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PARAMETER_SHEET);
+  if (!sheet) sheet = ss.insertSheet(PARAMETER_SHEET);
+
+  const headers = ["Kategori", "Nilai Tersimpan", "Label Tampilan", "Aktif", "Urutan"];
+  if (!sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground("#1e3a5f")
+    .setFontColor("#ffffff")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+  sheet.setFrozenRows(1);
+
+  if (sheet.getLastRow() < 2) {
+    const defaults = _defaultMasterParameters_();
+    sheet.getRange(2, 1, defaults.length, headers.length).setValues(defaults);
+  }
+  return sheet;
+}
+
+function _ensureMasterParameterSheet_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return _ensureMasterParameterSheetUnlocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _readMasterParameters_() {
+  const sheet = _ensureMasterParameterSheet_();
+  if (sheet.getLastRow() < 2) return [];
+  return _normalizeMasterParameterRows_(
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues()
+  ).sort(function(a, b) {
+    const categoryOrder = PARAMETER_CATEGORIES.indexOf(a.category) - PARAMETER_CATEGORIES.indexOf(b.category);
+    return categoryOrder || a.order - b.order || a.label.localeCompare(b.label);
+  });
+}
+
+function _getAvailableDataYears_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  const totalCols = Math.max(sheet.getLastColumn(), 27);
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.min(totalCols, 28)).getValues();
+  const years = {};
+
+  rows.forEach(function(row) {
+    const coord = _parseCoord(row[3], row[4]);
+    const offset = coord && coord.shifted ? 1 : 0;
+    const value = row[22 + offset];
+    let year = "";
+
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      year = Utilities.formatDate(value, Session.getScriptTimeZone() || "GMT+7", "yyyy");
+    } else {
+      const match = String(value == null ? "" : value).match(/(?:19|20)\d{2}/);
+      year = match ? match[0] : "";
+    }
+    if (year) years[year] = true;
+  });
+  return Object.keys(years).sort(function(a, b) { return Number(b) - Number(a); });
+}
+
+function _groupActiveParameterOptions_(rows) {
+  const grouped = {
+    jenisProperti: [],
+    hakKepemilikan: [],
+    jenisData: []
+  };
+  const keyByCategory = {
+    JENIS_PROPERTI: "jenisProperti",
+    HAK_KEPEMILIKAN: "hakKepemilikan",
+    JENIS_DATA: "jenisData"
+  };
+
+  rows.filter(function(item) { return item.active; }).forEach(function(item) {
+    grouped[keyByCategory[item.category]].push({ value: item.value, label: item.label });
+  });
+
+  // Jika sheet diedit manual sampai suatu kategori kosong, gunakan default kategori itu
+  // agar filter dan form tidak rusak.
+  const defaults = _normalizeMasterParameterRows_(_defaultMasterParameters_());
+  Object.keys(keyByCategory).forEach(function(category) {
+    const key = keyByCategory[category];
+    if (grouped[key].length === 0) {
+      grouped[key] = defaults.filter(function(item) {
+        return item.category === category && item.active;
+      }).map(function(item) {
+        return { value: item.value, label: item.label };
+      });
+    }
+  });
+  return grouped;
+}
+
+function getFilterOptions() {
+  try {
+    const rows = _readMasterParameters_();
+    const options = _groupActiveParameterOptions_(rows);
+    return {
+      success: true,
+      options: options,
+      years: _getAvailableDataYears_()
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+function _getUserRole_(username) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USERS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return "";
+  const normalizedUser = String(username || "").trim();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+  for (let index = 0; index < rows.length; index++) {
+    if (String(rows[index][0] || "").trim() === normalizedUser) {
+      return String(rows[index][2] || "").trim();
+    }
+  }
+  return "";
+}
+
+function _requireSuperadmin_(username) {
+  if (_getUserRole_(username) !== "Superadmin") {
+    throw new Error("Hanya Superadmin yang dapat mengelola parameter.");
+  }
+}
+
+function getMasterParameters(activeUser) {
+  try {
+    _requireSuperadmin_(activeUser);
+    return {
+      success: true,
+      rows: _readMasterParameters_(),
+      years: _getAvailableDataYears_()
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+function _prepareMasterParametersForSave_(rows) {
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > 300) {
+    throw new Error("Daftar parameter tidak valid.");
+  }
+
+  const normalized = _normalizeMasterParameterRows_(rows);
+  if (normalized.length !== rows.length) {
+    throw new Error("Kategori dan Nilai Tersimpan wajib diisi.");
+  }
+
+  const seen = {};
+  const activeByCategory = {};
+  PARAMETER_CATEGORIES.forEach(function(category) { activeByCategory[category] = 0; });
+
+  normalized.forEach(function(item) {
+    if (item.value.length > 100 || item.label.length > 100) {
+      throw new Error("Nilai dan label parameter maksimal 100 karakter.");
+    }
+    const duplicateKey = item.category + "|" + item.value.toLowerCase();
+    if (seen[duplicateKey]) {
+      throw new Error("Parameter duplikat: " + item.value);
+    }
+    seen[duplicateKey] = true;
+    if (item.active) activeByCategory[item.category]++;
+  });
+
+  PARAMETER_CATEGORIES.forEach(function(category) {
+    if (!activeByCategory[category]) {
+      throw new Error("Setiap kategori harus memiliki minimal satu parameter aktif.");
+    }
+  });
+
+  return normalized.sort(function(a, b) {
+    const categoryOrder = PARAMETER_CATEGORIES.indexOf(a.category) - PARAMETER_CATEGORIES.indexOf(b.category);
+    return categoryOrder || a.order - b.order || a.label.localeCompare(b.label);
+  });
+}
+
+function saveMasterParameters(rows, activeUser) {
+  try {
+    _requireSuperadmin_(activeUser);
+    const normalized = _prepareMasterParametersForSave_(rows);
+    const values = normalized.map(function(item) {
+      return [item.category, item.value, item.label, item.active, item.order];
+    });
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const sheet = _ensureMasterParameterSheetUnlocked_();
+      const existingRows = Math.max(sheet.getLastRow() - 1, 0);
+      if (existingRows > 0) sheet.getRange(2, 1, existingRows, 5).clearContent();
+      sheet.getRange(2, 1, values.length, 5).setValues(values);
+      SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
+
+    logActivity(activeUser, "Memperbarui Master Parameter (" + values.length + " parameter)");
+    const filterResult = getFilterOptions();
+    return {
+      success: true,
+      rows: normalized,
+      options: filterResult.options,
+      years: filterResult.years
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -129,8 +400,9 @@ function setupSpreadsheet() {
     historySheet.getRange(1, 1, 1, 4).setValues([["No.", "Username", "Waktu Akses", "Aktivitas"]]);
     historySheet.getRange(1, 1, 1, 4).setBackground("#ea4335").setFontColor("#ffffff").setFontWeight("bold");
   }
+  _ensureMasterParameterSheet_();
   SpreadsheetApp.flush();
-  return "Spreadsheet siap! Database Properti, Akun, dan Histori telah disetup.";
+  return "Spreadsheet siap! Database Properti, Akun, Histori, dan Master Parameter telah disetup.";
 }
 
 function logActivity(username, aktivitas) {
