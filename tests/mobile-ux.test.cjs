@@ -43,7 +43,7 @@ test('overlay login dilepas total setelah autentikasi', () => {
   assert.match(html, /overlay\.hidden = true/);
   assert.match(html, /overlay\.setAttribute\('aria-hidden', 'true'\)/);
   assert.match(html, /backdrop\.classList\.remove\('show'\)/);
-  assert.match(html, /closeLoginOverlay\(\); applyPermissions\(res\.role\)/);
+  assert.match(html, /closeLoginOverlay\(\); initializeAuthenticatedApp\(res\.role\)/);
 });
 
 test('form tambah dan edit dibagi menjadi lima tahap', () => {
