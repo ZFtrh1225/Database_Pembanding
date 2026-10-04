@@ -11,6 +11,13 @@ const PARAMETER_CATEGORIES = ["JENIS_PROPERTI", "HAK_KEPEMILIKAN", "JENIS_DATA"]
 const WEB_APP_ORIGIN = "https://zftrh1225.github.io";
 const MAPS_API_KEY_PROPERTY = "GOOGLE_MAPS_API_KEY";
 const QUALITY_REVIEW_SHEET = "Quality_Review";
+const DATA_RELATION_SHEET = "Relasi_Data";
+const DUPLICATE_RELATION_TYPES = [
+  "SAME_MARKET_DATA",
+  "NEW_MARKET_EVENT",
+  "SAME_PROPERTY_DIFFERENT_SOURCE",
+  "DIFFERENT_PROPERTY"
+];
 
 /**
  * Halaman jembatan untuk GitHub Pages.
@@ -48,8 +55,9 @@ function apiCall(action, args) {
 function _dispatchApiAction_(action, args) {
   if (action === 'checkLogin') return checkLogin(args[0], args[1]);
   if (action === 'searchData') return searchData(args[0] || {});
-  if (action === 'addData') return addData(args[0], args[1]);
-  if (action === 'editData') return editData(args[0], args[1], args[2]);
+  if (action === 'findDuplicateCandidates') return findDuplicateCandidates(args[0], args[1], args[2]);
+  if (action === 'addData') return addData(args[0], args[1], args[2]);
+  if (action === 'editData') return editData(args[0], args[1], args[2], args[3]);
   if (action === 'uploadFoto') return uploadFoto(args[0], args[1]);
   if (action === 'updateFoto') return updateFoto(args[0], args[1]);
   if (action === 'getFilterOptions') return getFilterOptions();
@@ -353,6 +361,38 @@ function _ensureQualityReviewSheet_() {
   }
 }
 
+function _dataRelationHeaders_() {
+  return [
+    "Relation ID", "Data Aktif ID", "Koordinat Data Aktif", "Data Existing ID",
+    "Koordinat Existing", "Jenis Hubungan", "Skor Kemiripan", "Indikator",
+    "Alasan", "Status Review", "Diputuskan Oleh", "Role", "Waktu Keputusan", "Sumber Aksi"
+  ];
+}
+
+function _ensureDataRelationSheetUnlocked_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(DATA_RELATION_SHEET);
+  const headers = _dataRelationHeaders_();
+  if (!sheet) sheet = ss.insertSheet(DATA_RELATION_SHEET);
+  if (!sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setBackground("#0f766e").setFontColor("#ffffff").setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function _ensureDataRelationSheet_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return _ensureDataRelationSheetUnlocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function _reviewDateText_(value) {
   if (!value) return "";
   if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
@@ -576,8 +616,9 @@ function setupSpreadsheet() {
   }
   _ensureMasterParameterSheet_();
   _ensureQualityReviewSheet_();
+  _ensureDataRelationSheet_();
   SpreadsheetApp.flush();
-  return "Spreadsheet siap! Database Properti, Akun, Histori, Master Parameter, dan Quality Review telah disetup.";
+  return "Spreadsheet siap! Database Properti, Akun, Histori, Master Parameter, Quality Review, dan Relasi Data telah disetup.";
 }
 
 function logActivity(username, aktivitas) {
@@ -824,24 +865,241 @@ function searchData(params) {
 
 function _str(v) { if (v === null || v === undefined) return ''; return String(v).trim().replace(/\.0+$/, ''); }
 
-function addData(rowData, activeUser) {
+function _requireDataEditor_(username) {
+  const role = _getUserRole_(username);
+  if (["Surveyor", "Admin", "Superadmin"].indexOf(role) === -1) {
+    throw new Error("Role ini tidak diizinkan menambah atau mengubah data pembanding.");
+  }
+  return role;
+}
+
+function _duplicateNormalizeText_(value) {
+  let text = String(value == null ? "" : value).toLowerCase().trim();
+  if (text.normalize) text = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return text
+    .replace(/\b(jl|jln)\.?\b/g, "jalan")
+    .replace(/\bgg\.?\b/g, "gang")
+    .replace(/\bno\.?\b/g, "nomor")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function _duplicatePhone_(value) {
+  let digits = String(value == null ? "" : value).replace(/\D/g, "");
+  if (digits.indexOf("0062") === 0) digits = digits.substring(4);
+  else if (digits.indexOf("62") === 0) digits = digits.substring(2);
+  if (digits.indexOf("0") === 0) digits = digits.substring(1);
+  return digits;
+}
+
+function _duplicateNumber_(value) {
+  if (typeof value === "number") return isFinite(value) ? value : null;
+  let text = String(value == null ? "" : value).trim().replace(/[^0-9,.-]/g, "");
+  if (!text) return null;
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) text = text.replace(/\./g, "").replace(",", ".");
+  else text = text.replace(",", ".");
+  const parsed = Number(text);
+  return isFinite(parsed) ? parsed : null;
+}
+
+function _duplicateAddressSimilarity_(left, right) {
+  const a = _duplicateNormalizeText_(left).split(" ").filter(Boolean);
+  const b = _duplicateNormalizeText_(right).split(" ").filter(Boolean);
+  if (!a.length || !b.length) return 0;
+  const aSet = {};
+  const bSet = {};
+  a.forEach(function(token) { aSet[token] = true; });
+  b.forEach(function(token) { bSet[token] = true; });
+  const union = {};
+  Object.keys(aSet).concat(Object.keys(bSet)).forEach(function(token) { union[token] = true; });
+  const intersection = Object.keys(aSet).filter(function(token) { return bSet[token]; }).length;
+  return Object.keys(union).length ? intersection / Object.keys(union).length : 0;
+}
+
+function _duplicateRelativeDifference_(left, right) {
+  const a = _duplicateNumber_(left), b = _duplicateNumber_(right);
+  if (a == null || b == null || a <= 0 || b <= 0) return null;
+  return Math.abs(a - b) / Math.max(a, b);
+}
+
+function _duplicateRecordFromRow_(row, sheetRow) {
+  const coord = _parseCoord(row[3], row[4]);
+  const offset = coord && coord.shifted ? 1 : 0;
+  return {
+    id: _str(row[0]),
+    sumber: _str(row[1]),
+    hp: _str(row[2]),
+    koordinat: coord ? coord.raw : _str(row[3]),
+    coord: coord,
+    alamat: _str(row[4 + offset]),
+    kota: _str(row[5 + offset]),
+    provinsi: _str(row[6 + offset]),
+    objek: _str(row[7 + offset]),
+    legalitas: _str(row[9 + offset]),
+    luasTanah: row[10 + offset],
+    luasBangunan: row[11 + offset],
+    harga: row[13 + offset],
+    statusHarga: _str(row[21 + offset]),
+    waktuData: _str(row[22 + offset]),
+    sheetRow: sheetRow || null
+  };
+}
+
+function _duplicateScore_(input, existing) {
+  let score = 0;
+  const indicators = [];
+  let distanceMeters = null;
+  function add(key, label, points, detail) {
+    score += points;
+    indicators.push({ key: key, label: label, points: points, detail: detail || "" });
+  }
+
+  if (input.coord && existing.coord) {
+    distanceMeters = _haversine(input.coord.lat, input.coord.lng, existing.coord.lat, existing.coord.lng) * 1000;
+    if (distanceMeters <= 10) add("coordinate", "Koordinat sangat dekat", 40, Math.round(distanceMeters) + " m");
+    else if (distanceMeters <= 30) add("coordinate", "Koordinat berdekatan", 35, Math.round(distanceMeters) + " m");
+    else if (distanceMeters <= 100) add("coordinate", "Lokasi sekitar", 20, Math.round(distanceMeters) + " m");
+  }
+
+  const inputPhone = _duplicatePhone_(input.hp), existingPhone = _duplicatePhone_(existing.hp);
+  if (inputPhone.length >= 8 && inputPhone === existingPhone) add("phone", "Nomor telepon sama", 25, "Nomor sumber cocok");
+
+  const addressSimilarity = _duplicateAddressSimilarity_(input.alamat, existing.alamat);
+  if (addressSimilarity >= 0.85) add("address", "Alamat sangat mirip", 20, Math.round(addressSimilarity * 100) + "%");
+  else if (addressSimilarity >= 0.65) add("address", "Alamat mirip", 12, Math.round(addressSimilarity * 100) + "%");
+
+  const landDifference = _duplicateRelativeDifference_(input.luasTanah, existing.luasTanah);
+  if (landDifference != null && landDifference <= 0.03) add("land", "Luas tanah hampir sama", 10, Math.round(landDifference * 100) + "% selisih");
+  else if (landDifference != null && landDifference <= 0.10) add("land", "Luas tanah berdekatan", 5, Math.round(landDifference * 100) + "% selisih");
+
+  const buildingDifference = _duplicateRelativeDifference_(input.luasBangunan, existing.luasBangunan);
+  if (buildingDifference != null && buildingDifference <= 0.03) add("building", "Luas bangunan hampir sama", 5, Math.round(buildingDifference * 100) + "% selisih");
+  else if (buildingDifference != null && buildingDifference <= 0.10) add("building", "Luas bangunan berdekatan", 3, Math.round(buildingDifference * 100) + "% selisih");
+
+  const priceDifference = _duplicateRelativeDifference_(input.harga, existing.harga);
+  if (priceDifference != null && priceDifference <= 0.03) add("price", "Harga hampir sama", 10, Math.round(priceDifference * 100) + "% selisih");
+  else if (priceDifference != null && priceDifference <= 0.10) add("price", "Harga berdekatan", 5, Math.round(priceDifference * 100) + "% selisih");
+
+  if (_duplicateNormalizeText_(input.objek) && _duplicateNormalizeText_(input.objek) === _duplicateNormalizeText_(existing.objek)) {
+    add("propertyType", "Jenis properti sama", 5, input.objek);
+  }
+
+  return {
+    score: Math.min(100, score),
+    indicators: indicators,
+    distanceMeters: distanceMeters,
+    addressSimilarity: addressSimilarity
+  };
+}
+
+function _findDuplicateCandidates_(rowData, excludeId) {
+  if (!Array.isArray(rowData)) throw new Error("Data pembanding tidak valid.");
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const input = _duplicateRecordFromRow_(rowData, null);
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(27, Math.min(sheet.getLastColumn(), 28))).getValues();
+  const normalizedExcludeId = String(excludeId || "").trim();
+  return rows.map(function(row, index) {
+    const existing = _duplicateRecordFromRow_(row, index + 2);
+    if (!existing.id || (normalizedExcludeId && existing.id === normalizedExcludeId)) return null;
+    const match = _duplicateScore_(input, existing);
+    if (match.score < 35) return null;
+    return {
+      id: existing.id,
+      koordinat: existing.koordinat,
+      alamat: existing.alamat,
+      kota: existing.kota,
+      provinsi: existing.provinsi,
+      objek: existing.objek,
+      legalitas: existing.legalitas,
+      luasTanah: existing.luasTanah,
+      luasBangunan: existing.luasBangunan,
+      harga: _str(existing.harga),
+      statusHarga: existing.statusHarga,
+      waktuData: existing.waktuData,
+      sumber: existing.sumber,
+      hp: existing.hp,
+      score: match.score,
+      indicators: match.indicators,
+      distanceMeters: match.distanceMeters == null ? null : Math.round(match.distanceMeters)
+    };
+  }).filter(Boolean).sort(function(a, b) {
+    return b.score - a.score || (a.distanceMeters == null ? Number.MAX_VALUE : a.distanceMeters) - (b.distanceMeters == null ? Number.MAX_VALUE : b.distanceMeters);
+  }).slice(0, 5);
+}
+
+function findDuplicateCandidates(rowData, activeUser, excludeId) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME); const lastRow = sheet.getLastRow();
-    if (lastRow >= 2) {
-      const existingCoords = sheet.getRange(2, 4, lastRow - 1, 1).getValues().flat();
-      const newCoord = String(rowData[3]).trim();
-      if (existingCoords.includes(newCoord)) return { success: false, error: "Gagal: Koordinat bertabrakan dengan data lain." };
+    _requireDataEditor_(activeUser);
+    return { success: true, candidates: _findDuplicateCandidates_(rowData, excludeId) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+function _resolveDuplicateDecision_(candidates, decision) {
+  if (!candidates.length) return null;
+  if (!decision || !decision.existingId || !decision.relationType) {
+    return { required: true, candidates: candidates };
+  }
+  const relationType = String(decision.relationType || "").trim();
+  if (DUPLICATE_RELATION_TYPES.indexOf(relationType) === -1 || relationType === "SAME_MARKET_DATA") {
+    throw new Error("Jenis hubungan data tidak dapat digunakan untuk menyimpan data baru.");
+  }
+  const existingCoord = _normalizeReviewCoord_(decision.existingCoord);
+  const candidate = candidates.find(function(item) {
+    return String(item.id) === String(decision.existingId) && _normalizeReviewCoord_(item.koordinat) === existingCoord;
+  });
+  if (!candidate) throw new Error("Kandidat data berubah. Jalankan pemeriksaan duplikat kembali.");
+  const reason = String(decision.reason || "").trim();
+  if (reason.length < 5) throw new Error("Alasan hubungan data wajib diisi minimal 5 karakter.");
+  if (reason.length > 500) throw new Error("Alasan hubungan data maksimal 500 karakter.");
+  return { required: false, candidate: candidate, relationType: relationType, reason: reason };
+}
+
+function _recordDataRelation_(activeRow, resolvedDecision, activeUser, role, sourceAction) {
+  if (!resolvedDecision || !resolvedDecision.candidate) return;
+  const candidate = resolvedDecision.candidate;
+  const now = new Date();
+  const relationId = "REL-" + Utilities.formatDate(now, "GMT+7", "yyyyMMddHHmmss") + "-" + Utilities.getUuid().slice(0, 8);
+  const indicatorText = candidate.indicators.map(function(item) {
+    return item.label + " (+" + item.points + ")" + (item.detail ? " " + item.detail : "");
+  }).join("; ");
+  const reviewStatus = role === "Surveyor" ? "Menunggu Review" : "Dikonfirmasi";
+  const relationRow = [
+    relationId, String(activeRow[0] || ""), String(activeRow[3] || ""),
+    candidate.id, candidate.koordinat, resolvedDecision.relationType, candidate.score,
+    indicatorText, resolvedDecision.reason, reviewStatus, String(activeUser || ""), role, now, sourceAction
+  ];
+  const sheet = _ensureDataRelationSheet_();
+  sheet.appendRow(relationRow);
+}
+
+function addData(rowData, activeUser, duplicateDecision) {
+  try {
+    const role = _requireDataEditor_(activeUser);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (!sheet) throw new Error("Sheet database tidak ditemukan.");
+    const candidates = _findDuplicateCandidates_(rowData, "");
+    const resolvedDecision = _resolveDuplicateDecision_(candidates, duplicateDecision);
+    if (resolvedDecision && resolvedDecision.required) {
+      return { success: false, requiresDuplicateDecision: true, candidates: candidates };
     }
     rowData[0] = rowData[0] || getNextId();
     sheet.appendRow(rowData); sheet.getRange(sheet.getLastRow(), 3).setNumberFormat('@'); SpreadsheetApp.flush();
+    let relationWarning = "";
+    try { _recordDataRelation_(rowData, resolvedDecision, activeUser, role, "Tambah Data"); }
+    catch (relationError) { relationWarning = relationError.message; }
     let sumberLog = rowData[1] ? " - " + rowData[1] : "";
     logActivity(activeUser, "Menambah Data Baru (ID: " + rowData[0] + sumberLog + ")");
-    return { success: true, id: rowData[0] };
+    return { success: true, id: rowData[0], relationRecorded: !relationWarning, relationWarning: relationWarning };
   } catch (err) { return { success: false, error: err.message }; }
 }
 
-function editData(rowData, activeUser, originalCoord) {
+function editData(rowData, activeUser, originalCoord, duplicateDecision) {
   try {
+    const role = _requireDataEditor_(activeUser);
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
     const targetId = String(rowData[0]).trim();
     const targetCoord = originalCoord ? String(originalCoord).trim() : String(rowData[3]).trim();
@@ -853,16 +1111,19 @@ function editData(rowData, activeUser, originalCoord) {
     }
     if (rowIndex === -1) return { success: false, error: "Data ID " + targetId + " tidak ditemukan di titik koordinat tersebut." };
 
-    const currentCoord = String(sheet.getRange(rowIndex, 4).getValue()).trim(); const newCoord = String(rowData[3]).trim();
-    if (newCoord !== currentCoord) {
-      const allCoords = sheet.getRange(2, 4, lastRow - 1, 1).getValues().flat();
-      if (allCoords.includes(newCoord)) return { success: false, error: "Gagal: Koordinat bertabrakan." };
+    const candidates = _findDuplicateCandidates_(rowData, targetId);
+    const resolvedDecision = _resolveDuplicateDecision_(candidates, duplicateDecision);
+    if (resolvedDecision && resolvedDecision.required) {
+      return { success: false, requiresDuplicateDecision: true, candidates: candidates };
     }
     sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
     sheet.getRange(rowIndex, 3).setNumberFormat('@'); SpreadsheetApp.flush();
+    let relationWarning = "";
+    try { _recordDataRelation_(rowData, resolvedDecision, activeUser, role, "Edit Data"); }
+    catch (relationError) { relationWarning = relationError.message; }
     let sumberLog = rowData[1] ? " - " + rowData[1] : "";
     logActivity(activeUser, "Mengedit Data (ID: " + targetId + sumberLog + ")");
-    return { success: true, id: targetId };
+    return { success: true, id: targetId, relationRecorded: !relationWarning, relationWarning: relationWarning };
   } catch (err) { return { success: false, error: err.message }; }
 }
 
