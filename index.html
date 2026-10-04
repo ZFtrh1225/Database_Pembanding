@@ -705,6 +705,18 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   gap: 6px; white-space: nowrap; backdrop-filter: blur(8px);
 }
 .mmap-lines:hover, .mmap-lines.active { border-color: #ffd966; color: #ffd966; }
+.mmap-layer-toggle {
+  display:flex; min-height:40px; overflow:hidden; border:1px solid rgba(255,255,255,.38);
+  border-radius:8px; background:rgba(20,40,72,.9); box-shadow:0 2px 10px rgba(0,0,0,.2);
+  backdrop-filter:blur(8px);
+}
+.mmap-layer-toggle[hidden] { display:none !important; }
+.mmap-layer-toggle button {
+  min-width:72px; min-height:40px; padding:7px 10px; border:0; background:transparent; color:#fff;
+  font:700 11px var(--font); cursor:pointer; touch-action:manipulation;
+}
+.mmap-layer-toggle button + button { border-left:1px solid rgba(255,255,255,.25); }
+.mmap-layer-toggle button.active { background:#fff; color:#1e3a5f; }
 .mmap-zoom { display: flex; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .mmap-zoom button {
   width: 40px; min-height: 40px; border: 1px solid #cbd5e1;
@@ -1339,7 +1351,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   }
   .measure-map-wrap { flex: 1; min-height: 48vh; }
   .mmap-topbar {
-    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px; left: 8px; right: 8px; top: max(8px, env(safe-area-inset-top, 0px));
     padding: 0; max-width: none;
   }
@@ -1349,6 +1361,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   }
   .mmap-topbar .mmap-mobile-label, .mmap-mode-short { display: inline; }
   .mmap-topbar .mmap-desktop-label, .mmap-mode-full { display: none; }
+  .mmap-layer-toggle { grid-column:span 2; width:100%; }
+  .mmap-layer-toggle button { flex:1; min-width:0; min-height:44px; padding:7px 4px; }
   .mmap-zoom { grid-column: span 2; }
   .mmap-zoom button { flex: 1; min-height: 44px; }
   #measureMap .gm-style-mtc { display: none; }
@@ -2480,6 +2494,10 @@ body.mmode-picking .mpick-hint { display: flex; }
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17L9 11L14 14L21 7" stroke-dasharray="3 2"/><circle cx="3" cy="17" r="1"/><circle cx="21" cy="7" r="1"/></svg>
         <span class="mmap-desktop-label" id="mLinesBtnTxt">Sembunyikan Garis</span><span class="mmap-mobile-label">Garis</span>
       </button>
+      <div class="mmap-layer-toggle" id="mMeasureLayers" role="group" aria-label="Lapisan Google Maps" hidden>
+        <button type="button" id="mLayerRoadmap" class="active" onclick="setMeasurementMapLayer('roadmap')" aria-pressed="true">Default</button>
+        <button type="button" id="mLayerSatellite" onclick="setMeasurementMapLayer('satellite')" aria-pressed="false">Satelit</button>
+      </div>
       <div class="mmap-zoom" role="group" aria-label="Zoom peta pengukuran">
         <button type="button" onclick="mZoomMeasurement(1)" aria-label="Perbesar peta" title="Perbesar">+</button>
         <button type="button" onclick="mZoomMeasurement(-1)" aria-label="Perkecil peta" title="Perkecil">−</button>
@@ -7962,6 +7980,7 @@ var _mMks = {}, _mLbls = {};            // markers, labels
 var _mRoutes = {};                       // Google Maps road/fallback polylines per DP id
 var _mDirSvc = null;                     // compatibility fallback DirectionsService (Legacy)
 var _mRouteClassPromise = null;           // modern google.maps.routes.Route
+var _mMapType = 'roadmap';
 var _mDpIds  = ['1','2','3','4','5','6'];
 var _mLinesVisible = true;
 var _mRouteRunId = 0;
@@ -8055,26 +8074,48 @@ function toggleMSidebar() {
   }, 320);
 }
 
+function _mSyncMapLayerButtons() {
+  var roadmapBtn = document.getElementById('mLayerRoadmap');
+  var satelliteBtn = document.getElementById('mLayerSatellite');
+  if (roadmapBtn) {
+    roadmapBtn.classList.toggle('active', _mMapType === 'roadmap');
+    roadmapBtn.setAttribute('aria-pressed', String(_mMapType === 'roadmap'));
+  }
+  if (satelliteBtn) {
+    satelliteBtn.classList.toggle('active', _mMapType === 'satellite');
+    satelliteBtn.setAttribute('aria-pressed', String(_mMapType === 'satellite'));
+  }
+}
+
+function setMeasurementMapLayer(type) {
+  if (type !== 'roadmap' && type !== 'satellite') return;
+  _mMapType = type;
+  if (_mMap && typeof _mMap.setMapTypeId === 'function') _mMap.setMapTypeId(type);
+  _mSyncMapLayerButtons();
+  try { localStorage.setItem('dbp_measure_map_type', type); } catch (error) {}
+}
+
 // ── INIT PETA MEASUREMENT ────
 function _mInitMap() {
   var el = document.getElementById('measureMap');
   if (!el || !window.google || !google.maps) return;
 
+  try {
+    var savedMapType = localStorage.getItem('dbp_measure_map_type');
+    if (savedMapType === 'roadmap' || savedMapType === 'satellite') _mMapType = savedMapType;
+  } catch (error) {}
+
   _mMap = new google.maps.Map(el, {
     center: { lat: -6.2, lng: 106.816 },
     zoom: 14,
-    mapTypeId: 'roadmap',
+    mapTypeId: _mMapType,
     zoomControl: false,
-    mapTypeControl: true,
+    mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
-    mapTypeControlOptions: {
-      style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-      position: google.maps.ControlPosition.BOTTOM_LEFT,
-      mapTypeIds: ['roadmap', 'satellite', 'hybrid']
-    },
     gestureHandling: 'greedy'
   });
+  _mSyncMapLayerButtons();
 
   _mDirSvc = typeof google.maps.DirectionsService === 'function' ? new google.maps.DirectionsService() : null;
 
@@ -8337,9 +8378,28 @@ function _mComputeLegacyRoadRoute(origin, destination) {
   });
 }
 
+function _mRouteErrorText(error, depth) {
+  if (error === null || typeof error === 'undefined') return '';
+  if (typeof error === 'string' || typeof error === 'number') return String(error);
+  if ((depth || 0) > 2) return '';
+  var parts = [];
+  ['name','code','status','message','reason'].forEach(function(key) {
+    if (error[key] !== null && typeof error[key] !== 'undefined') parts.push(String(error[key]));
+  });
+  if (error.cause) parts.push(_mRouteErrorText(error.cause, (depth || 0) + 1));
+  if (Array.isArray(error.errors)) {
+    error.errors.slice(0, 3).forEach(function(item) { parts.push(_mRouteErrorText(item, (depth || 0) + 1)); });
+  }
+  if (!parts.length) {
+    try { parts.push(JSON.stringify(error)); } catch (jsonError) {}
+  }
+  return parts.filter(Boolean).join(' ');
+}
+
 function _mFriendlyRouteError(error) {
-  var raw = String((error && (error.code || error.message)) || 'UNKNOWN_ERROR');
-  if (/PERMISSION|DENIED|ApiNotActivated|API_KEY|403/i.test(raw)) return 'Routes API belum diaktifkan atau belum diizinkan pada API key.';
+  var raw = _mRouteErrorText(error, 0) || 'UNKNOWN_ERROR';
+  if (/PERMISSION|REQUEST_DENIED|DENIED|ApiNotActivated|API.?KEY|access.?not.?configured|not.?authori[sz]ed|not.?enabled|403/i.test(raw)) return 'Routes API belum aktif atau belum diizinkan pada pembatasan API key.';
+  if (/BILLING/i.test(raw)) return 'Billing Google Cloud belum aktif untuk layanan rute.';
   if (/ZERO_RESULTS|NOT_FOUND/i.test(raw)) return 'Rute jalan tidak ditemukan untuk koordinat tersebut.';
   if (/OVER_QUERY|RESOURCE_EXHAUSTED|429/i.test(raw)) return 'Kuota layanan rute sedang terlampaui.';
   if (/INVALID/i.test(raw)) return 'Koordinat atau permintaan rute tidak valid.';
@@ -8352,7 +8412,7 @@ function _mComputeRoadRoute(origin, destination) {
       result.modernError = modernError;
       return result;
     }).catch(function(legacyError) {
-      var finalError = new Error(_mFriendlyRouteError(modernError));
+      var finalError = new Error(_mFriendlyRouteError({ errors:[modernError, legacyError] }));
       finalError.modernError = modernError;
       finalError.legacyError = legacyError;
       throw finalError;
@@ -8584,6 +8644,7 @@ function toggleMeasureOSM() {
   var btn = document.getElementById('btnMeasureOsm');
   var gMap = document.getElementById('measureMap');
   var oMap = document.getElementById('measureOsmMap');
+  var layerToggle = document.getElementById('mMeasureLayers');
 
   if (_mOsmActive) {
     // Switch ke OSM
@@ -8596,6 +8657,7 @@ function toggleMeasureOSM() {
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>';
     gMap.style.display = 'none';
     oMap.classList.add('active');
+    if (layerToggle) layerToggle.hidden = true;
 
     if (!_mOsmInited) {
       _mInitMeasureOsm();
@@ -8613,6 +8675,8 @@ function toggleMeasureOSM() {
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">OpenStreetMap</span><span class="mmap-mode-short">OSM</span>';
     oMap.classList.remove('active');
     gMap.style.display = '';
+    if (layerToggle) layerToggle.hidden = false;
+    _mSyncMapLayerButtons();
 
     // Init Google Maps measurement saat pertama kali dipakai (karena default-nya OSM)
     if (!_mMapInited) {
