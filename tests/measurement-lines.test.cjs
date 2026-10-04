@@ -79,7 +79,7 @@ c.google = { maps: {
   Polyline, LatLngBounds: class { extend() {} },
   Point: class { constructor(x, y) { this.x = x; this.y = y; } },
   Size: class { constructor(width, height) { this.width = width; this.height = height; } },
-  Marker: class { constructor(opts) { this.opts = opts; } setMap() {} },
+  Marker: class { constructor(opts) { this.opts = opts; } setMap() {} setIcon(icon) { this.opts.icon = icon; } },
   TravelMode: { DRIVING: 'DRIVING' }, UnitSystem: { METRIC: 'METRIC' },
   DirectionsStatus: { OK: 'OK' }
 } };
@@ -87,12 +87,14 @@ c.window.google = c.google;
 for (const name of [
   '_mOsmStopDashAnimation', '_mOsmDashTick', '_mOsmSyncDashAnimation', '_mSyncLineVisibility',
   'toggleMeasurementLines', 'mZoomMeasurement', '_mSyncMapLayerButtons', 'setMeasurementMapLayer',
+  '_mPinScaleForZoom', '_mPinDimensions', '_mPinSvg', '_mBuildGooglePinIcon', '_mSyncGoogleMarkerScale',
   '_mCreateRoutePolyline', '_mRoutePathToPins',
   '_mParse', '_mHaversine', '_mFmtDist', '_mFmtMeters',
   '_mNormalizeRoutePoint', '_mGetRouteClass', '_mComputeModernRoadRoute', '_mComputeLegacyRoadRoute',
   '_mRouteErrorText', '_mFriendlyRouteError', '_mComputeRoadRoute', '_mFormatRouteDuration', '_mSetDistanceState',
   '_mRouteNoticeDismissed', 'dismissMeasurementRouteNotice', '_mShowRouteNotice', 'retryMeasurementRoutes',
-  '_mClearLayers', '_mMakePin', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon', '_mOsmRedraw'
+  '_mClearLayers', '_mMakePin', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon',
+  '_mOsmMakeLabelIcon', '_mSyncOsmMarkerScale', '_mOsmRedraw'
 ]) vm.runInContext(extract(name), c);
 
 async function settle() {
@@ -113,8 +115,15 @@ async function settle() {
   // Rute Google modern harus mempertahankan geometri jalan, jarak, dan durasi.
   node('mCoord_obj').value = '-5.380964, 105.284946';
   node('mCoord_1').value = '-5.382664, 105.280162';
-  const pin = c._mMakePin({ lat: -5.380964, lng: 105.284946 }, '#db4437', 'OBJ', true);
-  assert.equal(pin.opts.icon.anchor.y, 46, 'Titik koordinat Google tepat di ujung pin, bukan bayangan');
+  const pin = c._mMakePin({ lat: -5.380964, lng: 105.284946 }, '#db4437', 'Objek Penilaian', true);
+  assert.equal(pin.opts.icon.anchor.y, c._mPinDimensions(14, true).tipY, 'Titik koordinat Google tepat di ujung pin');
+  assert.doesNotMatch(decodeURIComponent(pin.opts.icon.url), />OBJ<|>DP\d+</, 'Pin Google tidak memuat teks internal');
+  const googleWidthAt14 = pin.opts.icon.scaledSize.width;
+  c._mMks = { obj:pin };
+  c._mMap.zoom = 18;
+  c._mSyncGoogleMarkerScale();
+  assert.ok(pin.opts.icon.scaledSize.width > googleWidthAt14, 'Pin Google membesar ketika zoom diperbesar');
+  c._mMap.zoom = 14;
   c._mMakePin = () => ({ setMap() {} });
   const labelCalls = [];
   c._mMakeObjLabel = () => ({ setMap() {} });
@@ -195,12 +204,13 @@ async function settle() {
   const osmLayers = new Set();
   c._mOsmMap = {
     hasLayer: layer => osmLayers.has(layer), removeLayer: layer => osmLayers.delete(layer),
+    zoom: 14, getZoom() { return this.zoom; },
     fitBounds() {}, zoomIn() { this.zoom = (this.zoom || 14) + 1; },
     zoomOut() { this.zoom = (this.zoom || 14) - 1; }
   };
   c.L = {
     divIcon: data => data,
-    marker: () => ({ addTo(map) { osmLayers.add(this); return this; } }),
+    marker: (coords, opts) => ({ coords, icon:opts.icon, setIcon(icon) { this.icon = icon; }, addTo(map) { osmLayers.add(this); return this; } }),
     polyline: (points, opts) => ({
       points, options: opts, path: { style: {} },
       getElement() { return osmLayers.has(this) ? this.path : null; },
@@ -213,6 +223,17 @@ async function settle() {
   assert.equal(c._mOsmLines[0].options.className, 'measure-osm-line');
   assert.equal(osmLayers.has(c._mOsmLines[0]), false);
   assert.ok(c._mOsmMarkers.length > 0 && c._mOsmLabels.length > 0);
+  assert.match(c._mOsmMarkers[1].icon.html, /#e60023/, 'Warna pin Data 1 mengikuti warna panel dan garis');
+  assert.doesNotMatch(c._mOsmMarkers[0].icon.html, />OBJ<|>DP\d+</, 'Pin OSM tidak memuat teks internal');
+  const osmWidthAt14 = c._mOsmMarkers[1].icon.iconSize[0];
+  c._mOsmMap.zoom = 18;
+  c._mSyncOsmMarkerScale();
+  assert.ok(c._mOsmMarkers[1].icon.iconSize[0] > osmWidthAt14, 'Pin OSM membesar ketika zoom diperbesar');
+  const labelIcon = c._mOsmLabels[1].icon;
+  const pinSizeAt18 = c._mPinDimensions(18, false);
+  assert.equal(labelIcon.iconAnchor[1] - labelIcon.iconSize[1], pinSizeAt18.tipY + 8,
+    'Label Data 1 mengikuti tinggi pin dengan jarak delapan piksel');
+  c._mOsmMap.zoom = 14;
   assert.match(node('mDist_1').textContent, /lurus/);
   c.toggleMeasurementLines();
   assert.equal(osmLayers.has(c._mOsmLines[0]), true);
@@ -254,6 +275,8 @@ async function settle() {
   assert.match(html, /\.mmap-layer-toggle \{ grid-column:span 2;/);
   assert.match(html, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(html, /Route\.computeRoutes/);
+  assert.match(html, /_mMakePin\(coord, _mRouteColors\[id\]/, 'Pin Google memakai warna data dari panel');
+  assert.match(html, /_mOsmMap\.on\('zoomend', _mSyncOsmMarkerScale\)/, 'Pin OSM merespons perubahan zoom');
   assert.doesNotMatch(extract('_mMakeLabel'), /mdl-pill|distanceText/, 'Label pin Google hanya berisi nama data');
   assert.doesNotMatch(extract('_mOsmRedraw'), /labelHtml[\s\S]*mdl-pill/, 'Label pin OSM tidak memuat jarak');
   assert.match(extract('_mOsmRedraw'), /Data ' \+ id/, 'Label pin OSM tetap menampilkan nomor data');
