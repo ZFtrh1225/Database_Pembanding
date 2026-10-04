@@ -51,6 +51,7 @@ let nextFrame = 0, cancelledFrame = 0, reduceMotion = false;
 const c = vm.createContext({
   document: { getElementById: node, hidden: false },
   window: { matchMedia: () => ({ matches: reduceMotion }) },
+  localStorage: { value: null, setItem(key, value) { this.value = value; }, getItem() { return this.value; } },
   setTimeout: fn => { fn(); return 1; }, clearTimeout: () => {},
   requestAnimationFrame: () => ++nextFrame,
   cancelAnimationFrame: handle => { cancelledFrame = handle; },
@@ -58,10 +59,11 @@ const c = vm.createContext({
   _mOsmDashFrame: null, _mOsmDashLast: 0, _mOsmDashOffset: 0,
   _mRoutes: {}, _mMks: {}, _mLbls: {}, _mRouteRunId: 0,
   _mRouteClassPromise: null, _mRouteNoticeTimer: null,
+  _mMapType: 'roadmap',
   _mOsmLines: [], _mOsmMarkers: [], _mOsmLabels: [],
   _mDpIds: ['1', '2', '3', '4', '5', '6'],
   _mRouteColors: { '1': '#e60023' },
-  _mMap: { zoom: 14, getZoom() { return this.zoom; }, setZoom(z) { this.zoom = z; }, fitBounds() {} },
+  _mMap: { zoom: 14, getZoom() { return this.zoom; }, setZoom(z) { this.zoom = z; }, setMapTypeId(type) { this.mapTypeId = type; }, fitBounds() {} },
   _mOsmMap: null
 });
 class Polyline {
@@ -81,10 +83,11 @@ c.google = { maps: {
 c.window.google = c.google;
 for (const name of [
   '_mOsmStopDashAnimation', '_mOsmDashTick', '_mOsmSyncDashAnimation', '_mSyncLineVisibility',
-  'toggleMeasurementLines', 'mZoomMeasurement', '_mCreateRoutePolyline', '_mRoutePathToPins',
+  'toggleMeasurementLines', 'mZoomMeasurement', '_mSyncMapLayerButtons', 'setMeasurementMapLayer',
+  '_mCreateRoutePolyline', '_mRoutePathToPins',
   '_mParse', '_mHaversine', '_mFmtDist', '_mFmtMeters',
   '_mNormalizeRoutePoint', '_mGetRouteClass', '_mComputeModernRoadRoute', '_mComputeLegacyRoadRoute',
-  '_mFriendlyRouteError', '_mComputeRoadRoute', '_mFormatRouteDuration', '_mSetDistanceState',
+  '_mRouteErrorText', '_mFriendlyRouteError', '_mComputeRoadRoute', '_mFormatRouteDuration', '_mSetDistanceState',
   '_mShowRouteNotice', 'retryMeasurementRoutes',
   '_mClearLayers', '_mMakePin', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon', '_mOsmRedraw'
 ]) vm.runInContext(extract(name), c);
@@ -96,6 +99,14 @@ async function settle() {
 }
 
 (async function main() {
+  c.setMeasurementMapLayer('satellite');
+  assert.equal(c._mMap.mapTypeId, 'satellite', 'Lapisan satelit diterapkan ke Google Maps');
+  assert.equal(node('mLayerSatellite').attributes['aria-pressed'], 'true');
+  assert.equal(c.localStorage.value, 'satellite', 'Pilihan lapisan disimpan untuk sesi berikutnya');
+  c.setMeasurementMapLayer('roadmap');
+  assert.equal(node('mLayerRoadmap').attributes['aria-pressed'], 'true');
+  assert.match(c._mFriendlyRouteError({ errors:[{}, new Error('REQUEST_DENIED')] }), /Routes API belum aktif/);
+
   // Rute Google modern harus mempertahankan geometri jalan, jarak, dan durasi.
   node('mCoord_obj').value = '-5.380964, 105.284946';
   node('mCoord_1').value = '-5.382664, 105.280162';
@@ -228,6 +239,8 @@ async function settle() {
   assert.match(html, /renderer: L\.svg\(\)/, 'Leaflet memakai jalur SVG');
   assert.doesNotMatch(html, /requestAnimationFrame\(_mDashTick\)/);
   assert.match(html, /\.mmap-zoom \{ grid-column: span 2; \}/);
+  assert.match(html, /\.mmap-layer-toggle \{ grid-column:span 2;/);
+  assert.match(html, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(html, /Route\.computeRoutes/);
   console.log('Measurement: Routes API, fallback, animasi OSM, toggle, zoom, dan respons terlambat OK');
 })().catch(error => {
