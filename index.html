@@ -2836,6 +2836,9 @@ class GasRunner {
   getMasterParameters(user) { this._call('getMasterParameters', [user]); }
   saveMasterParameters(rows, user) { this._call('saveMasterParameters', [rows, user]); }
   saveQualityReview(payload, user) { this._call('saveQualityReview', [payload, user]); }
+  findDuplicateCandidates(rowData, user, excludeId) { this._call('findDuplicateCandidates', [rowData, user, excludeId]); }
+  getDataRelations(user, options) { this._call('getDataRelations', [user, options]); }
+  reviewDataRelation(payload, user) { this._call('reviewDataRelation', [payload, user]); }
 }
 
 var _googleMapsLoadPromise = null;
@@ -3088,8 +3091,29 @@ function closeLoginOverlay() {
   document.body.style.overflow = '';
 }
 
+function initializeAuthenticatedApp(role) {
+  // Peta adalah fungsi utama. Jalankan lebih dahulu dan isolasikan fitur pendukung
+  // agar kegagalan badge, izin, atau parameter tidak menahan layar di "Memuat peta".
+  try {
+    safeInitMap();
+  } catch (error) {
+    console.error('Inisialisasi peta gagal.', error);
+    _setMapLoadingState('error', error && error.message ? error.message : 'Peta gagal diinisialisasi.');
+  }
+  try {
+    applyPermissions(role);
+  } catch (error) {
+    console.error('Penerapan izin pengguna gagal.', error);
+  }
+  try {
+    loadFilterOptions();
+  } catch (error) {
+    console.warn('Parameter filter belum dapat dimuat.', error);
+  }
+}
+
 if (!sessionStorage.getItem('isLoggedIn')) { showLoginOverlay(); }
-else { closeLoginOverlay(); setTimeout(function() { applyPermissions(activeRole); loadFilterOptions(); safeInitMap(); }, 300); }
+else { closeLoginOverlay(); setTimeout(function() { initializeAuthenticatedApp(activeRole); }, 300); }
 
 function setLoginMessage(message) {
   var el = document.getElementById('loginMessage');
@@ -3127,7 +3151,7 @@ function doLogin() {
         sessionStorage.setItem('isLoggedIn', 'true'); sessionStorage.setItem('userRole', res.role); sessionStorage.setItem('userName', res.username);
         activeRole = res.role; activeUsername = res.username;
         setLoginMessage('');
-        closeLoginOverlay(); applyPermissions(res.role); loadFilterOptions(); toast('Login berhasil, ' + res.username + '!', 'success'); safeInitMap();
+        closeLoginOverlay(); initializeAuthenticatedApp(res.role); toast('Login berhasil, ' + res.username + '!', 'success');
       } else { setLoginMessage(res.error || 'Username atau password tidak sesuai.'); }
     })
     .withFailureHandler(function(e) { btn.textContent = 'Masuk'; btn.disabled = false; btn.removeAttribute('aria-busy'); setLoginMessage('Tidak dapat terhubung ke server. ' + e.message); })
@@ -3181,7 +3205,12 @@ function applyPermissions(role) {
   if (role === 'Surveyor') { if(btnExport) btnExport.disabled = true; }
   else if (role === 'Viewer') { if(btnExport) btnExport.disabled = true; if(btnAddTop) btnAddTop.disabled = true; if(btnAddMap) btnAddMap.disabled = true; if(btnTable) btnTable.disabled = true; }
   _applyViewerMapRestrictions(role);
-  if (canReviewRelations) loadRelationReviewCount();
+  if (canReviewRelations) {
+    setTimeout(function() {
+      try { loadRelationReviewCount(); }
+      catch (error) { console.warn('Jumlah review relasi belum dapat dimuat.', error); }
+    }, 0);
+  }
 }
 
 var _masterParameterRows = [];
