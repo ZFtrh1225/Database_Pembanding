@@ -26,3 +26,13 @@ Penyimpanan ini hanya berlaku pada browser/perangkat yang digunakan. Belum ada p
 
 Harga dan indikasi nilai tidak diberi makna “murah lebih baik” atau “mahal lebih buruk”. Ringkasan rata-rata, median, dan rentang bersifat deskriptif dan bukan kesimpulan nilai.
 
+## Statistik sebaran nilai/m²
+
+Ruang kerja menghitung statistik dari kandidat yang sedang tampil setelah filter perbandingan diterapkan:
+
+- rata-rata dan median indikasi nilai/m²;
+- standar deviasi sampel dalam Rp/m² dengan pembagi `n - 1`;
+- koefisien variasi (`standar deviasi ÷ rata-rata × 100%`);
+- rentang minimum–maksimum dan selisih relatif terhadap nilai minimum.
+
+Warna koefisien variasi mempertahankan indikator internal aplikasi: hijau sampai 4%, kuning di atas 4% sampai 7%, dan merah di atas 7%. Ambang ini bukan standar MAPPI/SPI dan tidak menentukan kelayakan pembanding secara otomatis. Statistik tidak ditampilkan sebagai kesimpulan nilai; penilai tetap menelaah sumber, tanggal, lokasi, karakteristik, serta penyesuaian setiap data.

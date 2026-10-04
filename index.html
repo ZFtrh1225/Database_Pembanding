@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Database Pembanding</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <!-- Google Maps dimuat saat runtime setelah key diambil dari Apps Script. -->
 
@@ -268,6 +269,11 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .mode-menu-item:hover { background: var(--sky) !important; }
 .mode-dropdown-wrap .btn-view.active { background: #4285f4; color: #fff; }
 .map-loading { position: absolute; inset: 0; background: #e8ecf0; display: flex; flex-direction:column; align-items: center; justify-content:center; z-index: 5; }
+.map-loading-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:14px; }
+.map-loading-actions button { min-height:38px; padding:7px 12px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--navy); font:800 11px var(--font); cursor:pointer; }
+.map-loading-actions button.primary { border-color:var(--blue); background:var(--blue); color:#fff; }
+.connectivity-banner { display:none; position:fixed; top:62px; left:50%; transform:translateX(-50%); z-index:9995; width:min(calc(100% - 24px),520px); padding:9px 12px; border:1px solid #f59e0b; border-radius:9px; background:#fffbeb; color:#92400e; box-shadow:var(--shadow-lg); font-size:11px; font-weight:700; text-align:center; }
+.connectivity-banner.show { display:block; }
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; margin-bottom:10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -424,6 +430,14 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .compare-table .compare-diff-bad { background:#fef2f2; color:#991b1b; }
 .compare-table .compare-diff-neutral { background:#f8fafc; color:#475569; }
 .compare-diff-label { display:block; margin-top:4px; font-size:9px; font-weight:800; line-height:1.25; }
+.compare-stat-grid { display:grid; grid-template-columns:repeat(4,minmax(135px,1fr)); gap:7px; margin-top:6px; }
+.compare-stat-card { min-width:0; padding:9px; border:1px solid var(--border); border-radius:8px; background:#fff; }
+.compare-stat-card.good { border-color:#86efac; background:#f0fdf4; color:#166534; }
+.compare-stat-card.warn { border-color:#fcd34d; background:#fffbeb; color:#92400e; }
+.compare-stat-card.bad { border-color:#fca5a5; background:#fef2f2; color:#991b1b; }
+.compare-stat-name { display:block; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.25px; }
+.compare-stat-value { display:block; margin-top:3px; font-size:12px; font-weight:800; }
+.compare-stat-help { display:block; margin-top:3px; color:var(--text-sub); font-size:8.5px; line-height:1.35; }
 .compare-header-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:5px; margin-top:8px; }
 .compare-remove-btn { border:1px solid #fecaca; border-radius:6px; background:#fff1f2; color:#be123c; min-height:30px; padding:4px 7px; font:700 9px var(--font); cursor:pointer; }
 .primary-card-badge { display:inline-flex; align-items:center; margin-left:5px; padding:2px 6px; border-radius:10px; background:#f59e0b; color:#fff; font-size:8px; font-weight:800; }
@@ -1449,6 +1463,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   #compareOverlay .compare-reasons { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; padding:2px 1px 7px; }
   #compareOverlay .compare-reason-card { flex:0 0 min(78vw,270px); scroll-snap-align:start; }
   #compareOverlay .compare-scroll { scroll-snap-type:x proximity; }
+  #compareOverlay .compare-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   #compareOverlay .compare-table { min-width:780px; }
   #compareOverlay .compare-table th { position:sticky; left:0; z-index:2; min-width:118px; box-shadow:2px 0 5px rgba(30,58,95,.08); }
   #compareOverlay .compare-table td { min-width:155px; scroll-snap-align:start; }
@@ -1549,6 +1564,8 @@ body.mmode-picking .mpick-hint { display: flex; }
     <p class="login-footnote">Akses dibatasi untuk pengguna yang telah terdaftar.</p>
   </main>
 </div>
+
+<div class="connectivity-banner" id="connectivityBanner" role="status" aria-live="polite">📴 Perangkat sedang offline. Data yang sudah tampil tetap dapat ditelaah; pencarian baru memerlukan koneksi.</div>
 
 <header class="topbar">
   <div class="topbar-brand"><div class="icon">🏠</div><span class="topbar-brand-text">Database Pembanding</span></div>
@@ -2964,6 +2981,8 @@ function applyPermissions(role) {
 var _masterParameterRows = [];
 var _activeParameterCategory = 'JENIS_PROPERTI';
 var _filterOptionsState = null;
+var FILTER_OPTIONS_CACHE_KEY = 'databasePembanding:filterOptions:v2';
+var FILTER_OPTIONS_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 function _parameterEscape_(value) {
   return String(value == null ? '' : value)
@@ -3064,7 +3083,7 @@ function _setDynamicSelectValue_(elementId, value) {
   select.value = wanted;
 }
 
-function _applyFilterOptions_(result) {
+function _applyFilterOptions_(result, skipCacheWrite) {
   if (!result || !result.success || !result.options) return false;
   _filterOptionsState = result;
   var options = result.options;
@@ -3076,15 +3095,17 @@ function _applyFilterOptions_(result) {
   _renderDynamicSelect_('f_legalitas', options.hakKepemilikan || [], true);
   _renderDynamicSelect_('f_statusHarga', options.jenisData || [], false);
   _renderPropertyLegends_(options.jenisProperti || []);
-  try { sessionStorage.setItem('databasePembanding:filterOptions:v1', JSON.stringify({ savedAt:Date.now(), result:result })); } catch (e) {}
+  if (!skipCacheWrite) {
+    try { localStorage.setItem(FILTER_OPTIONS_CACHE_KEY, JSON.stringify({ savedAt:Date.now(), result:result })); } catch (e) {}
+  }
   return true;
 }
 
 function loadFilterOptions(forceRefresh) {
   if (!forceRefresh) {
     try {
-      var cached = JSON.parse(sessionStorage.getItem('databasePembanding:filterOptions:v1') || 'null');
-      if (cached && Date.now() - cached.savedAt < 15 * 60 * 1000 && _applyFilterOptions_(cached.result)) return;
+      var cached = JSON.parse(localStorage.getItem(FILTER_OPTIONS_CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.savedAt < FILTER_OPTIONS_CACHE_MAX_AGE_MS && _applyFilterOptions_(cached.result, true)) return;
     } catch (e) {}
   }
   GAS.script.run
@@ -3097,6 +3118,7 @@ function loadFilterOptions(forceRefresh) {
     .getFilterOptions();
 }
 function invalidateFilterOptionsCache() {
+  try { localStorage.removeItem(FILTER_OPTIONS_CACHE_KEY); } catch (e) {}
   try { sessionStorage.removeItem('databasePembanding:filterOptions:v1'); } catch (e) {}
 }
 
@@ -3245,12 +3267,14 @@ function saveParameterManager() {
 }
 
 function locateMe() {
-  if (!gMap) return; toast('Mencari sinyal GPS...', 'loading');
+  toast('Mencari sinyal GPS...', 'loading');
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
       var lat = pos.coords.latitude, lng = pos.coords.longitude;
       toast('Lokasi ditemukan! Menarik radius data...', 'success');
       document.getElementById('mapSearch').value = lat.toFixed(6) + ',' + lng.toFixed(6);
+      if (_currentMapMode === 'osm' && _osmMap) _osmMap.setView([lat, lng], 16);
+      else if (gMap) { gMap.setCenter({lat:lat,lng:lng}); gMap.setZoom(16); }
       doSearch();
     }, function(err) {
       toast('Gagal akses GPS. Pastikan izin lokasi aktif.', 'error');
@@ -3280,8 +3304,12 @@ function _bindOSMInteraction() {
 }
 
 function startDrawingPolygon() {
-  if (!gMap) return;
-  if (_currentMapMode === 'osm') selectMapMode('gmaps');
+  if (!gMap || _currentMapMode === 'osm') {
+    toast('Menyiapkan Google Maps untuk menggambar area…', 'loading');
+    switchMapMode('gmaps');
+    _ensureGoogleMapReady().then(function() { startDrawingPolygon(); }).catch(function() {});
+    return;
+  }
   _pickingLocation = false; _drawingPolygon = true;
   polyPoints = []; if (polyLayer) { polyLayer.setMap(null); polyLayer = null; }
   toast('Klik titik-titik pembatas di peta. Klik Kanan pada mouse untuk selesai.', 'success');
@@ -3307,6 +3335,42 @@ function toggle3D() {
 var _currentMapMode = 'osm'; // 'gmaps' or 'osm' — default OpenStreetMap saat pertama dibuka
 var _osmMap = null;
 var _osmMarkers = [];
+var _osmBaseLayer = null;
+var _initialSearchStarted = false;
+
+function _setMapLoadingState(state, message) {
+  var el = document.getElementById('mapLoading');
+  if (!el) return;
+  if (!state || state === 'hidden') { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  if (state === 'error') {
+    el.innerHTML = '<div style="text-align:center;color:#991b1b;padding:24px;max-width:360px"><div style="font-size:28px">⚠️</div><div style="margin-top:8px;font-size:12px;font-weight:800">Google Maps gagal dimuat</div><div style="margin-top:6px;font-size:10px;line-height:1.5;color:#7f1d1d">' + _parameterEscape_(message || 'Periksa koneksi dan konfigurasi API.') + '</div><div class="map-loading-actions"><button type="button" class="primary" onclick="retryGoogleMap()">Coba Lagi</button><button type="button" onclick="switchMapMode(\'osm\')">Gunakan OpenStreetMap</button></div></div>';
+    return;
+  }
+  el.innerHTML = '<div class="spinner"></div><div style="color:#5a6a7e;font-size:12px;">' + _parameterEscape_(message || 'Memuat peta…') + '</div>';
+}
+
+function _initOpenStreetMap() {
+  if (_osmMap) return _osmMap;
+  if (!window.L || !document.getElementById('osmMap')) return null;
+  _osmMap = L.map('osmMap', { zoomControl:true }).setView([-6.175, 106.827], 14);
+  _osmBaseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom:19
+  }).addTo(_osmMap);
+  _osmBaseLayer.once('load', function() { if (_currentMapMode === 'osm') _setMapLoadingState('hidden'); });
+  _osmBaseLayer.once('tileerror', function() { toast('Sebagian tile peta gagal dimuat. Periksa koneksi internet.', 'error'); });
+  _bindOSMInteraction();
+  document.getElementById('btnGPS').style.display = 'flex';
+  setTimeout(function() { if (_osmMap) _osmMap.invalidateSize(); if (_currentMapMode === 'osm') _setMapLoadingState('hidden'); }, 800);
+  return _osmMap;
+}
+
+function _startInitialSearchOnce() {
+  if (_initialSearchStarted) return;
+  _initialSearchStarted = true;
+  requestAnimationFrame(function() { doSearch(); });
+}
 
 function toggleModeMenu(ev) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
@@ -3347,7 +3411,7 @@ function _updateModeButtonLabel(mode) {
 }
 
 function switchMapMode(mode) {
-  if (mode === _currentMapMode) { _updateModeButtonLabel(mode); return; }
+  if (mode === _currentMapMode && (mode !== 'gmaps' || gMap)) { _updateModeButtonLabel(mode); return; }
   _currentMapMode = mode;
 
   var gmapEl = document.getElementById('map');
@@ -3358,14 +3422,8 @@ function switchMapMode(mode) {
     gmapEl.style.display = 'none';
     osmEl.style.display = 'block';
 
-    if (!_osmMap) {
-      _osmMap = L.map('osmMap', { zoomControl: true }).setView([-6.175, 106.827], 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(_osmMap);
-      _bindOSMInteraction();
-    }
+    _initOpenStreetMap();
+    _setMapLoadingState('hidden');
 
     // Sync center from Google Maps
     if (gMap) {
@@ -3386,16 +3444,26 @@ function switchMapMode(mode) {
     osmEl.style.display = 'none';
     gmapEl.style.display = 'block';
 
-    // Sync center from OSM
-    if (_osmMap && gMap) {
-      var osmCenter = _osmMap.getCenter();
-      var osmZoom = _osmMap.getZoom();
-      gMap.setCenter({ lat: osmCenter.lat, lng: osmCenter.lng });
-      gMap.setZoom(osmZoom);
-    }
-
-    if (gMap) setTimeout(function() { google.maps.event.trigger(gMap, 'resize'); }, 100);
     _updateModeButtonLabel('gmaps');
+    if (!gMap) {
+      _setMapLoadingState('loading', 'Menyiapkan Google Maps…');
+      _ensureGoogleMapReady().then(function() {
+        if (_currentMapMode !== 'gmaps') return;
+        if (_osmMap) {
+          var osmCenter = _osmMap.getCenter(), osmZoom = _osmMap.getZoom();
+          gMap.setCenter({ lat:osmCenter.lat, lng:osmCenter.lng }); gMap.setZoom(osmZoom);
+        }
+        renderMarkers(currentData, _lastSearchParams || collectParams());
+        setTimeout(function() { google.maps.event.trigger(gMap, 'resize'); }, 100);
+        toast('Mode: Google Maps aktif', 'success');
+      }).catch(function(error) { toast('Google Maps belum dapat digunakan: ' + error.message, 'error'); });
+      return;
+    }
+    if (_osmMap) {
+      var osmCenter = _osmMap.getCenter(), osmZoom = _osmMap.getZoom();
+      gMap.setCenter({ lat:osmCenter.lat, lng:osmCenter.lng }); gMap.setZoom(osmZoom);
+    }
+    setTimeout(function() { google.maps.event.trigger(gMap, 'resize'); }, 100);
     toast('Mode: Google Maps aktif', 'success');
   }
 }
@@ -5072,22 +5140,7 @@ function initMap() {
     }
   });
 
-  document.getElementById('mapLoading').style.display = 'none';
-
-  // Default mode = OpenStreetMap. Init Leaflet map + sync setelah pencarian awal selesai.
-  if (_currentMapMode === 'osm') {
-    if (!_osmMap) {
-      _osmMap = L.map('osmMap', { zoomControl: true }).setView([-6.175, 106.827], 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(_osmMap);
-      _bindOSMInteraction();
-    }
-    setTimeout(function() { if (_osmMap) _osmMap.invalidateSize(); }, 200);
-  }
-
-  doSearch();
+  _setMapLoadingState('hidden');
 }
 
 document.addEventListener('click', function (e) {
@@ -5159,8 +5212,8 @@ function setSearchState(state, message) {
   overlay.classList.add('show');
 }
 
+var _searchRequestSequence = 0;
 function doSearch() {
-  var btn = document.getElementById('btnCari');
   setSearchButtonLoading(true);
   setSearchState('loading');
   var params = collectParams();
@@ -5171,13 +5224,19 @@ function doSearch() {
       setSearchState('hidden');
       toast('Area belum digambar atau tidak valid (butuh min 3 titik).', 'error'); return;
   }
+  if (navigator.onLine === false) {
+      setSearchButtonLoading(false);
+      setSearchState('error', 'Perangkat sedang offline. Sambungkan internet, lalu tekan Coba lagi.');
+      return;
+  }
+  var searchRequestId = ++_searchRequestSequence;
 
   // Hasil pencarian sebelumnya tidak boleh dipakai selama permintaan baru berjalan.
   markAnalysisStale();
 
   GAS.script.run
     .withSuccessHandler(function (res) {
-      setSearchButtonLoading(false);
+      if (searchRequestId !== _searchRequestSequence) return;
       if (res.success) {
         
         // TAMBAHAN: Menyimpan Model Ekonometrika dari Server ke Memori Browser
@@ -5204,23 +5263,38 @@ function doSearch() {
         document.getElementById('btnAnalisa').disabled = activeData.length === 0;
         renderQualityTargetSummary();
 
-        renderMarkers(currentData, params); 
-        renderTable(currentData); 
-        saveFilterHistory(params);
-        if (res.total > 0) {
-          setSearchState('hidden');
-          toast(res.total + ' data ditemukan', 'success');
-        } else {
-          setSearchState('empty');
-        }
-        if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); }, 350); }
-      } else { setSearchState('error', res.error); toast('Error: ' + res.error, 'error'); }
+        requestAnimationFrame(function() {
+          if (searchRequestId !== _searchRequestSequence) return;
+          renderMarkers(currentData, params);
+          requestAnimationFrame(function() {
+            if (searchRequestId !== _searchRequestSequence) return;
+            renderTable(currentData);
+            saveFilterHistory(params);
+            setSearchButtonLoading(false);
+            if (res.total > 0) {
+              setSearchState('hidden');
+              toast(res.total + ' data ditemukan', 'success');
+            } else {
+              setSearchState('empty');
+            }
+            if (window.innerWidth <= 768) { document.querySelector('.panel-filter').classList.add('collapsed'); setTimeout(function() { if (gMap) google.maps.event.trigger(gMap, 'resize'); if (_osmMap) _osmMap.invalidateSize(); }, 350); }
+          });
+        });
+      } else { setSearchButtonLoading(false); setSearchState('error', res.error); toast('Error: ' + res.error, 'error'); }
     })
-    .withFailureHandler(function (err) { setSearchButtonLoading(false); setSearchState('error', err.message); toast('Gagal memuat data dari server: ' + err.message, 'error'); })
+    .withFailureHandler(function (err) { if (searchRequestId !== _searchRequestSequence) return; setSearchButtonLoading(false); setSearchState('error', err.message); toast('Gagal memuat data dari server: ' + err.message, 'error'); })
     .searchData(params);
 }
 
 function toggleHeatmap() {
+  if (!gMap || _currentMapMode !== 'gmaps') {
+    toast('Heatmap menggunakan Google Maps. Menyiapkan peta…', 'loading');
+    switchMapMode('gmaps');
+    _ensureGoogleMapReady().then(function() {
+      if (!isHeatmap) toggleHeatmap();
+    }).catch(function() {});
+    return;
+  }
   isHeatmap = !isHeatmap;
   document.getElementById('btnHeatmap').classList.toggle('active', isHeatmap);
   renderMarkers(currentData, collectParams()); 
@@ -5585,7 +5659,7 @@ function analyzePOI(lat, lng, uid) {
     resDiv.innerHTML = '';
 
     // Clear old POI layers
-    poiLayerGroup.forEach(function(item){ item.setMap(null); });
+    poiLayerGroup.forEach(function(item){ if (item && typeof item.setMap === 'function') item.setMap(null); });
     poiLayerGroup = [];
 
     _fetchOverpassForRadius(lat, lng, radius)
@@ -5593,12 +5667,13 @@ function analyzePOI(lat, lng, uid) {
         btn.disabled = false;
         btn.textContent = '↻ Perbarui analisis jarak POI';
         var groups = _poiResults(res.elements, lat, lng, radius);
-        var propLatLng = new google.maps.LatLng(lat, lng);
+        var canDrawGoogle = !!(gMap && window.google && google.maps);
+        var propLatLng = canDrawGoogle ? new google.maps.LatLng(lat, lng) : null;
         var label = (radius / 1000).toLocaleString('id-ID') + ' km';
         var html = '<p class="poi-note">Fasilitas dalam radius ' + label + (res.fromCache ? ' · hasil tersimpan maksimal 7 hari' : ' · data OSM baru diambil') + '. Jarak garis lurus; untuk bangunan/area dihitung ke titik perwakilan, bukan pintu masuk.</p>';
         var foundAny = false;
-        var poiBounds = new google.maps.LatLngBounds();
-        poiBounds.extend(propLatLng);
+        var poiBounds = canDrawGoogle ? new google.maps.LatLngBounds() : null;
+        if (poiBounds) poiBounds.extend(propLatLng);
         ['Transportasi', 'Kesehatan', 'Pendidikan', 'Peribadatan', 'Niaga & belanja'].forEach(function(group, groupIdx) {
           var types = groups[group] || {};
           var subtypes = Object.keys(types);
@@ -5613,6 +5688,7 @@ function analyzePOI(lat, lng, uid) {
           html += '</details>';
           if (closest) {
                 foundAny = true;
+                if (!canDrawGoogle) return;
                 var line = new google.maps.Polyline({
                     path: [{lat: lat, lng: lng}, {lat: closest.lat, lng: closest.lon}],
                     strokeColor: '#2d6be4',
@@ -5646,7 +5722,7 @@ function analyzePOI(lat, lng, uid) {
         });
         resDiv.innerHTML = html;
 
-        if (foundAny) {
+        if (foundAny && canDrawGoogle) {
              setTimeout(function() { gMap.fitBounds(poiBounds, 50); }, 200);
         }
 
@@ -7313,11 +7389,11 @@ function handleDataRowClick(event, uid) {
 
 function geocodeLocation() {
   var input = document.getElementById('mapSearch').value.trim(); if (!input) return;
-  var coord = _parseCoordJS(input); if (coord) { if (gMap) { gMap.setCenter({lat:coord.lat,lng:coord.lng}); gMap.setZoom(16); } doSearch(); return; }
+  var coord = _parseCoordJS(input); if (coord) { if (_currentMapMode === 'osm' && _osmMap) _osmMap.setView([coord.lat,coord.lng], 16); else if (gMap) { gMap.setCenter({lat:coord.lat,lng:coord.lng}); gMap.setZoom(16); } doSearch(); return; }
   toast('Mencari lokasi…', '');
   fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(input) + '&countrycodes=id&limit=1', { headers: { 'Accept-Language': 'id' } })
     .then(function (r) { return r.json(); })
-    .then(function (data) { if (data.length > 0) { var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon); document.getElementById('mapSearch').value = lat.toFixed(6) + ',' + lng.toFixed(6); if (gMap) { gMap.setCenter({lat:lat,lng:lng}); gMap.setZoom(15); } toast('Lokasi ditemukan', 'success'); doSearch(); } else { toast('Lokasi tidak ditemukan.', 'error'); } })
+    .then(function (data) { if (data.length > 0) { var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon); document.getElementById('mapSearch').value = lat.toFixed(6) + ',' + lng.toFixed(6); if (_currentMapMode === 'osm' && _osmMap) _osmMap.setView([lat,lng], 15); else if (gMap) { gMap.setCenter({lat:lat,lng:lng}); gMap.setZoom(15); } toast('Lokasi ditemukan', 'success'); doSearch(); } else { toast('Lokasi tidak ditemukan.', 'error'); } })
     .catch(function (e) { toast('Gagal geocode: ' + e.message, 'error'); });
 }
 
@@ -7727,6 +7803,24 @@ function _comparisonReasons(row, profile) {
   return reasons.slice(0, 6);
 }
 
+function _comparisonStatistics(values) {
+  var clean = (values || []).map(function(value) { return Number(value); }).filter(function(value) { return isFinite(value) && value > 0; }).sort(function(a,b) { return a-b; });
+  if (!clean.length) return null;
+  var count = clean.length;
+  var average = clean.reduce(function(sum, value) { return sum + value; }, 0) / count;
+  var median = count % 2 ? clean[(count - 1) / 2] : (clean[count / 2 - 1] + clean[count / 2]) / 2;
+  var sampleStdev = null, coefficientVariation = null;
+  if (count > 1) {
+    var squaredDifference = clean.reduce(function(sum, value) { return sum + Math.pow(value - average, 2); }, 0);
+    sampleStdev = Math.sqrt(squaredDifference / (count - 1));
+    coefficientVariation = average > 0 ? (sampleStdev / average) * 100 : null;
+  }
+  var spreadPct = clean[0] > 0 ? ((clean[count - 1] - clean[0]) / clean[0]) * 100 : null;
+  var variationTone = coefficientVariation == null ? 'neutral' : (coefficientVariation <= 4 ? 'good' : (coefficientVariation <= 7 ? 'warn' : 'bad'));
+  var variationLabel = coefficientVariation == null ? 'Perlu minimal dua data' : (coefficientVariation <= 4 ? 'Sebaran rendah' : (coefficientVariation <= 7 ? 'Sebaran sedang' : 'Sebaran tinggi'));
+  return { count:count, average:average, median:median, min:clean[0], max:clean[count - 1], sampleStdev:sampleStdev, coefficientVariation:coefficientVariation, spreadPct:spreadPct, variationTone:variationTone, variationLabel:variationLabel };
+}
+
 function showCompareModal(preserveControls) {
   var table = document.getElementById('compareTableContent');
   _loadPrimaryCompareKeys();
@@ -7804,12 +7898,20 @@ function showCompareModal(preserveControls) {
     return '<td class="' + (_isPrimaryCompare(row) ? 'compare-primary-col' : '') + '">' + (photo ? '<img src="' + _escapeHtmlAppraisal(photo) + '" loading="lazy" alt="Foto ' + _escapeHtmlAppraisal(row.id) + '">' : '<div style="height:82px;display:grid;place-items:center;background:#f1f5f9;color:#94a3b8;border-radius:7px;">Tanpa foto</div>') + '</td>';
   }).join('') + '</tr>';
 
-  var indVals = props.map(function(row) { return parseFloat(String(row.indikasiNilai || '').replace(/[^0-9]/g, '')) || 0; }).filter(function(value) { return value > 0; }).sort(function(a,b) { return a-b; });
+  var indVals = props.map(function(row) { return parseFloat(String(row.indikasiNilai || '').replace(/[^0-9]/g, '')) || 0; });
+  var comparisonStats = _comparisonStatistics(indVals);
   var stats = '';
-  if (indVals.length) {
-    var average = indVals.reduce(function(sum,value) { return sum + value; }, 0) / indVals.length;
-    var median = indVals.length % 2 ? indVals[(indVals.length - 1) / 2] : (indVals[indVals.length / 2 - 1] + indVals[indVals.length / 2]) / 2;
-    stats = '<tr><th>Ringkasan nilai/m²</th><td colspan="' + (props.length + 1) + '" class="compare-diff-neutral" style="text-align:left;">Rata-rata ' + formatRupiah(Math.round(average)) + ' · Median ' + formatRupiah(Math.round(median)) + ' · Rentang ' + formatRupiah(indVals[0]) + '–' + formatRupiah(indVals[indVals.length - 1]) + '<span class="compare-diff-label">Ringkasan deskriptif, bukan kesimpulan nilai.</span></td></tr>';
+  if (comparisonStats) {
+    var stdevText = comparisonStats.sampleStdev == null ? '–' : formatRupiah(Math.round(comparisonStats.sampleStdev));
+    var cvText = comparisonStats.coefficientVariation == null ? '–' : comparisonStats.coefficientVariation.toFixed(2) + '%';
+    var spreadText = comparisonStats.spreadPct == null ? '–' : comparisonStats.spreadPct.toFixed(2) + '%';
+    stats = '<tr><th>Statistik nilai/m²</th><td colspan="' + (props.length + 1) + '" class="compare-diff-neutral" style="text-align:left;">' +
+      '<div class="compare-stat-grid">' +
+        '<div class="compare-stat-card"><span class="compare-stat-name">Pusat Data</span><span class="compare-stat-value">' + formatRupiah(Math.round(comparisonStats.median)) + '</span><span class="compare-stat-help">Median · rata-rata ' + formatRupiah(Math.round(comparisonStats.average)) + '</span></div>' +
+        '<div class="compare-stat-card"><span class="compare-stat-name">Standar Deviasi</span><span class="compare-stat-value">' + stdevText + '/m²</span><span class="compare-stat-help">Simpangan baku sampel dari ' + comparisonStats.count + ' data.</span></div>' +
+        '<div class="compare-stat-card ' + comparisonStats.variationTone + '"><span class="compare-stat-name">Koefisien Variasi</span><span class="compare-stat-value">' + cvText + '</span><span class="compare-stat-help">' + comparisonStats.variationLabel + ' · SD ÷ rata-rata.</span></div>' +
+        '<div class="compare-stat-card"><span class="compare-stat-name">Rentang</span><span class="compare-stat-value">' + formatRupiah(comparisonStats.min) + '–' + formatRupiah(comparisonStats.max) + '</span><span class="compare-stat-help">Selisih relatif ' + spreadText + '.</span></div>' +
+      '</div><span class="compare-diff-label">Ambang CV ≤4%, 4–7%, dan &gt;7% adalah indikator telaah internal, bukan standar MAPPI/SPI atau kesimpulan nilai. Sebaran rendah tidak otomatis membuat data layak sebagai pembanding.</span></td></tr>';
   }
 
   table.innerHTML = head + photoRow +
@@ -8292,6 +8394,11 @@ document.addEventListener('visibilitychange', function() {
 });
 
 function toggleMeasureOSM() {
+  if (_mOsmActive && !(window.google && google.maps)) {
+    toast('Menyiapkan Google Maps untuk Measurement…', 'loading');
+    _ensureGoogleMapReady().then(function() { toggleMeasureOSM(); }).catch(function() {});
+    return;
+  }
   _mOsmActive = !_mOsmActive;
   var btn = document.getElementById('btnMeasureOsm');
   var gMap = document.getElementById('measureMap');
@@ -8552,21 +8659,57 @@ openMeasurement = function() {
 
 var _mapInited = false;
 var _mapInitPromise = null;
-function safeInitMap() {
-  if (_mapInited) return;
-  if (_mapInitPromise) return;
-  if (!document.getElementById('map')) { setTimeout(safeInitMap, 100); return; }
+function _ensureGoogleMapReady() {
+  if (gMap) return Promise.resolve(gMap);
+  if (_mapInitPromise) return _mapInitPromise;
   _mapInitPromise = loadGoogleMapsApi().then(function() {
-    if (_mapInited) return;
+    if (!gMap) initMap();
     _mapInited = true;
-    initMap();
+    _setMapLoadingState('hidden');
+    return gMap;
   }).catch(function(err) {
     _mapInitPromise = null;
-    var el = document.getElementById('mapLoading');
-    if (el) el.innerHTML = '<div style="text-align:center;color:#dc2626;padding:30px"><div style="font-size:28px">⚠️</div><div style="margin-top:10px;font-size:12px">Error: ' + err.message + '</div></div>';
-    toast('Koneksi peta gagal: ' + err.message, 'error');
+    _mapInited = false;
+    _setMapLoadingState('error', err.message);
+    throw err;
   });
+  return _mapInitPromise;
 }
+
+function retryGoogleMap() {
+  var oldScript = document.getElementById('googleMapsRuntime');
+  if (oldScript && oldScript.parentNode && !(window.google && google.maps)) oldScript.parentNode.removeChild(oldScript);
+  _googleMapsLoadPromise = null;
+  _mapInitPromise = null;
+  switchMapMode('gmaps');
+}
+
+function safeInitMap() {
+  if (!document.getElementById('osmMap')) { setTimeout(safeInitMap, 100); return; }
+  _setMapLoadingState('loading', 'Menyiapkan OpenStreetMap…');
+  _initOpenStreetMap();
+  _startInitialSearchOnce();
+}
+
+function syncConnectivityState() {
+  var banner = document.getElementById('connectivityBanner');
+  if (!banner) return;
+  var offline = navigator.onLine === false;
+  banner.classList.toggle('show', offline);
+  if (!offline) banner.textContent = 'Koneksi kembali tersedia.';
+  else banner.textContent = '📴 Perangkat sedang offline. Data yang sudah tampil tetap dapat ditelaah; pencarian baru memerlukan koneksi.';
+}
+window.addEventListener('offline', syncConnectivityState);
+window.addEventListener('online', function() {
+  var banner = document.getElementById('connectivityBanner');
+  if (banner) {
+    banner.textContent = '✅ Koneksi kembali tersedia. Anda dapat mencoba pencarian lagi.';
+    banner.classList.add('show');
+    setTimeout(function() { if (navigator.onLine !== false) banner.classList.remove('show'); }, 2500);
+  }
+});
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncConnectivityState);
+else syncConnectivityState();
   
 // =========================================================================
 // =====   MOBILE UX — navigation, filter summary & staged form       =====
