@@ -40,9 +40,10 @@ function node(id) {
     value: '', textContent: '', innerHTML: '', style: {}, classList: classList(id),
     className: '', attributes: {}, setAttribute(k, v) { this.attributes[k] = v; },
     querySelector(selector) {
-      if (selector !== 'button') return null;
-      if (!this.button) this.button = { style: {} };
-      return this.button;
+      if (selector !== 'button' && selector !== '.mroute-retry' && selector !== '.mroute-close') return null;
+      if (!this.buttons) this.buttons = {};
+      if (!this.buttons[selector]) this.buttons[selector] = { style: {} };
+      return this.buttons[selector];
     }
   });
   return nodes.get(id);
@@ -52,6 +53,7 @@ const c = vm.createContext({
   document: { getElementById: node, hidden: false },
   window: { matchMedia: () => ({ matches: reduceMotion }) },
   localStorage: { value: null, setItem(key, value) { this.value = value; }, getItem() { return this.value; } },
+  sessionStorage: { value: null, setItem(key, value) { this.value = value; }, getItem() { return this.value; }, removeItem() { this.value = null; } },
   setTimeout: fn => { fn(); return 1; }, clearTimeout: () => {},
   requestAnimationFrame: () => ++nextFrame,
   cancelAnimationFrame: handle => { cancelledFrame = handle; },
@@ -59,6 +61,7 @@ const c = vm.createContext({
   _mOsmDashFrame: null, _mOsmDashLast: 0, _mOsmDashOffset: 0,
   _mRoutes: {}, _mMks: {}, _mLbls: {}, _mRouteRunId: 0,
   _mRouteClassPromise: null, _mRouteNoticeTimer: null,
+  _mRouteNoticeSessionKey: 'dbp_measure_route_notice_dismissed',
   _mMapType: 'roadmap',
   _mOsmLines: [], _mOsmMarkers: [], _mOsmLabels: [],
   _mDpIds: ['1', '2', '3', '4', '5', '6'],
@@ -88,7 +91,7 @@ for (const name of [
   '_mParse', '_mHaversine', '_mFmtDist', '_mFmtMeters',
   '_mNormalizeRoutePoint', '_mGetRouteClass', '_mComputeModernRoadRoute', '_mComputeLegacyRoadRoute',
   '_mRouteErrorText', '_mFriendlyRouteError', '_mComputeRoadRoute', '_mFormatRouteDuration', '_mSetDistanceState',
-  '_mShowRouteNotice', 'retryMeasurementRoutes',
+  '_mRouteNoticeDismissed', 'dismissMeasurementRouteNotice', '_mShowRouteNotice', 'retryMeasurementRoutes',
   '_mClearLayers', '_mMakePin', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon', '_mOsmRedraw'
 ]) vm.runInContext(extract(name), c);
 
@@ -113,7 +116,9 @@ async function settle() {
   const pin = c._mMakePin({ lat: -5.380964, lng: 105.284946 }, '#db4437', 'OBJ', true);
   assert.equal(pin.opts.icon.anchor.y, 46, 'Titik koordinat Google tepat di ujung pin, bukan bayangan');
   c._mMakePin = () => ({ setMap() {} });
-  c._mMakeObjLabel = c._mMakeLabel = () => ({ setMap() {} });
+  const labelTexts = [];
+  c._mMakeObjLabel = () => ({ setMap() {} });
+  c._mMakeLabel = (coord, id, text) => { labelTexts.push(text); return { setMap() {} }; };
   const road = [{ lat: -5.381, lng: 105.2848 }, { lat: -5.3814, lng: 105.283 }, { lat: -5.3825, lng: 105.2803 }];
   let modernMode = 'success';
   class Route {
@@ -150,6 +155,7 @@ async function settle() {
   assert.equal(c._mRoutes['1'].opts.strokeOpacity, 1);
   assert.equal(c._mRoutes['1'].opts.icons, undefined, 'Simbol berulang tidak boleh melebihi ujung pin');
   assert.equal(node('mDist_1').textContent, '790 m · 2 mnt');
+  assert.equal(labelTexts.at(-1), '790 m', 'Label pin Google hanya menampilkan jarak');
   assert.match(node('mRouteNoticeText').textContent, /Rute jalan Google aktif/);
   c.mZoomMeasurement(1);
   assert.equal(c._mMap.getZoom(), 15);
@@ -165,7 +171,12 @@ async function settle() {
   assert.equal(c._mRoutes['1'].opts.path.length, 2);
   assert.equal(c._mRoutes['1'].opts.path[0].lat, -5.380964);
   assert.equal(c._mRoutes['1'].opts.path[1].lat, -5.382664);
+  assert.doesNotMatch(labelTexts.at(-1), /lurus|mnt/, 'Label fallback di atas pin tetap ringkas');
   assert.match(node('mRouteNoticeText').textContent, /1 dari 1 rute/);
+  c.dismissMeasurementRouteNotice();
+  assert.equal(c.sessionStorage.value, '1', 'Peringatan yang ditutup disembunyikan selama sesi browser');
+  c._mShowRouteNotice('error', 'Peringatan berulang');
+  assert.doesNotMatch(node('mRouteNotice').className, /show/, 'Peringatan tidak muncul berulang setelah ditutup');
 
   modernMode = 'success';
   c._mRouteClassPromise = null;
@@ -242,6 +253,7 @@ async function settle() {
   assert.match(html, /\.mmap-layer-toggle \{ grid-column:span 2;/);
   assert.match(html, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(html, /Route\.computeRoutes/);
+  assert.match(html, /<div class="mdl-pill">' \+ ds \+ '<\/div><\/div>/, 'Label pin OSM hanya berisi jarak');
   console.log('Measurement: Routes API, fallback, animasi OSM, toggle, zoom, dan respons terlambat OK');
 })().catch(error => {
   console.error(error);

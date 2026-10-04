@@ -753,12 +753,15 @@ body.mmode-picking #measureMap, body.mmode-picking #measureMap * { cursor: cross
   display:none; position:absolute; top:58px; left:50%; transform:translateX(-50%); z-index:500;
   width:min(calc(100% - 28px),620px); padding:8px 10px; border:1px solid #bfdbfe;
   border-radius:9px; background:rgba(239,246,255,.96); color:#1e3a8a; box-shadow:0 4px 16px rgba(15,23,42,.2);
-  font:700 10.5px/1.4 var(--font); align-items:center; justify-content:space-between; gap:10px;
+  font:700 10.5px/1.4 var(--font); align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
 }
 .mroute-notice.show { display:flex; }
 .mroute-notice.warn { border-color:#fcd34d; background:rgba(255,251,235,.97); color:#92400e; }
 .mroute-notice.error { border-color:#fca5a5; background:rgba(254,242,242,.97); color:#991b1b; }
+.mroute-notice-text { flex:1 1 220px; min-width:0; }
+.mroute-notice-actions { display:flex; flex:none; align-items:center; gap:6px; margin-left:auto; }
 .mroute-notice button { flex:none; min-height:32px; padding:5px 9px; border:1px solid currentColor; border-radius:7px; background:#fff; color:inherit; font:800 9.5px var(--font); cursor:pointer; }
+.mroute-notice .mroute-close { width:32px; padding:5px; font-size:16px; line-height:1; }
 .mpick-hint {
   display: none; position: absolute; bottom: 20px; left: 50%;
   transform: translateX(-50%); z-index: 500;
@@ -1500,6 +1503,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   .measure-sidebar { height:min(46dvh, 430px); max-height:min(46dvh, 430px); padding-bottom:env(safe-area-inset-bottom, 0px); }
   .measure-map-wrap { min-height:54dvh; }
   .mroute-notice { top:104px; width:calc(100% - 20px); align-items:flex-start; }
+  .mroute-notice button { min-height:40px; }
+  .mroute-notice .mroute-close { width:40px; }
   .iw-wrap { width:min(280px, calc(100vw - 56px)); min-width:0; }
 }
 
@@ -2470,7 +2475,13 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div id="measureOsmMap" class="active"></div>
 
     <div class="mroute-loading" id="mRouteLoading"><div class="dotspin"></div><span id="mRouteLoadingTxt">Menghitung rute…</span></div>
-    <div class="mroute-notice" id="mRouteNotice" role="status" aria-live="polite"><span id="mRouteNoticeText"></span><button type="button" onclick="retryMeasurementRoutes()">Coba Hitung Lagi</button></div>
+    <div class="mroute-notice" id="mRouteNotice" role="status" aria-live="polite">
+      <span class="mroute-notice-text" id="mRouteNoticeText"></span>
+      <div class="mroute-notice-actions">
+        <button class="mroute-retry" type="button" onclick="retryMeasurementRoutes()">Coba Hitung Lagi</button>
+        <button class="mroute-close" type="button" onclick="dismissMeasurementRouteNotice()" aria-label="Tutup peringatan rute" title="Tutup">×</button>
+      </div>
+    </div>
 
     <div class="mmap-keywarn" id="mKeyWarn" style="display:none;">
       <h4 id="mKeyWarnTitle">⚠️ Google Maps API Key Error</h4>
@@ -8437,15 +8448,35 @@ function _mSetDistanceState(element, text, fallback, title) {
 }
 
 var _mRouteNoticeTimer = null;
+var _mRouteNoticeSessionKey = 'dbp_measure_route_notice_dismissed';
+function _mRouteNoticeDismissed() {
+  try { return sessionStorage.getItem(_mRouteNoticeSessionKey) === '1'; }
+  catch (error) { return false; }
+}
+
+function dismissMeasurementRouteNotice() {
+  try { sessionStorage.setItem(_mRouteNoticeSessionKey, '1'); } catch (error) {}
+  _mShowRouteNotice('', '');
+}
+
 function _mShowRouteNotice(type, message) {
   var notice = document.getElementById('mRouteNotice'), textEl = document.getElementById('mRouteNoticeText');
   if (!notice || !textEl) return;
   clearTimeout(_mRouteNoticeTimer);
   if (!type || !message) { notice.className = 'mroute-notice'; return; }
+  if ((type === 'warn' || type === 'error') && _mRouteNoticeDismissed()) {
+    notice.className = 'mroute-notice';
+    return;
+  }
+  if (type === 'success') {
+    try { sessionStorage.removeItem(_mRouteNoticeSessionKey); } catch (error) {}
+  }
   notice.className = 'mroute-notice show' + (type === 'success' ? '' : ' ' + type);
   textEl.textContent = message;
-  var button = notice.querySelector && notice.querySelector('button');
-  if (button) button.style.display = type === 'success' ? 'none' : '';
+  var retryButton = notice.querySelector && notice.querySelector('.mroute-retry');
+  var closeButton = notice.querySelector && notice.querySelector('.mroute-close');
+  if (retryButton) retryButton.style.display = type === 'success' ? 'none' : '';
+  if (closeButton) closeButton.style.display = type === 'success' ? 'none' : '';
   if (type === 'success') _mRouteNoticeTimer = setTimeout(function() { notice.className = 'mroute-notice'; }, 4000);
 }
 
@@ -8513,13 +8544,14 @@ function _mRedraw() {
         var path = _mRoutePathToPins(result.path, cObj, dp.coord);
         var meters = result.meters || (_mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng) * 1000);
         var duration = _mFormatRouteDuration(result.durationMillis);
-        var ds = _mFmtMeters(meters) + (duration ? ' · ' + duration : '');
+        var distanceText = _mFmtMeters(meters);
+        var ds = distanceText + (duration ? ' · ' + duration : '');
         _mRoutes[dp.id] = _mCreateRoutePolyline(path, _mRouteColors[dp.id] || '#0033ff');
         _mSyncLineVisibility();
         path.forEach(function(point){ bounds.extend(point); });
         hasBounds = true;
         _mSetDistanceState(dp.distEl, ds, false, 'Rute jalan Google');
-        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, ds, cObj);
+        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, distanceText, cObj);
         return {
           id:dp.id, dist:ds, meters:meters, color:_mRouteColors[dp.id] || '#0033ff',
           source:result.source, warnings:result.warnings || []
@@ -8529,12 +8561,13 @@ function _mRedraw() {
             !document.getElementById('measureOverlay').classList.contains('open')) return null;
 
         var km = _mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng);
-        var ds = _mFmtDist(km) + ' · lurus';
+        var distanceText = _mFmtDist(km);
+        var ds = distanceText + ' · lurus';
         var reason = (error && error.message) || _mFriendlyRouteError(error);
         _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
         _mSyncLineVisibility();
         _mSetDistanceState(dp.distEl, ds, true, 'Rute jalan gagal: ' + reason);
-        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, ds, cObj);
+        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, distanceText, cObj);
         return {
           id:dp.id, dist:ds, meters:km * 1000, color:_mRouteColors[dp.id] || '#0033ff',
           fallback:true, error:reason
@@ -8816,7 +8849,7 @@ function _mOsmRedraw() {
       // Label jarak di ATAS pin DP (bukan tengah garis) dengan keterangan "Data X"
       var labelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
         + '<div class="mdl-title">Data ' + id + '</div>'
-        + '<div class="mdl-pill">' + ds + ' (lurus)</div></div>';
+        + '<div class="mdl-pill">' + ds + '</div></div>';
       var labelIcon = L.divIcon({
         html: labelHtml,
         className: '',
