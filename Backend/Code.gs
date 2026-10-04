@@ -10,6 +10,7 @@ const PARAMETER_SHEET = "Master_Parameter";
 const PARAMETER_CATEGORIES = ["JENIS_PROPERTI", "HAK_KEPEMILIKAN", "JENIS_DATA"];
 const WEB_APP_ORIGIN = "https://zftrh1225.github.io";
 const MAPS_API_KEY_PROPERTY = "GOOGLE_MAPS_API_KEY";
+const QUALITY_REVIEW_SHEET = "Quality_Review";
 
 /**
  * Halaman jembatan untuk GitHub Pages.
@@ -54,6 +55,7 @@ function _dispatchApiAction_(action, args) {
   if (action === 'getFilterOptions') return getFilterOptions();
   if (action === 'getMasterParameters') return getMasterParameters(args[0]);
   if (action === 'saveMasterParameters') return saveMasterParameters(args[0], args[1]);
+  if (action === 'saveQualityReview') return saveQualityReview(args[0], args[1]);
   if (action === 'getPublicConfig') return getPublicConfig();
   if (action === 'health') return { success: true, service: 'Database Pembanding API', version: 'bridge-v1' };
   return { success: false, error: "Fungsi tidak ditemukan!" };
@@ -286,6 +288,179 @@ function _requireSuperadmin_(username) {
   }
 }
 
+function _requireQualityEditor_(username) {
+  const role = _getUserRole_(username);
+  if (role !== "Admin" && role !== "Superadmin") {
+    throw new Error("Hanya Admin atau Superadmin yang dapat menyimpan review kualitas.");
+  }
+  return role;
+}
+
+function _qualityReviewHeaders_() {
+  return [
+    "Review Key", "ID", "Koordinat", "Status Verifikasi", "Catatan Verifikasi",
+    "Diverifikasi Oleh", "Diverifikasi Pada", "Status Review", "Keputusan Duplikat",
+    "Catatan Kualitas", "Diperbarui Oleh", "Diperbarui Pada"
+  ];
+}
+
+function _normalizeReviewCoord_(value) {
+  const raw = String(value == null ? "" : value).trim();
+  const coord = _parseCoord(raw, "");
+  if (!coord) return raw.replace(/\s+/g, "");
+  return Number(coord.lat).toFixed(6) + "," + Number(coord.lng).toFixed(6);
+}
+
+function _qualityReviewKey_(id, coordinate) {
+  return String(id == null ? "" : id).trim().toLowerCase() + "|" + _normalizeReviewCoord_(coordinate);
+}
+
+function _emptyQualityReview_() {
+  return {
+    verificationStatus: "Belum Diverifikasi",
+    verificationNote: "",
+    verifiedBy: "",
+    verifiedAt: "",
+    reviewStatus: "Aktif",
+    duplicateDecision: "Belum Ditinjau",
+    qualityNote: "",
+    updatedBy: "",
+    updatedAt: ""
+  };
+}
+
+function _ensureQualityReviewSheetUnlocked_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(QUALITY_REVIEW_SHEET);
+  const headers = _qualityReviewHeaders_();
+  if (!sheet) sheet = ss.insertSheet(QUALITY_REVIEW_SHEET);
+  if (!sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setBackground("#7c3aed").setFontColor("#ffffff").setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function _ensureQualityReviewSheet_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return _ensureQualityReviewSheetUnlocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function _reviewDateText_(value) {
+  if (!value) return "";
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, "GMT+7", "dd-MM-yyyy HH:mm");
+  }
+  return String(value);
+}
+
+function _reviewFromRow_(row) {
+  const review = _emptyQualityReview_();
+  review.verificationStatus = String(row[3] || review.verificationStatus);
+  review.verificationNote = String(row[4] || "");
+  review.verifiedBy = String(row[5] || "");
+  review.verifiedAt = _reviewDateText_(row[6]);
+  review.reviewStatus = String(row[7] || review.reviewStatus);
+  review.duplicateDecision = String(row[8] || review.duplicateDecision);
+  review.qualityNote = String(row[9] || "");
+  review.updatedBy = String(row[10] || "");
+  review.updatedAt = _reviewDateText_(row[11]);
+  return review;
+}
+
+function _readQualityReviews_() {
+  const sheet = _ensureQualityReviewSheet_();
+  const map = {};
+  if (sheet.getLastRow() < 2) return map;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 12).getValues();
+  rows.forEach(function(row) {
+    const key = String(row[0] || "") || _qualityReviewKey_(row[1], row[2]);
+    if (key) map[key] = _reviewFromRow_(row);
+  });
+  return map;
+}
+
+function _boundedReviewText_(value, label) {
+  const text = String(value == null ? "" : value).trim();
+  if (text.length > 500) throw new Error(label + " maksimal 500 karakter.");
+  return text;
+}
+
+function _allowedReviewValue_(value, allowed, fallback, label) {
+  const normalized = String(value || fallback);
+  if (allowed.indexOf(normalized) === -1) throw new Error(label + " tidak valid.");
+  return normalized;
+}
+
+function _assertQualityTargetExists_(id, coordinate) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) throw new Error("Data pembanding tidak ditemukan.");
+  const targetKey = _qualityReviewKey_(id, coordinate);
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  const exists = rows.some(function(row) {
+    const parsed = _parseCoord(row[3], row[4]);
+    return _qualityReviewKey_(row[0], parsed ? parsed.raw : row[3]) === targetKey;
+  });
+  if (!exists) throw new Error("Data pembanding tidak ditemukan. Muat ulang data lalu coba kembali.");
+}
+
+function saveQualityReview(payload, activeUser) {
+  try {
+    _requireQualityEditor_(activeUser);
+    payload = payload || {};
+    const id = String(payload.id || "").trim();
+    const coordinate = String(payload.koordinat || "").trim();
+    if (!id || !coordinate) throw new Error("ID dan koordinat wajib tersedia untuk review.");
+    _assertQualityTargetExists_(id, coordinate);
+
+    const verificationStatus = _allowedReviewValue_(payload.verificationStatus,
+      ["Belum Diverifikasi", "Terverifikasi", "Perlu Verifikasi Ulang"],
+      "Belum Diverifikasi", "Status verifikasi");
+    const reviewStatus = _allowedReviewValue_(payload.reviewStatus,
+      ["Aktif", "Perlu Ditelaah", "Dikecualikan"], "Aktif", "Status review");
+    const duplicateDecision = _allowedReviewValue_(payload.duplicateDecision,
+      ["Belum Ditinjau", "Bukan Duplikat", "Duplikat"], "Belum Ditinjau", "Keputusan duplikat");
+    const verificationNote = _boundedReviewText_(payload.verificationNote, "Catatan verifikasi");
+    const qualityNote = _boundedReviewText_(payload.qualityNote, "Catatan kualitas");
+    const key = _qualityReviewKey_(id, coordinate);
+    const now = new Date();
+    const verifiedBy = verificationStatus === "Terverifikasi" ? String(activeUser || "") : "";
+    const verifiedAt = verificationStatus === "Terverifikasi" ? now : "";
+    const values = [key, id, coordinate, verificationStatus, verificationNote, verifiedBy, verifiedAt,
+      reviewStatus, duplicateDecision, qualityNote, String(activeUser || ""), now];
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const sheet = _ensureQualityReviewSheetUnlocked_();
+      let targetRow = -1;
+      if (sheet.getLastRow() >= 2) {
+        const keys = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+        for (let i = 0; i < keys.length; i++) {
+          if (String(keys[i][0] || "") === key) { targetRow = i + 2; break; }
+        }
+      }
+      if (targetRow === -1) sheet.appendRow(values);
+      else sheet.getRange(targetRow, 1, 1, values.length).setValues([values]);
+      SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
+
+    logActivity(activeUser, "Review kualitas data ID " + id + " (" + verificationStatus + ", " + reviewStatus + ")");
+    return { success: true, review: _reviewFromRow_(values) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 function getMasterParameters(activeUser) {
   try {
     _requireSuperadmin_(activeUser);
@@ -400,8 +575,9 @@ function setupSpreadsheet() {
     historySheet.getRange(1, 1, 1, 4).setBackground("#ea4335").setFontColor("#ffffff").setFontWeight("bold");
   }
   _ensureMasterParameterSheet_();
+  _ensureQualityReviewSheet_();
   SpreadsheetApp.flush();
-  return "Spreadsheet siap! Database Properti, Akun, Histori, dan Master Parameter telah disetup.";
+  return "Spreadsheet siap! Database Properti, Akun, Histori, Master Parameter, dan Quality Review telah disetup.";
 }
 
 function logActivity(username, aktivitas) {
@@ -622,16 +798,20 @@ function searchData(params) {
       });
     }
 
+    const reviewMap = _readQualityReviews_();
     const result = filtered.map(row => {
       var coord = _parseCoord(row[3], row[4]); var offset = (coord && coord.shifted) ? 1 : 0;
+      var id = _str(row[0]);
+      var coordinate = coord ? coord.raw : _str(row[3]);
       return {
-        id: _str(row[0]), sumber: _str(row[1]), hp: _formatPhone(row[2]), koordinat: coord ? coord.raw : _str(row[3]),
+        id: id, sumber: _str(row[1]), hp: _formatPhone(row[2]), koordinat: coordinate,
         alamat: _str(row[4+offset]), kota: _str(row[5+offset]), provinsi: _str(row[6+offset]), objek: _str(row[7+offset]),
         tipeBangunan: _str(row[8+offset]), legalitas: _str(row[9+offset]), luasTanah: row[10+offset], luasBangunan: row[11+offset],
         tahunBangun: row[12+offset], harga: _str(row[13+offset]), frontage: row[14+offset], lokasi: 
         _str(row[15+offset]), posisi: _str(row[16+offset]), bentuk: _str(row[17+offset]), kontur: _str(row[18+offset]), lebarJalanROW: row[19+offset],
         elevasi: row[20+offset], statusHarga: _str(row[21+offset]), waktuData: _str(row[22+offset]), tujuanPenilaian: _str(row[23+offset]),
-        peruntukan: _str(row[24+offset]), indikasiNilai: _str(row[25+offset]), foto: _str(row[26+offset]) || ""
+        peruntukan: _str(row[24+offset]), indikasiNilai: _str(row[25+offset]), foto: _str(row[26+offset]) || "",
+        qualityReview: reviewMap[_qualityReviewKey_(id, coordinate)] || _emptyQualityReview_()
       };
     });
     
