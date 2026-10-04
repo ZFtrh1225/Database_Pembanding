@@ -17,6 +17,10 @@ Label di atas setiap pin data pembanding hanya menampilkan identitas seperti **D
 
 Pin memakai bentuk teardrop bergaya Google Maps tanpa tulisan di dalamnya. Objek Penilaian tetap berwarna merah, sedangkan setiap pin data pembanding mengikuti warna garis dan indikator data yang sama pada panel. Ukuran pin mengecil atau membesar secara terbatas mengikuti tingkat zoom. Posisi label dihitung dari tinggi pin aktual sehingga label tetap dekat dan konsisten pada Google Maps maupun OpenStreetMap.
 
+## Pembatasan peta untuk Viewer
+
+Role **Viewer** hanya menggunakan OpenStreetMap, baik pada peta utama maupun pada Measurement. Pilihan Google Maps disembunyikan, tombol pergantian mode Measurement dikunci pada OSM, dan fitur khusus Google seperti heatmap, gambar area polygon, lapisan Default/Satelit, serta perhitungan rute jalan tidak dapat diaktifkan. Pembatasan juga diterapkan di fungsi JavaScript, sehingga Viewer tidak dapat melewatinya dengan memanggil tombol atau fungsi lama secara langsung. Role lain tetap dapat menggunakan kedua penyedia peta seperti sebelumnya.
+
 Pesan **Routes API belum aktif atau belum diizinkan pada pembatasan API key** berarti project Google Cloud perlu diperiksa: aktifkan Routes API, pastikan billing aktif, dan tambahkan Routes API pada daftar API yang diizinkan untuk key aplikasi. Setelah perubahan Google Cloud tersimpan, tunggu propagasi sebentar lalu tekan **Coba Hitung Lagi**; aplikasi tidak perlu di-deploy ulang hanya untuk perubahan konfigurasi Cloud tersebut.
 
 OSM memakai renderer SVG Leaflet; setiap frame memperbarui posisi pola putus-putus pada jalur SVG yang benar-benar terlihat. Satu putaran menempuh 22 piksel, tepat sepanjang satu garis dan satu sela, sehingga sambungannya mulus. Gerak berlangsung 120 piksel per detik dan menunggu jika Leaflet belum memasang SVG pada frame pertama. Animasi aktif ketika Measurement terbuka, garis ditampilkan, dan mode OSM aktif; berhenti ketika tab tersembunyi. Di Google Maps, titik jangkar ikon berada pada ujung pin yang sebenarnya; garis solid mengikuti koordinat yang sama. Respons rute lama diabaikan setelah input atau tampilan berubah.
