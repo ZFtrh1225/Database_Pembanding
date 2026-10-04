@@ -814,6 +814,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   line-height: 1.3;
   letter-spacing: .2px;
 }
+.mdist-label.data-only { padding:6px 10px; border-radius:8px; }
+.mdist-label.data-only .mdl-title { margin-bottom:0; color:#1e3a5f; font-weight:800; }
 /* ----------------------------- */
 
 /* Tombol OSM Toggle di Measurement */
@@ -8242,8 +8244,8 @@ function _mMakePin(coord, color, label, isObj) {
   return marker;
 }
 
-// ── LABEL JARAK DI ATAS PIN DP (Google Maps) ─────────────────────────────
-function _mMakeLabel(coord, dpId, ds, objCoord) {
+// ── LABEL NAMA DATA DI ATAS PIN DP (Google Maps) ─────────────────────────
+function _mMakeLabel(coord, dpId) {
   if (!_mMap) return null;
   // Label ditempatkan tepat di atas pin DP (bukan di tengah garis)
   var labelCoord = coord;
@@ -8251,13 +8253,12 @@ function _mMakeLabel(coord, dpId, ds, objCoord) {
   var overlay = new google.maps.OverlayView();
   overlay.onAdd = function() {
     var div = document.createElement('div');
-    div.className = 'mdist-label';
+    div.className = 'mdist-label data-only';
     div.style.position = 'absolute';
     // Geser ke atas pin: anchor di bawah-tengah label, lalu naik dari titik pin
     div.style.transform = 'translate(-50%, -100%)';
     div.style.marginTop = '-52px';
-    div.innerHTML = '<div class="mdl-title">Data '+dpId+'</div>'
-                  + '<div class="mdl-pill">'+ds+'</div>';
+    div.innerHTML = '<div class="mdl-title">Data '+dpId+'</div>';
     overlay._div = div;
     this.getPanes().floatPane.appendChild(div);
   };
@@ -8551,7 +8552,7 @@ function _mRedraw() {
         path.forEach(function(point){ bounds.extend(point); });
         hasBounds = true;
         _mSetDistanceState(dp.distEl, ds, false, 'Rute jalan Google');
-        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, distanceText, cObj);
+        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id);
         return {
           id:dp.id, dist:ds, meters:meters, color:_mRouteColors[dp.id] || '#0033ff',
           source:result.source, warnings:result.warnings || []
@@ -8567,7 +8568,7 @@ function _mRedraw() {
         _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
         _mSyncLineVisibility();
         _mSetDistanceState(dp.distEl, ds, true, 'Rute jalan gagal: ' + reason);
-        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, distanceText, cObj);
+        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id);
         return {
           id:dp.id, dist:ds, meters:km * 1000, color:_mRouteColors[dp.id] || '#0033ff',
           fallback:true, error:reason
@@ -8846,16 +8847,15 @@ function _mOsmRedraw() {
       if (_mLinesVisible) line.addTo(_mOsmMap);
       _mOsmLines.push(line);
 
-      // Label jarak di ATAS pin DP (bukan tengah garis) dengan keterangan "Data X"
-      var labelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
-        + '<div class="mdl-title">Data ' + id + '</div>'
-        + '<div class="mdl-pill">' + ds + '</div></div>';
+      // Label ringkas di atas pin; jarak lengkap tetap tersedia di panel/ringkasan.
+      var labelHtml = '<div class="mdist-label data-only" style="transform:none;margin:0;">'
+        + '<div class="mdl-title">Data ' + id + '</div></div>';
       var labelIcon = L.divIcon({
         html: labelHtml,
         className: '',
-        iconSize: [140, 44],
+        iconSize: [90, 28],
         // anchor di tengah-bawah label, sehingga label muncul di atas pin DP
-        iconAnchor: [70, 96]
+        iconAnchor: [45, 80]
       });
       var labelMarker = L.marker([coord.lat, coord.lng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
       _mOsmLabels.push(labelMarker);
