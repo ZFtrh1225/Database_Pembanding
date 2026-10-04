@@ -13,7 +13,7 @@ Garis putus-putus berjalan dari objek menuju tiap data pembanding **hanya pada O
 
 Jika Routes API modern belum aktif, aplikasi mencoba `DirectionsService` lama sebagai kompatibilitas sementara dan menampilkan pemberitahuan kuning. Jika kedua layanan gagal, aplikasi memakai garis lurus, menandai jaraknya dengan `· lurus` di panel/ringkasan, serta menyediakan tombol **Coba Hitung Lagi** dan **× Tutup**. Peringatan yang ditutup tidak muncul lagi selama sesi browser yang sama. Dengan demikian fallback tetap transparan tanpa terus menutupi peta.
 
-Label di atas setiap pin data pembanding hanya menampilkan angka jarak, baik pada rute Google maupun garis lurus Google/OpenStreetMap. Keterangan `lurus` dan estimasi waktu tetap berada di panel/ringkasan agar label peta ringkas tetapi jenis pengukurannya tidak hilang.
+Label di atas setiap pin data pembanding hanya menampilkan identitas seperti **Data 1** atau **Data 2**, baik pada Google Maps maupun OpenStreetMap. Jarak, keterangan `lurus`, dan estimasi waktu tetap berada di panel/ringkasan agar peta lebih lapang—terutama di ponsel—tanpa menghilangkan informasi pengukuran.
 
 Pesan **Routes API belum aktif atau belum diizinkan pada pembatasan API key** berarti project Google Cloud perlu diperiksa: aktifkan Routes API, pastikan billing aktif, dan tambahkan Routes API pada daftar API yang diizinkan untuk key aplikasi. Setelah perubahan Google Cloud tersimpan, tunggu propagasi sebentar lalu tekan **Coba Hitung Lagi**; aplikasi tidak perlu di-deploy ulang hanya untuk perubahan konfigurasi Cloud tersebut.
 
