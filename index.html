@@ -235,6 +235,17 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .legend-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sub); white-space: nowrap; }
 .legend-pin { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cluster-legend { display:flex; align-items:center; gap:5px; padding-left:8px; border-left:1px solid var(--border); font-size:10px; color:var(--text-sub); white-space:nowrap; }
+.cluster-legend strong { color:var(--navy); }
+.cluster-dot { width:12px; height:12px; border-radius:50%; display:inline-block; box-shadow:0 0 0 3px color-mix(in srgb, currentColor 22%, transparent); }
+.cluster-dot.small { background:#22c55e; color:#22c55e; }
+.cluster-dot.medium { background:#facc15; color:#facc15; }
+.cluster-dot.large { background:#ef4444; color:#ef4444; }
+.map-cluster-shell { display:grid; place-items:center; width:100%; height:100%; border-radius:50%; color:#fff; font:800 12px/1 var(--font); border:2px solid rgba(255,255,255,.94); box-shadow:0 3px 12px rgba(15,23,42,.32); }
+.map-cluster-shell.small { background:#22c55e; box-shadow:0 0 0 7px rgba(34,197,94,.24),0 3px 12px rgba(15,23,42,.32); }
+.map-cluster-shell.medium { background:#eab308; color:#422006; box-shadow:0 0 0 8px rgba(250,204,21,.28),0 3px 12px rgba(15,23,42,.32); }
+.map-cluster-shell.large { background:#ef4444; box-shadow:0 0 0 9px rgba(239,68,68,.25),0 3px 12px rgba(15,23,42,.32); }
+.unified-map-cluster { background:transparent !important; border:none !important; }
 .view-toggle { display: flex; gap: 4px; }
 .btn-view { background: var(--bg); border: 1.5px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 11px; font-family: var(--font); cursor: pointer; color: var(--text-sub); transition: all .18s; display: flex; align-items: center; gap: 4px; }
 .btn-view.active { background: var(--navy); color: #fff; border-color: var(--navy); }
@@ -825,6 +836,9 @@ body.mmode-picking .mpick-hint { display: flex; }
   display: flex; align-items: center; gap: 8px;
   font-size: 12px; color: var(--text); padding: 4px 0;
 }
+.legend-popup-section { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+.legend-popup-section-title { margin-bottom:3px; color:var(--navy); font-size:10px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; }
+.legend-popup-note { margin-top:5px; color:var(--text-sub); font-size:10px; line-height:1.35; }
 
 /* ---------- FILTER ACTIONS WRAPPER ---------- */
 .filter-actions { display: contents; }
@@ -1662,6 +1676,7 @@ body.mmode-picking .mpick-hint { display: flex; }
         <div class="legend-item"><div class="legend-pin" style="background:#ab47bc;"></div>Ruko</div>
         <div class="legend-item"><div class="legend-pin" style="background:#f4b400;"></div>Office/Retail/Apt</div>
         <div class="legend-item"><div class="legend-pin" style="background:#db4437; border:2px solid #fff; width:12px; height:12px; border-radius:50%;"></div>Lokasi Aset</div>
+        <div class="cluster-legend" title="Warna kelompok sama di OpenStreetMap dan Google Maps"><strong>Cluster:</strong><span class="cluster-dot small"></span>&lt;10 <span class="cluster-dot medium"></span>10–99 <span class="cluster-dot large"></span>≥100</div>
       </div>
 
       <!-- Mobile-only: Legend popup trigger -->
@@ -1677,6 +1692,7 @@ body.mmode-picking .mpick-hint { display: flex; }
           <div class="legend-popup-item"><div class="legend-pin" style="background:#ab47bc;"></div>Ruko</div>
           <div class="legend-popup-item"><div class="legend-pin" style="background:#f4b400;"></div>Office/Retail/Apt</div>
           <div class="legend-popup-item"><div class="legend-pin" style="background:#db4437; border:2px solid #fff; width:12px; height:12px; border-radius:50%;"></div>Lokasi Aset</div>
+          <div class="legend-popup-section"><div class="legend-popup-section-title">Kelompok marker</div><div class="legend-popup-item"><span class="cluster-dot small"></span>Hijau · kurang dari 10 data</div><div class="legend-popup-item"><span class="cluster-dot medium"></span>Kuning · 10–99 data</div><div class="legend-popup-item"><span class="cluster-dot large"></span>Merah · 100 data atau lebih</div><div class="legend-popup-note">Angka di lingkaran adalah jumlah data, bukan skor kualitas.</div></div>
         </div>
       </div>
       <div class="active-filter-chips" id="activeFilterChips" aria-label="Filter aktif"></div>
@@ -2737,6 +2753,43 @@ var _gInfoWindow = null; // Shared InfoWindow for dashboard map
 var activeRole = sessionStorage.getItem('userRole');
 var activeUsername = sessionStorage.getItem('userName');
 var PIN_COLORS = { 'Tanah Kosong': '#4285f4', 'Tanah Bangunan': '#0f9d58', 'Ruko': '#ab47bc', 'Office/Retail/Unit Apartemen': '#f4b400' };
+var MAP_CLUSTER_COLORS = { small:'#22c55e', medium:'#eab308', large:'#ef4444' };
+
+function _mapClusterTier(count) {
+  count = Number(count) || 0;
+  return count < 10 ? 'small' : (count < 100 ? 'medium' : 'large');
+}
+
+function _mapClusterSize(tier) { return tier === 'large' ? 56 : (tier === 'medium' ? 50 : 44); }
+
+function _makeOsmClusterIcon(cluster) {
+  var count = cluster.getChildCount(), tier = _mapClusterTier(count), size = _mapClusterSize(tier);
+  return L.divIcon({
+    html:'<div class="map-cluster-shell ' + tier + '" role="button" aria-label="Kelompok ' + count + ' data">' + count + '</div>',
+    className:'unified-map-cluster',
+    iconSize:L.point(size, size)
+  });
+}
+
+function _makeGoogleClusterRenderer() {
+  return {
+    render:function(cluster) {
+      var count = cluster.count, tier = _mapClusterTier(count), size = _mapClusterSize(tier);
+      var color = MAP_CLUSTER_COLORS[tier], textColor = tier === 'medium' ? '#422006' : '#ffffff';
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 60 60">' +
+        '<circle cx="30" cy="30" r="28" fill="' + color + '" opacity=".22"/>' +
+        '<circle cx="30" cy="30" r="23" fill="' + color + '" opacity=".38"/>' +
+        '<circle cx="30" cy="30" r="18" fill="' + color + '" stroke="#fff" stroke-width="2"/>' +
+        '<text x="30" y="34" text-anchor="middle" font-family="Plus Jakarta Sans,Arial,sans-serif" font-size="13" font-weight="800" fill="' + textColor + '">' + count + '</text></svg>';
+      return new google.maps.Marker({
+        position:cluster.position,
+        icon:{ url:'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg), scaledSize:new google.maps.Size(size, size), anchor:new google.maps.Point(size / 2, size / 2) },
+        title:'Kelompok ' + count + ' data · hijau <10, kuning 10–99, merah ≥100',
+        zIndex:Number(google.maps.Marker.MAX_ZINDEX) + count
+      });
+    }
+  };
+}
 
 function getAgingFlag(yrStr) {
   var parsed = _parseWaktuData(yrStr);
@@ -2876,15 +2929,30 @@ function _propertyColor_(value) {
   return PIN_COLORS[value];
 }
 
+function _clusterLegendDesktopHtml_() {
+  return '<div class="cluster-legend" title="Warna kelompok sama di OpenStreetMap dan Google Maps"><strong>Cluster:</strong>' +
+    '<span class="cluster-dot small"></span>&lt;10 ' +
+    '<span class="cluster-dot medium"></span>10–99 ' +
+    '<span class="cluster-dot large"></span>≥100</div>';
+}
+
+function _clusterLegendMobileHtml_() {
+  return '<div class="legend-popup-section"><div class="legend-popup-section-title">Kelompok marker</div>' +
+    '<div class="legend-popup-item"><span class="cluster-dot small"></span>Hijau · kurang dari 10 data</div>' +
+    '<div class="legend-popup-item"><span class="cluster-dot medium"></span>Kuning · 10–99 data</div>' +
+    '<div class="legend-popup-item"><span class="cluster-dot large"></span>Merah · 100 data atau lebih</div>' +
+    '<div class="legend-popup-note">Angka di lingkaran adalah jumlah data, bukan skor kualitas.</div></div>';
+}
+
 function _renderPropertyLegends_(items) {
   var desktop = document.getElementById('desktopLegend');
   var mobile = document.getElementById('mobileLegendItems');
   var desktopHtml = items.map(function(item) {
     return '<div class="legend-item"><div class="legend-pin" style="background:' + _propertyColor_(item.value) + ';"></div>' + _parameterEscape_(item.label) + '</div>';
-  }).join('') + '<div class="legend-item"><div class="legend-pin" style="background:#db4437;border:2px solid #fff;width:12px;height:12px;border-radius:50%;"></div>Lokasi Aset</div>';
+  }).join('') + '<div class="legend-item"><div class="legend-pin" style="background:#db4437;border:2px solid #fff;width:12px;height:12px;border-radius:50%;"></div>Lokasi Aset</div>' + _clusterLegendDesktopHtml_();
   var mobileHtml = items.map(function(item) {
     return '<div class="legend-popup-item"><div class="legend-pin" style="background:' + _propertyColor_(item.value) + ';"></div>' + _parameterEscape_(item.label) + '</div>';
-  }).join('') + '<div class="legend-popup-item"><div class="legend-pin" style="background:#db4437;border:2px solid #fff;width:12px;height:12px;border-radius:50%;"></div>Lokasi Aset</div>';
+  }).join('') + '<div class="legend-popup-item"><div class="legend-pin" style="background:#db4437;border:2px solid #fff;width:12px;height:12px;border-radius:50%;"></div>Lokasi Aset</div>' + _clusterLegendMobileHtml_();
   if (desktop) desktop.innerHTML = desktopHtml;
   if (mobile) mobile.innerHTML = mobileHtml;
 }
@@ -3295,7 +3363,7 @@ function _syncMarkersToOSM() {
     ensureLeafletMarkerCluster().then(function() { if (_currentMapMode === 'osm') _syncMarkersToOSM(); }).catch(function() {});
   }
   if (currentData.length >= 30 && window.L && L.markerClusterGroup) {
-    _osmClusterGroup = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius:48, disableClusteringAtZoom:18 });
+    _osmClusterGroup = L.markerClusterGroup({ showCoverageOnHover:false, maxClusterRadius:48, disableClusteringAtZoom:18, iconCreateFunction:_makeOsmClusterIcon });
     _osmMap.addLayer(_osmClusterGroup);
   }
 
@@ -5164,7 +5232,7 @@ function renderMarkers(data, params) {
     ensureGoogleMarkerCluster().then(function() {
       if (renderVersion !== _markerRenderVersion || isHeatmap) return;
       gMarkers.forEach(function(marker) { marker.setMap(null); });
-      _gMarkerCluster = new markerClusterer.MarkerClusterer({ map:gMap, markers:gMarkers });
+      _gMarkerCluster = new markerClusterer.MarkerClusterer({ map:gMap, markers:gMarkers, renderer:_makeGoogleClusterRenderer() });
     }).catch(function() { /* marker biasa tetap tersedia sebagai fallback */ });
   }
 
