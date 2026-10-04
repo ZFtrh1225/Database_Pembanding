@@ -3122,7 +3122,9 @@ document.addEventListener("DOMContentLoaded", function() {
   function toProperCase(str) { return str.replace(/\w\S*/g, function(txt){ return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(); }); }
   ['f_sumber', 'f_provinsi', 'f_tipe'].forEach(function(id) { var el = document.getElementById(id); if (el) { el.addEventListener('input', function() { var start = this.selectionStart, end = this.selectionEnd; this.value = toProperCase(this.value); this.setSelectionRange(start, end); }); } });
   var fKota = document.getElementById('f_kota'); if (fKota) { fKota.addEventListener('input', function() { var start = this.selectionStart, end = this.selectionEnd, val = toProperCase(this.value); val = val.replace(/Dki/g, 'DKI'); this.value = val; this.setSelectionRange(start, end); }); }
-  var numFields = ['f_hp', 'f_lt', 'f_lb', 'f_tahunBangun', 'f_harga', 'f_frontage', 'f_row', 'f_waktuData', 'f_indikasi'];
+  // Harga dan indikasi nilai memiliki formatter Rupiah sendiri. Jangan masukkan
+  // keduanya ke penyaring digit umum karena titik pemisah ribuan akan dianggap salah.
+  var numFields = ['f_hp', 'f_lt', 'f_lb', 'f_tahunBangun', 'f_frontage', 'f_row', 'f_waktuData'];
   numFields.forEach(function(id) { var el = document.getElementById(id); if (el) { el.addEventListener('input', function() { if (/[^\d]/.test(this.value)) { toast('Hanya menerima input angka', 'error'); this.value = this.value.replace(/[^\d]/g, ''); } }); } });
   var fElevasi = document.getElementById('f_elevasi'); if (fElevasi) { fElevasi.addEventListener('input', function() { if (/[^\d.-]/.test(this.value)) { toast('Hanya menerima input angka', 'error'); this.value = this.value.replace(/[^\d.-]/g, ''); } }); }
   var fCoord = document.getElementById('f_koordinat');
@@ -9984,14 +9986,20 @@ function renderDataFormReview() {
   review.innerHTML = '<h4>Periksa sebelum menyimpan</h4><div class="form-review-grid">' + items.map(function(item) { return '<div class="form-review-item"><span>' + item[0] + '</span><strong>' + _escapeHtmlAppraisal(item[1]) + '</strong></div>'; }).join('') + '</div><div class="form-review-note">Ringkasan ini membantu pemeriksaan input; kelayakan sebagai pembanding tetap ditentukan oleh penilai.</div>';
 }
 
+function _formatCurrencyInputValue(value) {
+  var digits = String(value == null ? '' : value).replace(/[^0-9]/g,'');
+  digits = digits.replace(/^0+(?=\d)/, '');
+  return digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g,'.') : '';
+}
+
 function setupDataInputFormatting() {
   ['f_harga','f_indikasi'].forEach(function(id) {
     var field = document.getElementById(id); if (!field || field.dataset.currencyReady === 'true') return;
     field.addEventListener('input', function() {
-      var digits = field.value.replace(/[^0-9]/g,'');
-      field.value = digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g,'.') : '';
+      field.value = _formatCurrencyInputValue(field.value);
       renderDataFormReview();
     });
+    field.addEventListener('blur', function() { field.value = _formatCurrencyInputValue(field.value); });
     field.dataset.currencyReady = 'true';
   });
 }
