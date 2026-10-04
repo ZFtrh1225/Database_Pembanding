@@ -167,6 +167,37 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .duplicate-decision-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding-top:13px; border-top:1px solid var(--border); }
 .duplicate-decision-grid .span-2 { grid-column:1/-1; }
 .duplicate-existing-warning { margin-top:10px; color:#64748b; font-size:10px; line-height:1.45; }
+.relation-review-modal { width:min(1120px,96vw); max-width:1120px; max-height:92vh; }
+.relation-review-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; padding:10px; border:1px solid var(--border); border-radius:10px; background:#f8fafc; }
+.relation-review-tabs { display:flex; flex-wrap:wrap; gap:6px; }
+.relation-review-tabs button { min-height:34px; padding:6px 11px; border:1px solid #cbd5e1; border-radius:18px; background:#fff; color:#475569; font:700 10.5px var(--font); cursor:pointer; }
+.relation-review-tabs button.active { border-color:#2563eb; background:#2563eb; color:#fff; }
+.relation-review-summary { color:#64748b; font-size:10.5px; font-weight:700; }
+.relation-review-list { display:grid; gap:12px; }
+.relation-review-card { border:1px solid var(--border); border-radius:12px; background:#fff; overflow:hidden; }
+.relation-review-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:11px 13px; border-bottom:1px solid var(--border); background:#f8fafc; }
+.relation-review-head strong { display:block; color:var(--navy); font-size:12px; }
+.relation-review-head small { display:block; margin-top:3px; color:#64748b; font-size:9.5px; }
+.relation-review-badges { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px; }
+.relation-review-badge { padding:4px 7px; border-radius:12px; background:#e2e8f0; color:#475569; font-size:9px; font-weight:800; white-space:nowrap; }
+.relation-review-badge.pending { background:#fef3c7; color:#92400e; }
+.relation-review-badge.confirmed { background:#dcfce7; color:#166534; }
+.relation-review-badge.rejected { background:#fee2e2; color:#991b1b; }
+.relation-review-context { padding:10px 13px; border-bottom:1px solid var(--border); color:#475569; font-size:10.5px; line-height:1.5; }
+.relation-review-context strong { color:#334155; }
+.relation-pair { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px; background:#f8fafc; }
+.relation-data-panel { min-width:0; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff; }
+.relation-data-panel h4 { margin:0 0 8px; color:var(--navy); font-size:11.5px; }
+.relation-data-grid { display:grid; grid-template-columns:110px minmax(0,1fr); gap:5px 8px; font-size:10px; line-height:1.35; }
+.relation-data-grid span { color:#64748b; }
+.relation-data-grid strong { color:#1e293b; overflow-wrap:anywhere; }
+.relation-review-controls { display:grid; grid-template-columns:minmax(180px,.7fr) minmax(220px,1.3fr) auto; gap:9px; align-items:end; padding:12px; border-top:1px solid var(--border); }
+.relation-review-actions { display:flex; gap:6px; justify-content:flex-end; }
+.relation-review-actions button { min-height:38px; padding:7px 11px; border:0; border-radius:8px; font:700 10.5px var(--font); cursor:pointer; }
+.relation-review-actions .confirm { background:#166534; color:#fff; }
+.relation-review-actions .reject { background:#fff; color:#b91c1c; border:1px solid #fecaca; }
+.relation-review-final { padding:11px 13px; border-top:1px solid var(--border); background:#f8fafc; color:#475569; font-size:10.5px; line-height:1.5; }
+.relation-review-empty { padding:36px 18px; border:1px dashed #cbd5e1; border-radius:12px; text-align:center; color:#64748b; font-size:11px; }
 .form-input.invalid, .form-select.invalid { border-color:var(--red) !important; background:#fff7f7 !important; }
 .field-error-text { margin-top:4px; color:var(--red); font-size:10.5px; line-height:1.35; }
 .form-review { margin-top:14px; padding:12px; border:1px solid #bfdbfe; border-radius:10px; background:#eff6ff; }
@@ -1484,6 +1515,15 @@ body.mmode-picking .mpick-hint { display: flex; }
   .duplicate-score { grid-column:2; justify-self:start; }
   .duplicate-decision-grid { grid-template-columns:1fr; }
   .duplicate-decision-grid .span-2 { grid-column:auto; }
+  .relation-review-modal { width:100%; max-width:none; max-height:94dvh; border-radius:18px 18px 0 0; }
+  #relationReviewOverlay { align-items:flex-end; padding:0; }
+  .relation-review-toolbar { align-items:stretch; flex-direction:column; }
+  .relation-review-tabs { flex-wrap:nowrap; overflow-x:auto; }
+  .relation-review-tabs button { flex:none; min-height:40px; }
+  .relation-pair { grid-template-columns:1fr; }
+  .relation-review-controls { grid-template-columns:1fr; }
+  .relation-review-actions { display:grid; grid-template-columns:1fr 1fr; }
+  .relation-review-actions button { min-height:44px; }
   .detail-hero { grid-template-columns:88px minmax(0,1fr); gap:10px; padding:10px; }
   .detail-hero img, .detail-hero-photo { width:88px; height:76px; }
   #detailOverlay { align-items:flex-end; padding:0; }
@@ -1640,6 +1680,7 @@ body.mmode-picking .mpick-hint { display: flex; }
     <button class="btn-top btn-mob-hide" id="btnAddTop" onclick="openModalNew()">+ Tambah Data</button>
     <button class="btn-top primary btn-mob-hide" id="btnExport" onclick="exportData()">⬇ Export</button>
     <button class="btn-top btn-mob-hide" id="btnParameters" style="display:none;" onclick="openParameterManager()">⚙ Parameter</button>
+    <button class="btn-top btn-mob-hide" id="btnRelationReview" style="display:none;" onclick="openRelationReview()">🔗 Review Relasi <span id="relationReviewBadge"></span></button>
 
     <!-- Mobile-only kebab "More" menu -->
     <div class="topbar-more btn-mob-only">
@@ -1651,6 +1692,7 @@ body.mmode-picking .mpick-hint { display: flex; }
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); openMeasurement();">📐 <span>Measurement</span></button>
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); exportData();">⬇️ <span>Export</span></button>
         <button class="topbar-more-item" id="btnParametersMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openParameterManager();">⚙️ <span>Kelola Parameter</span></button>
+        <button class="topbar-more-item" id="btnRelationReviewMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openRelationReview();">🔗 <span>Review Relasi Data</span><strong id="relationReviewBadgeMobile"></strong></button>
       </div>
     </div>
   </div>
@@ -2400,6 +2442,28 @@ body.mmode-picking .mpick-hint { display: flex; }
   </div>
 </div>
 
+<!-- MODAL REVIEW RELASI DATA -->
+<div class="modal-overlay" id="relationReviewOverlay" onclick="if(event.target===this)closeRelationReview()">
+  <div class="modal relation-review-modal">
+    <div class="modal-header">
+      <div><div class="modal-title">🔗 Review Relasi Data</div><div style="margin-top:3px;color:#64748b;font-size:10px;">Konfirmasi hubungan antar-data tanpa mengubah atau menghapus data utama.</div></div>
+      <button class="btn-close" type="button" onclick="closeRelationReview()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="relation-review-toolbar">
+        <div class="relation-review-tabs">
+          <button id="relationTabPending" class="active" type="button" onclick="setRelationReviewFilter('pending')">Menunggu Review</button>
+          <button id="relationTabHistory" type="button" onclick="setRelationReviewFilter('history')">Riwayat Keputusan</button>
+          <button id="relationTabAll" type="button" onclick="setRelationReviewFilter('all')">Semua</button>
+        </div>
+        <div class="relation-review-summary" id="relationReviewSummary">Memuat antrean…</div>
+      </div>
+      <div class="relation-review-list" id="relationReviewList"></div>
+    </div>
+    <div class="modal-footer"><button class="btn-submit" type="button" onclick="closeRelationReview()" style="background:#fff;color:#475569;border:1px solid var(--border);">Tutup</button></div>
+  </div>
+</div>
+
 <!-- ===================== MEASUREMENT OVERLAY ===================== -->
 <div class="measure-overlay" id="measureOverlay">
 
@@ -3107,12 +3171,17 @@ function _applyViewerMapRestrictions(role) {
 function applyPermissions(role) {
   var btnExport = document.getElementById('btnExport'), btnAddTop = document.getElementById('btnAddTop'), btnAddMap = document.getElementById('btnAddMap'), btnTable = document.getElementById('btnViewTable');
   var btnParameters = document.getElementById('btnParameters'), btnParametersMobile = document.getElementById('btnParametersMobile');
+  var btnRelationReview = document.getElementById('btnRelationReview'), btnRelationReviewMobile = document.getElementById('btnRelationReviewMobile');
+  var canReviewRelations = role === 'Admin' || role === 'Superadmin';
   if(btnExport) btnExport.disabled = false; if(btnAddTop) btnAddTop.disabled = false; if(btnAddMap) btnAddMap.disabled = false; if(btnTable) btnTable.disabled = false;
   if(btnParameters) btnParameters.style.display = role === 'Superadmin' ? '' : 'none';
   if(btnParametersMobile) btnParametersMobile.style.display = role === 'Superadmin' ? '' : 'none';
+  if(btnRelationReview) btnRelationReview.style.display = canReviewRelations ? '' : 'none';
+  if(btnRelationReviewMobile) btnRelationReviewMobile.style.display = canReviewRelations ? '' : 'none';
   if (role === 'Surveyor') { if(btnExport) btnExport.disabled = true; }
   else if (role === 'Viewer') { if(btnExport) btnExport.disabled = true; if(btnAddTop) btnAddTop.disabled = true; if(btnAddMap) btnAddMap.disabled = true; if(btnTable) btnTable.disabled = true; }
   _applyViewerMapRestrictions(role);
+  if (canReviewRelations) loadRelationReviewCount();
 }
 
 var _masterParameterRows = [];
@@ -7738,6 +7807,169 @@ function confirmDuplicateDecision() {
   _duplicateDecisionState = null;
   document.getElementById('duplicateOverlay').classList.remove('open');
   if (typeof callback === 'function') callback(decision);
+}
+
+var _relationReviewRows = [], _relationRenderedRows = [], _relationReviewFilter = 'pending';
+function _relationTypeLabel(type) {
+  return ({
+    SAME_MARKET_DATA:'Data pasar yang sama / duplikat',
+    NEW_MARKET_EVENT:'Properti sama — kejadian pasar baru',
+    SAME_PROPERTY_DIFFERENT_SOURCE:'Properti sama — sumber berbeda',
+    DIFFERENT_PROPERTY:'Properti berbeda'
+  })[type] || type || 'Belum ditentukan';
+}
+
+function _relationStatusClass(status) {
+  if (status === 'Dikonfirmasi') return 'confirmed';
+  if (status === 'Ditolak') return 'rejected';
+  return 'pending';
+}
+
+function _setRelationReviewBadges(count) {
+  var text = Number(count) > 0 ? ' (' + Number(count) + ')' : '';
+  var desktop = document.getElementById('relationReviewBadge'), mobile = document.getElementById('relationReviewBadgeMobile');
+  if (desktop) desktop.textContent = text;
+  if (mobile) mobile.textContent = text;
+}
+
+function loadRelationReviewCount() {
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) return;
+    _setRelationReviewBadges(res.pendingCount || 0);
+  }).withFailureHandler(function() {}).getDataRelations(activeUsername, { summaryOnly:true });
+}
+
+function _relationDataPanel(data, title, fallbackId, fallbackCoord) {
+  data = data || { id:fallbackId, koordinat:fallbackCoord };
+  function value(v) { return v !== undefined && v !== null && String(v).trim() !== '' ? String(v) : '–'; }
+  var address = [data.alamat, data.kota, data.provinsi].filter(Boolean).join(', ');
+  var fields = [
+    ['ID', value(data.id || fallbackId)], ['Koordinat', value(data.koordinat || fallbackCoord)],
+    ['Alamat', value(address)], ['Jenis properti', value(data.objek)], ['Legalitas', value(data.legalitas)],
+    ['Luas tanah', data.luasTanah ? value(data.luasTanah) + ' m²' : '–'], ['Luas bangunan', data.luasBangunan ? value(data.luasBangunan) + ' m²' : '–'],
+    ['Jenis / waktu data', [data.statusHarga, data.waktuData].filter(Boolean).join(' · ') || '–'],
+    ['Harga', data.harga ? formatRupiah(data.harga) : '–'], ['Sumber', value(data.sumber)], ['No. HP', value(data.hp)]
+  ];
+  return '<section class="relation-data-panel"><h4>' + _escapeHtmlAppraisal(title) + '</h4><div class="relation-data-grid">' + fields.map(function(field) {
+    return '<span>' + _escapeHtmlAppraisal(field[0]) + '</span><strong>' + _escapeHtmlAppraisal(field[1]) + '</strong>';
+  }).join('') + '</div></section>';
+}
+
+function _relationTypeOptions(selected) {
+  return [
+    ['NEW_MARKET_EVENT','Properti sama — kejadian pasar baru'],
+    ['SAME_PROPERTY_DIFFERENT_SOURCE','Properti sama — sumber berbeda'],
+    ['SAME_MARKET_DATA','Data pasar yang sama / duplikat'],
+    ['DIFFERENT_PROPERTY','Properti berbeda']
+  ].map(function(option) {
+    return '<option value="' + option[0] + '"' + (option[0] === selected ? ' selected' : '') + '>' + option[1] + '</option>';
+  }).join('');
+}
+
+function _relationReviewCard(relation, index) {
+  var pending = relation.status === 'Menunggu Review';
+  var proposedLabel = _relationTypeLabel(relation.proposedType);
+  var header = '<div class="relation-review-head"><div><strong>Relasi ' + _escapeHtmlAppraisal(relation.relationId) + '</strong><small>' + _escapeHtmlAppraisal(relation.submittedBy || '-') + ' · ' + _escapeHtmlAppraisal(relation.submittedAt || '-') + ' · ' + _escapeHtmlAppraisal(relation.sourceAction || '-') + '</small></div>' +
+    '<div class="relation-review-badges"><span class="relation-review-badge ' + _relationStatusClass(relation.status) + '">' + _escapeHtmlAppraisal(relation.status) + '</span><span class="relation-review-badge">Skor ' + Number(relation.score || 0) + '/100</span></div></div>';
+  var context = '<div class="relation-review-context"><strong>Usulan Surveyor:</strong> ' + _escapeHtmlAppraisal(proposedLabel) + '<br><strong>Alasan:</strong> ' + _escapeHtmlAppraisal(relation.reason || '–') + (relation.indicators ? '<br><strong>Indikator:</strong> ' + _escapeHtmlAppraisal(relation.indicators) : '') + '</div>';
+  var pair = '<div class="relation-pair">' + _relationDataPanel(relation.activeData, 'Data aktif / baru', relation.activeId, relation.activeCoord) + _relationDataPanel(relation.existingData, 'Data existing', relation.existingId, relation.existingCoord) + '</div>';
+  var controls = '';
+  if (pending) {
+    controls = '<div class="relation-review-controls"><div class="form-group"><label class="form-label">Klasifikasi akhir</label><select class="form-select relation-final-type" data-index="' + index + '">' + _relationTypeOptions(relation.proposedType) + '</select></div>' +
+      '<div class="form-group"><label class="form-label">Catatan reviewer</label><textarea class="form-input relation-review-note" data-index="' + index + '" rows="2" maxlength="500" placeholder="Wajib jika klasifikasi diubah atau ditolak"></textarea></div>' +
+      '<div class="relation-review-actions"><button class="reject" type="button" data-relation-reject="' + index + '">Tolak</button><button class="confirm" type="button" data-relation-confirm="' + index + '">Simpan Keputusan</button></div></div>';
+  } else {
+    controls = '<div class="relation-review-final"><strong>Keputusan akhir:</strong> ' + _escapeHtmlAppraisal(relation.status === 'Ditolak' ? 'Relasi ditolak' : _relationTypeLabel(relation.finalType || relation.proposedType)) + '<br><strong>Reviewer:</strong> ' + _escapeHtmlAppraisal(relation.reviewedBy || '-') + ' · ' + _escapeHtmlAppraisal(relation.reviewedAt || '-') + (relation.reviewNote ? '<br><strong>Catatan:</strong> ' + _escapeHtmlAppraisal(relation.reviewNote) : '') + '</div>';
+  }
+  return '<article class="relation-review-card">' + header + context + pair + controls + '</article>';
+}
+
+function _bindRelationReviewActions() {
+  document.querySelectorAll('[data-relation-confirm]').forEach(function(button) {
+    button.addEventListener('click', function() { saveRelationReviewByIndex(Number(button.dataset.relationConfirm), false); });
+  });
+  document.querySelectorAll('[data-relation-reject]').forEach(function(button) {
+    button.addEventListener('click', function() { saveRelationReviewByIndex(Number(button.dataset.relationReject), true); });
+  });
+}
+
+function renderRelationReview() {
+  var list = document.getElementById('relationReviewList'), summary = document.getElementById('relationReviewSummary');
+  if (!list || !summary) return;
+  _relationRenderedRows = _relationReviewRows.filter(function(relation) {
+    if (_relationReviewFilter === 'pending') return relation.status === 'Menunggu Review';
+    if (_relationReviewFilter === 'history') return relation.status !== 'Menunggu Review';
+    return true;
+  });
+  var pendingCount = _relationReviewRows.filter(function(relation) { return relation.status === 'Menunggu Review'; }).length;
+  summary.textContent = pendingCount + ' menunggu review · ' + _relationReviewRows.length + ' total relasi';
+  _setRelationReviewBadges(pendingCount);
+  if (!_relationRenderedRows.length) {
+    list.innerHTML = '<div class="relation-review-empty">' + (_relationReviewFilter === 'pending' ? 'Tidak ada relasi yang menunggu review.' : 'Belum ada riwayat keputusan pada filter ini.') + '</div>';
+    return;
+  }
+  list.innerHTML = _relationRenderedRows.map(_relationReviewCard).join('');
+  _bindRelationReviewActions();
+}
+
+function setRelationReviewFilter(filter) {
+  _relationReviewFilter = filter;
+  ['pending','history','all'].forEach(function(name) {
+    var id = name === 'pending' ? 'relationTabPending' : (name === 'history' ? 'relationTabHistory' : 'relationTabAll');
+    var button = document.getElementById(id); if (button) button.classList.toggle('active', name === filter);
+  });
+  renderRelationReview();
+}
+
+function loadRelationReviews() {
+  var list = document.getElementById('relationReviewList');
+  if (list) list.innerHTML = '<div class="relation-review-empty">⏳ Memuat relasi data…</div>';
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { if (list) list.innerHTML = '<div class="relation-review-empty">Gagal memuat: ' + _escapeHtmlAppraisal((res && res.error) || 'Kesalahan tidak diketahui') + '<br><button class="btn-submit" type="button" onclick="loadRelationReviews()" style="margin-top:10px;">Coba Lagi</button></div>'; return; }
+    _relationReviewRows = res.relations || [];
+    renderRelationReview();
+  }).withFailureHandler(function(error) {
+    if (list) list.innerHTML = '<div class="relation-review-empty">Gagal memuat: ' + _escapeHtmlAppraisal(error.message || String(error)) + '<br><button class="btn-submit" type="button" onclick="loadRelationReviews()" style="margin-top:10px;">Coba Lagi</button></div>';
+  }).getDataRelations(activeUsername);
+}
+
+function openRelationReview() {
+  if (activeRole !== 'Admin' && activeRole !== 'Superadmin') { toast('Hanya Admin atau Superadmin yang dapat mereview relasi data.', 'error'); return; }
+  document.getElementById('relationReviewOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setRelationReviewFilter('pending');
+  loadRelationReviews();
+}
+
+function closeRelationReview() {
+  document.getElementById('relationReviewOverlay').classList.remove('open');
+  if (!document.querySelector('.modal-overlay.open') && !document.querySelector('.measure-overlay.open')) document.body.style.overflow = '';
+}
+
+function saveRelationReviewByIndex(index, reject) {
+  var relation = _relationRenderedRows[index]; if (!relation) return;
+  var typeField = document.querySelector('.relation-final-type[data-index="' + index + '"]');
+  var noteField = document.querySelector('.relation-review-note[data-index="' + index + '"]');
+  var finalType = typeField ? typeField.value : relation.proposedType;
+  var note = noteField ? noteField.value.trim() : '';
+  var action = reject ? 'REJECT' : (finalType === relation.proposedType ? 'CONFIRM' : 'RECLASSIFY');
+  if ((action === 'REJECT' || action === 'RECLASSIFY') && note.length < 5) { toast('Catatan reviewer minimal 5 karakter untuk perubahan atau penolakan.', 'error'); if (noteField) noteField.focus(); return; }
+  if (reject && !window.confirm('Tolak hubungan data ini? Data utama tetap tersimpan dan tidak akan dihapus.')) return;
+  var card = typeField && typeField.closest('.relation-review-card');
+  if (card) card.querySelectorAll('button,select,textarea').forEach(function(control) { control.disabled = true; });
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) {
+      if (card) card.querySelectorAll('button,select,textarea').forEach(function(control) { control.disabled = false; });
+      toast((res && res.error) || 'Gagal menyimpan keputusan review.', 'error'); return;
+    }
+    var rowIndex = _relationReviewRows.findIndex(function(item) { return item.relationId === relation.relationId; });
+    if (rowIndex >= 0) _relationReviewRows[rowIndex] = res.relation;
+    toast(reject ? 'Relasi ditolak. Data utama tetap dipertahankan.' : 'Keputusan relasi berhasil disimpan.', 'success');
+    renderRelationReview();
+  }).withFailureHandler(function(error) {
+    if (card) card.querySelectorAll('button,select,textarea').forEach(function(control) { control.disabled = false; });
+    toast('Gagal: ' + (error.message || String(error)), 'error');
+  }).reviewDataRelation({ relationId:relation.relationId, action:action, finalType:finalType, note:note }, activeUsername);
 }
 
 function _resetDataSubmitButton(btn) {

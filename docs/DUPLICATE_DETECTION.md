@@ -35,7 +35,20 @@ Sheet dibuat otomatis melalui `setupSpreadsheet()` atau ketika hubungan pertama 
 
 Keputusan Surveyor berstatus **Menunggu Review**. Keputusan Admin atau Superadmin berstatus **Dikonfirmasi**. Pencatatan relasi tidak mengubah tanggal data pasar dan tidak membuat dua observasi dari properti yang sama otomatis dihitung sebagai dua pembanding independen.
 
+## Review relasi oleh Admin
+
+Admin dan Superadmin memperoleh menu **Review Relasi** pada desktop maupun menu tindakan mobile. Antrean menampilkan data aktif/baru dan data existing secara berdampingan, termasuk status serta waktu data, harga, luas, sumber, skor, indikator, alasan, dan pengguna yang mengajukan.
+
+Reviewer dapat:
+
+1. mengonfirmasi klasifikasi yang diajukan Surveyor;
+2. mengubah klasifikasi menjadi kejadian pasar baru, sumber berbeda, data pasar yang sama/duplikat, atau properti berbeda dengan catatan;
+3. menolak hubungan dengan alasan.
+
+Perubahan klasifikasi dan penolakan membutuhkan catatan minimal lima karakter. Penolakan hanya mengubah status pada `Relasi_Data`; data utama tetap dipertahankan. Klasifikasi **data pasar yang sama/duplikat** juga tidak menghapus atau menggabungkan data otomatis, sehingga tindakan koreksi berikutnya tetap memerlukan keputusan terpisah dan jejak audit.
+
+Kolom review tambahan dibuat otomatis: `Jenis Hubungan Final`, `Direview Oleh`, `Waktu Review`, dan `Catatan Review`. Data relasi lama tetap dapat dibaca dan kolom barunya dibiarkan kosong sampai direview.
+
 ## Catatan pemasangan
 
-Perubahan membutuhkan deployment ulang `Backend/Code.gs` karena menambahkan action API `findDuplicateCandidates` dan argumen keputusan pada `addData`/`editData`. Setelah backend dipasang, deploy frontend `index.html`, lalu jalankan `setupSpreadsheet()` sekali jika ingin membuat sheet `Relasi_Data` sebelum hubungan pertama tercatat.
-
+Perubahan membutuhkan deployment ulang `Backend/Code.gs` karena menambahkan action API `findDuplicateCandidates`, `getDataRelations`, `reviewDataRelation`, serta argumen keputusan pada `addData`/`editData`. Setelah backend dipasang, deploy frontend `index.html`, lalu jalankan `setupSpreadsheet()` sekali untuk memperbarui header `Relasi_Data`. Pembukaan antrean review juga akan melengkapi header secara otomatis.

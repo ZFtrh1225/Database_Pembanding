@@ -58,6 +58,8 @@ function _dispatchApiAction_(action, args) {
   if (action === 'findDuplicateCandidates') return findDuplicateCandidates(args[0], args[1], args[2]);
   if (action === 'addData') return addData(args[0], args[1], args[2]);
   if (action === 'editData') return editData(args[0], args[1], args[2], args[3]);
+  if (action === 'getDataRelations') return getDataRelations(args[0], args[1]);
+  if (action === 'reviewDataRelation') return reviewDataRelation(args[0], args[1]);
   if (action === 'uploadFoto') return uploadFoto(args[0], args[1]);
   if (action === 'updateFoto') return updateFoto(args[0], args[1]);
   if (action === 'getFilterOptions') return getFilterOptions();
@@ -365,7 +367,8 @@ function _dataRelationHeaders_() {
   return [
     "Relation ID", "Data Aktif ID", "Koordinat Data Aktif", "Data Existing ID",
     "Koordinat Existing", "Jenis Hubungan", "Skor Kemiripan", "Indikator",
-    "Alasan", "Status Review", "Diputuskan Oleh", "Role", "Waktu Keputusan", "Sumber Aksi"
+    "Alasan", "Status Review", "Diputuskan Oleh", "Role", "Waktu Keputusan", "Sumber Aksi",
+    "Jenis Hubungan Final", "Direview Oleh", "Waktu Review", "Catatan Review"
   ];
 }
 
@@ -374,12 +377,10 @@ function _ensureDataRelationSheetUnlocked_() {
   let sheet = ss.getSheetByName(DATA_RELATION_SHEET);
   const headers = _dataRelationHeaders_();
   if (!sheet) sheet = ss.insertSheet(DATA_RELATION_SHEET);
-  if (!sheet.getRange(1, 1).getValue()) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length)
-      .setBackground("#0f766e").setFontColor("#ffffff").setFontWeight("bold");
-    sheet.setFrozenRows(1);
-  }
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground("#0f766e").setFontColor("#ffffff").setFontWeight("bold");
+  sheet.setFrozenRows(1);
   return sheet;
 }
 
@@ -1067,13 +1068,184 @@ function _recordDataRelation_(activeRow, resolvedDecision, activeUser, role, sou
     return item.label + " (+" + item.points + ")" + (item.detail ? " " + item.detail : "");
   }).join("; ");
   const reviewStatus = role === "Surveyor" ? "Menunggu Review" : "Dikonfirmasi";
+  const reviewedBy = role === "Surveyor" ? "" : String(activeUser || "");
+  const reviewedAt = role === "Surveyor" ? "" : now;
+  const finalRelationType = role === "Surveyor" ? "" : resolvedDecision.relationType;
   const relationRow = [
     relationId, String(activeRow[0] || ""), String(activeRow[3] || ""),
     candidate.id, candidate.koordinat, resolvedDecision.relationType, candidate.score,
-    indicatorText, resolvedDecision.reason, reviewStatus, String(activeUser || ""), role, now, sourceAction
+    indicatorText, resolvedDecision.reason, reviewStatus, String(activeUser || ""), role, now, sourceAction,
+    finalRelationType, reviewedBy, reviewedAt, role === "Surveyor" ? "" : "Dikonfirmasi saat input."
   ];
   const sheet = _ensureDataRelationSheet_();
   sheet.appendRow(relationRow);
+}
+
+function _requireRelationReviewer_(username) {
+  const role = _getUserRole_(username);
+  if (role !== "Admin" && role !== "Superadmin") {
+    throw new Error("Hanya Admin atau Superadmin yang dapat mereview relasi data.");
+  }
+  return role;
+}
+
+function _relationKey_(id, coordinate) {
+  return String(id || "").trim().toLowerCase() + "|" + _normalizeReviewCoord_(coordinate);
+}
+
+function _relationRecordSummary_(record) {
+  if (!record) return null;
+  return {
+    id: record.id,
+    koordinat: record.koordinat,
+    alamat: record.alamat,
+    kota: record.kota,
+    provinsi: record.provinsi,
+    objek: record.objek,
+    legalitas: record.legalitas,
+    luasTanah: record.luasTanah,
+    luasBangunan: record.luasBangunan,
+    harga: _str(record.harga),
+    statusHarga: record.statusHarga,
+    waktuData: record.waktuData,
+    sumber: record.sumber,
+    hp: record.hp
+  };
+}
+
+function _relationDataLookup_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const lookup = {};
+  if (!sheet || sheet.getLastRow() < 2) return lookup;
+  const columnCount = Math.max(27, Math.min(sheet.getLastColumn(), 28));
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, columnCount).getValues();
+  rows.forEach(function(row, index) {
+    const record = _duplicateRecordFromRow_(row, index + 2);
+    if (record.id) lookup[_relationKey_(record.id, record.koordinat)] = record;
+  });
+  return lookup;
+}
+
+function _dataRelationFromRow_(row, dataLookup) {
+  const activeKey = _relationKey_(row[1], row[2]);
+  const existingKey = _relationKey_(row[3], row[4]);
+  const proposedType = String(row[5] || "");
+  const status = String(row[9] || "Menunggu Review");
+  return {
+    relationId: String(row[0] || ""),
+    activeId: String(row[1] || ""),
+    activeCoord: String(row[2] || ""),
+    existingId: String(row[3] || ""),
+    existingCoord: String(row[4] || ""),
+    proposedType: proposedType,
+    score: Number(row[6]) || 0,
+    indicators: String(row[7] || ""),
+    reason: String(row[8] || ""),
+    status: status,
+    submittedBy: String(row[10] || ""),
+    submittedRole: String(row[11] || ""),
+    submittedAt: _reviewDateText_(row[12]),
+    sourceAction: String(row[13] || ""),
+    finalType: String(row[14] || ""),
+    reviewedBy: String(row[15] || ""),
+    reviewedAt: _reviewDateText_(row[16]),
+    reviewNote: String(row[17] || ""),
+    activeData: _relationRecordSummary_(dataLookup[activeKey]),
+    existingData: _relationRecordSummary_(dataLookup[existingKey]),
+    _sortAt: row[12] instanceof Date ? row[12].getTime() : 0
+  };
+}
+
+function getDataRelations(activeUser, options) {
+  try {
+    _requireRelationReviewer_(activeUser);
+    const sheet = _ensureDataRelationSheet_();
+    if (sheet.getLastRow() < 2) return { success: true, relations: [], pendingCount: 0, total: 0 };
+    if (options && options.summaryOnly) {
+      const statuses = sheet.getRange(2, 10, sheet.getLastRow() - 1, 1).getValues();
+      return {
+        success: true,
+        relations: [],
+        pendingCount: statuses.filter(function(row) { return String(row[0] || "") === "Menunggu Review"; }).length,
+        total: statuses.length
+      };
+    }
+    const width = _dataRelationHeaders_().length;
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getValues();
+    const dataLookup = _relationDataLookup_();
+    const relations = rows.map(function(row) { return _dataRelationFromRow_(row, dataLookup); })
+      .filter(function(item) { return item.relationId; })
+      .sort(function(a, b) {
+        const pendingOrder = (a.status === "Menunggu Review" ? 0 : 1) - (b.status === "Menunggu Review" ? 0 : 1);
+        return pendingOrder || b._sortAt - a._sortAt;
+      });
+    relations.forEach(function(item) { delete item._sortAt; });
+    return {
+      success: true,
+      relations: relations.slice(0, 250),
+      pendingCount: relations.filter(function(item) { return item.status === "Menunggu Review"; }).length,
+      total: relations.length
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+function reviewDataRelation(payload, activeUser) {
+  try {
+    const reviewerRole = _requireRelationReviewer_(activeUser);
+    payload = payload || {};
+    const relationId = String(payload.relationId || "").trim();
+    const action = String(payload.action || "").trim().toUpperCase();
+    const note = String(payload.note || "").trim();
+    if (!relationId) throw new Error("Relation ID wajib tersedia.");
+    if (["CONFIRM", "RECLASSIFY", "REJECT"].indexOf(action) === -1) throw new Error("Keputusan review tidak valid.");
+    if ((action === "RECLASSIFY" || action === "REJECT") && note.length < 5) {
+      throw new Error("Catatan review minimal 5 karakter untuk perubahan atau penolakan.");
+    }
+    if (note.length > 500) throw new Error("Catatan review maksimal 500 karakter.");
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    let updatedRow;
+    try {
+      const sheet = _ensureDataRelationSheetUnlocked_();
+      if (sheet.getLastRow() < 2) throw new Error("Relasi data tidak ditemukan.");
+      const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+      let rowIndex = -1;
+      for (let index = 0; index < ids.length; index++) {
+        if (String(ids[index][0] || "").trim() === relationId) { rowIndex = index + 2; break; }
+      }
+      if (rowIndex === -1) throw new Error("Relasi data tidak ditemukan.");
+      const width = _dataRelationHeaders_().length;
+      const row = sheet.getRange(rowIndex, 1, 1, width).getValues()[0];
+      const proposedType = String(row[5] || "");
+      let finalType = proposedType;
+      let status = "Dikonfirmasi";
+      if (action === "RECLASSIFY") {
+        finalType = String(payload.finalType || "").trim();
+        if (DUPLICATE_RELATION_TYPES.indexOf(finalType) === -1) throw new Error("Klasifikasi akhir tidak valid.");
+      } else if (action === "REJECT") {
+        finalType = "";
+        status = "Ditolak";
+      }
+      row[9] = status;
+      row[14] = finalType;
+      row[15] = String(activeUser || "");
+      row[16] = new Date();
+      row[17] = note || (action === "CONFIRM" ? "Klasifikasi dikonfirmasi." : "");
+      sheet.getRange(rowIndex, 1, 1, width).setValues([row]);
+      SpreadsheetApp.flush();
+      updatedRow = row;
+    } finally {
+      lock.releaseLock();
+    }
+
+    logActivity(activeUser, "Review Relasi Data " + relationId + " (" + action + ", " + reviewerRole + ")");
+    return { success: true, relation: _dataRelationFromRow_(updatedRow, _relationDataLookup_()) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
 function addData(rowData, activeUser, duplicateDecision) {
