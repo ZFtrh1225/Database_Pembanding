@@ -7998,8 +7998,6 @@ var _mDpIds  = ['1','2','3','4','5','6'];
 var _mLinesVisible = true;
 var _mRouteRunId = 0;
 
-// Warna pin & rute per ID — warna lebih kontras & tebal agar terlihat jelas
-var _mColors = { obj:'#db4437','1':'#db4437','2':'#db4437','3':'#db4437','4':'#db4437','5':'#db4437','6':'#db4437' };
 // Warna garis rute (Google Maps) & garis putus-putus (OSM) — saturasi tinggi & kontras tinggi
 var _mRouteColors = { '1':'#e60023','2':'#0066ff','3':'#ff6600','4':'#9c00ff','5':'#00a020','6':'#ff0088' };
 
@@ -8140,6 +8138,7 @@ function _mInitMap() {
     _mProcess(id);
     _mRedraw();
   });
+  _mMap.addListener('zoom_changed', _mSyncGoogleMarkerScale);
 
   setTimeout(function(){ google.maps.event.trigger(_mMap, 'resize'); }, 200);
 }
@@ -8216,31 +8215,54 @@ function _mClearLayers() {
   _mMks = {}; _mLbls = {}; _mRoutes = {};
 }
 
-// ── PIN MARKER (gaya Google Maps merah, label OBJ/DP1) ───
-function _mMakePin(coord, color, label, isObj) {
-  if (!_mMap) return null;
-  var s = isObj ? 46 : 40, hs = s/2;
-  // Pin SVG dengan bentuk khas Google Maps (teardrop)
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+s+'" height="'+(s+8)+'" viewBox="0 0 '+s+' '+(s+8)+'">'
-    +'<defs><filter id="sd" x="-20%" y="-10%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,.45)"/></filter></defs>'
-    +'<ellipse cx="'+hs+'" cy="'+(s+5)+'" rx="'+(s*0.20)+'" ry="3.5" fill="rgba(0,0,0,.28)"/>'
-    +'<path d="M'+hs+' 0 C'+(s*.22)+' 0 0 '+(s*.22)+' 0 '+hs+' C0 '+(s*.78)+' '+hs+' '+s+' '+hs+' '+s+' C'+hs+' '+s+' '+s+' '+(s*.78)+' '+s+' '+hs+' C'+s+' '+(s*.22)+' '+(s*.78)+' 0 '+hs+' 0z" fill="'+color+'" filter="url(#sd)" stroke="white" stroke-width="2"/>'
-    +'<circle cx="'+hs+'" cy="'+hs+'" r="'+(hs*.5)+'" fill="white" opacity=".95"/>'
-    +'<text x="'+hs+'" y="'+(hs+3.5)+'" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="'+(isObj?8:8)+'" font-weight="800" fill="'+color+'">'+label+'</text>'
-    +'</svg>';
+function _mPinScaleForZoom(zoom) {
+  return Math.max(0.78, Math.min(1.28, 1 + ((Number(zoom) || 14) - 14) * 0.08));
+}
 
+function _mPinDimensions(zoom, isObj) {
+  var width = Math.round((isObj ? 44 : 38) * _mPinScaleForZoom(zoom));
+  var height = Math.round(width * 60 / 48);
+  return { width:width, height:height, tipY:Math.round(height * 56 / 60) };
+}
+
+function _mPinSvg(color) {
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 48 60">'
+    + '<defs><filter id="pinShadow" x="-25%" y="-15%" width="150%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".35"/></filter></defs>'
+    + '<ellipse cx="24" cy="57" rx="8" ry="2.5" fill="#000" opacity=".22"/>'
+    + '<path d="M24 2C11.7 2 3 11.2 3 23.2C3 38.1 24 56 24 56S45 38.1 45 23.2C45 11.2 36.3 2 24 2Z" fill="'+color+'" stroke="#fff" stroke-width="2.4" filter="url(#pinShadow)"/>'
+    + '<circle cx="24" cy="23" r="8.2" fill="#fff"/>'
+    + '</svg>';
+}
+
+function _mBuildGooglePinIcon(color, isObj, zoom) {
+  var size = _mPinDimensions(zoom, isObj);
+  return {
+    url:'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(_mPinSvg(color)),
+    scaledSize:new google.maps.Size(size.width, size.height),
+    anchor:new google.maps.Point(size.width / 2, size.tipY)
+  };
+}
+
+function _mSyncGoogleMarkerScale() {
+  if (!_mMap) return;
+  var zoom = _mMap.getZoom();
+  Object.keys(_mMks).forEach(function(id) {
+    var marker = _mMks[id], meta = marker && marker._mPinMeta;
+    if (meta && typeof marker.setIcon === 'function') marker.setIcon(_mBuildGooglePinIcon(meta.color, meta.isObj, zoom));
+  });
+}
+
+// ── PIN MARKER GAYA GOOGLE MAPS, TANPA TEKS DI DALAM PIN ───
+function _mMakePin(coord, color, title, isObj) {
+  if (!_mMap) return null;
   var marker = new google.maps.Marker({
     position: coord,
     map: _mMap,
-    icon: {
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-      scaledSize: new google.maps.Size(s, s+8),
-      // The pin tip is at y=s; the remaining 8px is only the SVG shadow.
-      anchor: new google.maps.Point(hs, s)
-    },
-    title: label,
+    icon:_mBuildGooglePinIcon(color, isObj, _mMap.getZoom()),
+    title:title,
     zIndex: isObj ? 1000 : 500
   });
+  marker._mPinMeta = { color:color, isObj:!!isObj };
   return marker;
 }
 
@@ -8257,7 +8279,7 @@ function _mMakeLabel(coord, dpId) {
     div.style.position = 'absolute';
     // Geser ke atas pin: anchor di bawah-tengah label, lalu naik dari titik pin
     div.style.transform = 'translate(-50%, -100%)';
-    div.style.marginTop = '-52px';
+    div.style.marginTop = '-' + (_mPinDimensions(_mMap.getZoom(), false).tipY + 8) + 'px';
     div.innerHTML = '<div class="mdl-title">Data '+dpId+'</div>';
     overlay._div = div;
     this.getPanes().floatPane.appendChild(div);
@@ -8265,7 +8287,10 @@ function _mMakeLabel(coord, dpId) {
   overlay.draw = function() {
     var proj = this.getProjection(); if (!proj || !this._div) return;
     var pos = proj.fromLatLngToDivPixel(new google.maps.LatLng(labelCoord.lat, labelCoord.lng));
-    if (pos) { this._div.style.left = pos.x + 'px'; this._div.style.top = pos.y + 'px'; }
+    if (pos) {
+      this._div.style.left = pos.x + 'px'; this._div.style.top = pos.y + 'px';
+      this._div.style.marginTop = '-' + (_mPinDimensions(_mMap.getZoom(), false).tipY + 8) + 'px';
+    }
   };
   overlay.onRemove = function() { if (this._div && this._div.parentNode) this._div.parentNode.removeChild(this._div); this._div = null; };
   overlay.setMap(_mMap);
@@ -8281,7 +8306,7 @@ function _mMakeObjLabel(coord) {
     div.className = 'mdist-label';
     div.style.position = 'absolute';
     div.style.transform = 'translate(-50%, -100%)';
-    div.style.marginTop = '-52px';
+    div.style.marginTop = '-' + (_mPinDimensions(_mMap.getZoom(), true).tipY + 8) + 'px';
     div.innerHTML = '<div class="mdl-title" style="color:#db4437; font-size:11px; margin-bottom:0;">Objek Penilaian</div>';
     overlay._div = div;
     this.getPanes().floatPane.appendChild(div);
@@ -8289,7 +8314,10 @@ function _mMakeObjLabel(coord) {
   overlay.draw = function() {
     var proj = this.getProjection(); if (!proj || !this._div) return;
     var pos = proj.fromLatLngToDivPixel(new google.maps.LatLng(coord.lat, coord.lng));
-    if (pos) { this._div.style.left = pos.x + 'px'; this._div.style.top = pos.y + 'px'; }
+    if (pos) {
+      this._div.style.left = pos.x + 'px'; this._div.style.top = pos.y + 'px';
+      this._div.style.marginTop = '-' + (_mPinDimensions(_mMap.getZoom(), true).tipY + 8) + 'px';
+    }
   };
   overlay.onRemove = function() { if (this._div && this._div.parentNode) this._div.parentNode.removeChild(this._div); this._div = null; };
   overlay.setMap(_mMap);
@@ -8503,7 +8531,7 @@ function _mRedraw() {
   var summaryData = [];     // dipakai untuk ringkasan setelah semua rute selesai
 
   if (cObj) {
-    _mMks['obj'] = _mMakePin(cObj, '#db4437', 'OBJ', true);
+    _mMks['obj'] = _mMakePin(cObj, '#db4437', 'Objek Penilaian', true);
     _mLbls['obj'] = _mMakeObjLabel(cObj);
     bounds.extend(cObj); hasBounds = true;
   }
@@ -8516,7 +8544,7 @@ function _mRedraw() {
     var distEl = document.getElementById('mDist_'+id);
     if (!coord) { _mSetDistanceState(distEl, '–', false, ''); return; }
 
-    _mMks[id] = _mMakePin(coord, '#db4437', 'DP'+id, false);
+    _mMks[id] = _mMakePin(coord, _mRouteColors[id] || '#0033ff', 'Data '+id, false);
     bounds.extend(coord); hasBounds = true;
     activeDps.push({ id: id, coord: coord, distEl: distEl });
   });
@@ -8749,6 +8777,7 @@ function _mInitMeasureOsm() {
     _mProcess(id);
     _mOsmRedraw();
   });
+  _mOsmMap.on('zoomend', _mSyncOsmMarkerScale);
 
   setTimeout(function() { _mOsmMap.invalidateSize(); }, 200);
 }
@@ -8764,22 +8793,41 @@ function _mOsmClearLayers() {
   _mOsmLabels = [];
 }
 
-// Buat marker icon SVG untuk OSM
-function _mOsmMakeIcon(color, label, isObj) {
-  var s = isObj ? 42 : 36;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+s+'" height="'+(s+8)+'" viewBox="0 0 '+s+' '+(s+8)+'">'
-    +'<ellipse cx="'+(s/2)+'" cy="'+(s+5)+'" rx="'+(s*0.18)+'" ry="3" fill="rgba(0,0,0,.3)"/>'
-    +'<path d="M'+(s/2)+' 0 C'+(s*.22)+' 0 0 '+(s*.22)+' 0 '+(s/2)+' C0 '+(s*.78)+' '+(s/2)+' '+s+' '+(s/2)+' '+s+' C'+(s/2)+' '+s+' '+s+' '+(s*.78)+' '+s+' '+(s/2)+' C'+s+' '+(s*.22)+' '+(s*.78)+' 0 '+(s/2)+' 0z" fill="'+color+'" stroke="white" stroke-width="2"/>'
-    +'<circle cx="'+(s/2)+'" cy="'+(s/2)+'" r="'+(s/2*.45)+'" fill="white" opacity=".95"/>'
-    +'<text x="'+(s/2)+'" y="'+(s/2+3)+'" text-anchor="middle" font-family="Plus Jakarta Sans,sans-serif" font-size="7" font-weight="800" fill="'+color+'">'+label+'</text>'
-    +'</svg>';
-
+// Marker OSM memakai bentuk dan skala yang sama dengan Google Maps.
+function _mOsmMakeIcon(color, isObj, zoom) {
+  var size = _mPinDimensions(typeof zoom === 'number' ? zoom : (_mOsmMap ? _mOsmMap.getZoom() : 14), isObj);
   return L.divIcon({
-    html: svg,
+    html:_mPinSvg(color),
     className: '',
-    iconSize: [s, s + 8],
-    iconAnchor: [s / 2, s + 8],
-    popupAnchor: [0, -(s + 8)]
+    iconSize:[size.width, size.height],
+    iconAnchor:[size.width / 2, size.tipY],
+    popupAnchor:[0, -size.tipY]
+  });
+}
+
+function _mOsmMakeLabelIcon(text, color, isObj, zoom) {
+  var width = isObj ? 140 : 90, height = isObj ? 30 : 28;
+  var pinSize = _mPinDimensions(typeof zoom === 'number' ? zoom : (_mOsmMap ? _mOsmMap.getZoom() : 14), isObj);
+  var style = isObj ? ' style="color:'+color+';font-size:11px;margin-bottom:0;"' : '';
+  return L.divIcon({
+    html:'<div class="mdist-label'+(isObj ? '' : ' data-only')+'" style="transform:none;margin:0;">'
+      + '<div class="mdl-title"'+style+'>'+text+'</div></div>',
+    className:'',
+    iconSize:[width, height],
+    iconAnchor:[width / 2, height + pinSize.tipY + 8]
+  });
+}
+
+function _mSyncOsmMarkerScale() {
+  if (!_mOsmMap) return;
+  var zoom = _mOsmMap.getZoom();
+  _mOsmMarkers.forEach(function(marker) {
+    var meta = marker && marker._mPinMeta;
+    if (meta && typeof marker.setIcon === 'function') marker.setIcon(_mOsmMakeIcon(meta.color, meta.isObj, zoom));
+  });
+  _mOsmLabels.forEach(function(marker) {
+    var meta = marker && marker._mLabelMeta;
+    if (meta && typeof marker.setIcon === 'function') marker.setIcon(_mOsmMakeLabelIcon(meta.text, meta.color, meta.isObj, zoom));
   });
 }
 
@@ -8798,21 +8846,16 @@ function _mOsmRedraw() {
 
   // Marker OBJ + label "Objek Penilaian" di atas pin
   if (cObj) {
-    var mObj = L.marker([cObj.lat, cObj.lng], { icon: _mOsmMakeIcon('#db4437', 'OBJ', true), zIndexOffset: 1000 }).addTo(_mOsmMap);
+    var mObj = L.marker([cObj.lat, cObj.lng], { icon: _mOsmMakeIcon('#db4437', true), zIndexOffset: 1000 }).addTo(_mOsmMap);
+    mObj._mPinMeta = { color:'#db4437', isObj:true };
     _mOsmMarkers.push(mObj);
     bounds.push([cObj.lat, cObj.lng]);
 
     // Label "Objek Penilaian" di atas marker OBJ
-    var objLabelHtml = '<div class="mdist-label" style="transform:none;margin:0;">'
-      + '<div class="mdl-title" style="color:#db4437; font-size:11px; margin-bottom:0;">Objek Penilaian</div></div>';
-    var objLabelIcon = L.divIcon({
-      html: objLabelHtml,
-      className: '',
-      iconSize: [140, 30],
-      // anchor di tengah-bawah label dengan offset, sehingga label muncul di atas pin OBJ
-      iconAnchor: [70, 88]
-    });
-    var objLabelMarker = L.marker([cObj.lat, cObj.lng], { icon: objLabelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
+    var objLabelMarker = L.marker([cObj.lat, cObj.lng], {
+      icon:_mOsmMakeLabelIcon('Objek Penilaian', '#db4437', true), interactive:false, zIndexOffset:2000
+    }).addTo(_mOsmMap);
+    objLabelMarker._mLabelMeta = { text:'Objek Penilaian', color:'#db4437', isObj:true };
     _mOsmLabels.push(objLabelMarker);
   }
 
@@ -8824,7 +8867,8 @@ function _mOsmRedraw() {
     if (!coord) { _mSetDistanceState(distEl, '–', false, ''); return; }
 
     var color = _mRouteColors[id] || '#0033ff';
-    var mDp = L.marker([coord.lat, coord.lng], { icon: _mOsmMakeIcon('#db4437', 'DP' + id, false), zIndexOffset: 500 }).addTo(_mOsmMap);
+    var mDp = L.marker([coord.lat, coord.lng], { icon: _mOsmMakeIcon(color, false), zIndexOffset: 500 }).addTo(_mOsmMap);
+    mDp._mPinMeta = { color:color, isObj:false };
     _mOsmMarkers.push(mDp);
     bounds.push([coord.lat, coord.lng]);
 
@@ -8847,17 +8891,11 @@ function _mOsmRedraw() {
       if (_mLinesVisible) line.addTo(_mOsmMap);
       _mOsmLines.push(line);
 
-      // Label ringkas di atas pin; jarak lengkap tetap tersedia di panel/ringkasan.
-      var labelHtml = '<div class="mdist-label data-only" style="transform:none;margin:0;">'
-        + '<div class="mdl-title">Data ' + id + '</div></div>';
-      var labelIcon = L.divIcon({
-        html: labelHtml,
-        className: '',
-        iconSize: [90, 28],
-        // anchor di tengah-bawah label, sehingga label muncul di atas pin DP
-        iconAnchor: [45, 80]
-      });
-      var labelMarker = L.marker([coord.lat, coord.lng], { icon: labelIcon, interactive: false, zIndexOffset: 2000 }).addTo(_mOsmMap);
+      // Posisi label mengikuti tinggi pin supaya jaraknya konsisten pada setiap zoom.
+      var labelMarker = L.marker([coord.lat, coord.lng], {
+        icon:_mOsmMakeLabelIcon('Data ' + id, color, false), interactive:false, zIndexOffset:2000
+      }).addTo(_mOsmMap);
+      labelMarker._mLabelMeta = { text:'Data ' + id, color:color, isObj:false };
       _mOsmLabels.push(labelMarker);
 
       summaryData.push({ id: id, dist: ds + ' (lurus)', meters: meters, color: color });
