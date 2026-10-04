@@ -163,6 +163,34 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .duplicate-candidate-signals { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
 .duplicate-signal { padding:3px 6px; border-radius:10px; background:#f1f5f9; color:#475569; font-size:9px; font-weight:700; }
 .duplicate-score { min-width:52px; padding:5px 7px; border-radius:9px; background:#fef3c7; color:#92400e; text-align:center; font-size:10px; font-weight:800; }
+.survey-capture-panel { display:none; margin-bottom:14px; padding:12px; border:1px solid #7dd3fc; border-radius:12px; background:linear-gradient(135deg,#f0f9ff,#ecfeff); }
+.survey-capture-panel.show { display:block; }
+.survey-capture-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.survey-capture-head strong { display:block; color:#075985; font-size:12px; }
+.survey-capture-head small { display:block; margin-top:3px; color:#0369a1; font-size:10px; line-height:1.4; }
+.survey-gps-button { flex:none; min-height:40px; padding:8px 11px; border:0; border-radius:9px; background:#0284c7; color:#fff; font:700 11px var(--font); cursor:pointer; }
+.survey-meta-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px; }
+.survey-meta-item { min-width:0; padding:8px; border:1px solid #bae6fd; border-radius:8px; background:rgba(255,255,255,.8); }
+.survey-meta-item span { display:block; color:#64748b; font-size:9px; }
+.survey-meta-item strong { display:block; margin-top:3px; color:#0c4a6e; font-size:10.5px; overflow-wrap:anywhere; }
+.survey-photo-note { margin-top:9px; color:#0c4a6e; font-size:10px; line-height:1.45; }
+.survey-workspace-summary { margin-bottom:12px; padding:10px 12px; border:1px solid #bae6fd; border-radius:10px; background:#f0f9ff; color:#0c4a6e; font-size:11px; line-height:1.5; }
+.survey-workspace-list { display:grid; gap:10px; }
+.survey-empty { padding:24px; border:1px dashed #94a3b8; border-radius:12px; color:var(--text-sub); text-align:center; font-size:11px; line-height:1.5; }
+.survey-card { display:grid; grid-template-columns:112px minmax(0,1fr); gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff; }
+.survey-card-photo { width:112px; height:92px; border-radius:9px; object-fit:cover; background:#e2e8f0; }
+.survey-card-photo.empty { display:grid; place-items:center; color:#64748b; font-size:28px; }
+.survey-card-head { display:flex; justify-content:space-between; gap:9px; align-items:flex-start; }
+.survey-card-head strong { color:var(--navy); font-size:12px; }
+.survey-status { flex:none; padding:4px 7px; border-radius:10px; background:#f1f5f9; color:#475569; font-size:9px; font-weight:800; }
+.survey-status.pending { background:#fef3c7; color:#92400e; }
+.survey-status.approved { background:#dcfce7; color:#166534; }
+.survey-status.rejected { background:#fee2e2; color:#991b1b; }
+.survey-card-meta { margin-top:5px; color:var(--text-sub); font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
+.survey-card-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+.survey-card-actions button { min-height:35px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--navy); font:700 10px var(--font); cursor:pointer; }
+.survey-card-actions .approve { border-color:#16a34a; background:#16a34a; color:#fff; }
+.survey-card-actions .reject { border-color:#fecaca; background:#fff1f2; color:#be123c; }
 .duplicate-score.high { background:#fee2e2; color:#991b1b; }
 .duplicate-decision-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding-top:13px; border-top:1px solid var(--border); }
 .duplicate-decision-grid .span-2 { grid-column:1/-1; }
@@ -1465,6 +1493,12 @@ body.mmode-picking .mpick-hint { display: flex; }
   .mobile-nav-icon-wrap { position:relative; }
   #mobileFilterBadge { display:none; position:absolute; right:-10px; top:-8px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--red); color:#fff; font:700 9px/17px var(--font); }
   #mobileFilterBadge.show { display:block; }
+  #mobileSurveyBadge { display:none; position:absolute; right:-12px; top:-8px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#f59e0b; color:#fff; font:700 9px/17px var(--font); }
+  #mobileSurveyBadge.show { display:block; }
+  .mobile-bottom-nav.survey-enabled { grid-template-columns:repeat(5,1fr); }
+  .survey-meta-grid { grid-template-columns:1fr; }
+  .survey-card { grid-template-columns:84px minmax(0,1fr); padding:10px; gap:10px; }
+  .survey-card-photo { width:84px; height:84px; }
 
   .filter-backdrop { inset: var(--mobile-topbar) 0 var(--mobile-nav) 0; }
   .panel-filter {
@@ -1678,6 +1712,7 @@ body.mmode-picking .mpick-hint { display: flex; }
       Measurement
     </button>
     <button class="btn-top btn-mob-hide" id="btnAddTop" onclick="openModalNew()">+ Tambah Data</button>
+    <button class="btn-top btn-mob-hide" id="btnFieldSurvey" style="display:none;" onclick="openFieldSurveyWorkspace()">📍 Survei <span id="fieldSurveyBadge"></span></button>
     <button class="btn-top primary btn-mob-hide" id="btnExport" onclick="exportData()">⬇ Export</button>
     <button class="btn-top btn-mob-hide" id="btnParameters" style="display:none;" onclick="openParameterManager()">⚙ Parameter</button>
     <button class="btn-top btn-mob-hide" id="btnRelationReview" style="display:none;" onclick="openRelationReview()">🔗 Review Relasi <span id="relationReviewBadge"></span></button>
@@ -1689,6 +1724,7 @@ body.mmode-picking .mpick-hint { display: flex; }
       </button>
       <div class="topbar-more-menu" id="topbarMoreMenu" role="menu" aria-hidden="true">
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); openModalNew();">➕ <span>Tambah Data</span></button>
+        <button class="topbar-more-item" id="btnFieldSurveyMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openFieldSurveyWorkspace();">📍 <span>Survei Lapangan</span><strong id="fieldSurveyBadgeMobile"></strong></button>
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); openMeasurement();">📐 <span>Measurement</span></button>
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); exportData();">⬇️ <span>Export</span></button>
         <button class="topbar-more-item" id="btnParametersMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openParameterManager();">⚙️ <span>Kelola Parameter</span></button>
@@ -1907,7 +1943,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   <button class="mobile-nav-btn active" id="mobileNavMap" type="button" onclick="mobileSetView('map')" aria-label="Tampilkan peta" aria-current="page"><span aria-hidden="true">🗺️</span><small>Peta</small></button>
   <button class="mobile-nav-btn" id="mobileNavTable" type="button" onclick="mobileSetView('table')" aria-label="Tampilkan daftar data"><span aria-hidden="true">☰</span><small>Data</small></button>
   <button class="mobile-nav-btn" id="mobileNavFilter" type="button" onclick="toggleSidebar()" aria-label="Buka filter"><span class="mobile-nav-icon-wrap" aria-hidden="true">⌁<b id="mobileFilterBadge"></b></span><small>Filter</small></button>
-  <button class="mobile-nav-btn mobile-nav-primary" id="mobileNavAdd" type="button" onclick="openModalNew()" aria-label="Tambah data baru"><span aria-hidden="true">＋</span><small>Tambah</small></button>
+  <button class="mobile-nav-btn" id="mobileNavAdd" type="button" onclick="openModalNew()" aria-label="Tambah data baru"><span aria-hidden="true">＋</span><small>Tambah</small></button>
+  <button class="mobile-nav-btn mobile-nav-primary" id="mobileNavSurvey" type="button" onclick="openFieldSurveyWorkspace()" aria-label="Mode survei lapangan"><span class="mobile-nav-icon-wrap" aria-hidden="true">📍<b id="mobileSurveyBadge"></b></span><small>Survei</small></button>
 </nav>
 
 <div class="modal-overlay" id="analyticsOverlay" onclick="if(event.target===this)closeAnalyticsModal()">
@@ -2357,6 +2394,18 @@ body.mmode-picking .mpick-hint { display: flex; }
         <div class="form-wizard-track" aria-hidden="true"><span id="formStepProgress"></span></div>
         <div class="form-wizard-tabs" id="formWizardTabs"></div>
       </div>
+      <section class="survey-capture-panel" id="surveyCapturePanel" aria-live="polite">
+        <div class="survey-capture-head">
+          <div><strong>📍 Bukti Survei Lapangan</strong><small>GPS dan waktu pengambilan dicatat sebagai metadata. Foto tampilan diberi watermark; foto asli tetap tanpa perubahan.</small></div>
+          <button class="survey-gps-button" id="btnCaptureSurveyGps" type="button" onclick="captureSurveyLocation()">Ambil GPS</button>
+        </div>
+        <div class="survey-meta-grid">
+          <div class="survey-meta-item"><span>Waktu pengambilan</span><strong id="surveyCapturedAtText">Belum diambil</strong></div>
+          <div class="survey-meta-item"><span>Koordinat GPS</span><strong id="surveyGpsText">Belum tersedia</strong></div>
+          <div class="survey-meta-item"><span>Akurasi</span><strong id="surveyAccuracyText">–</strong></div>
+        </div>
+        <div class="survey-photo-note">Gunakan kamera perangkat untuk bukti terbaik. Draf teks tersimpan otomatis di perangkat, tetapi foto harus dipilih kembali jika browser ditutup sebelum upload.</div>
+      </section>
       <div class="draft-banner" id="dataDraftBanner" hidden>
         <div><strong>Draf tersimpan ditemukan</strong><span>Form yang belum disimpan dapat dipulihkan.</span></div>
         <div class="draft-banner-actions"><button type="button" onclick="restoreDataDraft()">Pulihkan</button><button type="button" class="danger" onclick="discardDataDraft()">Hapus</button></div>
@@ -2409,7 +2458,26 @@ body.mmode-picking .mpick-hint { display: flex; }
       <button class="btn-reset" style="width:auto;padding:8px 20px; margin-top:0;" onclick="closeModal()">Batal</button>
       <button class="btn-reset mobile-form-action" id="btnFormBack" type="button" onclick="changeFormStep(-1)">← Kembali</button>
       <button class="btn-submit mobile-form-action" id="btnFormNext" type="button" onclick="changeFormStep(1)">Lanjut →</button>
+      <button class="btn-reset" id="btnSaveSurveyDraft" type="button" onclick="saveFieldSurveyDraft(false)" style="display:none;">Simpan Draf</button>
       <button class="btn-submit" id="btnSubmit" onclick="submitData()">💾 Simpan Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- RUANG KERJA SURVEI LAPANGAN -->
+<div class="modal-overlay" id="fieldSurveyOverlay" onclick="if(event.target===this)closeFieldSurveyWorkspace()">
+  <div class="modal" style="max-width:860px;">
+    <div class="modal-header">
+      <span class="modal-title">📍 Mode Survei Lapangan</span>
+      <button class="btn-close" type="button" onclick="closeFieldSurveyWorkspace()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="survey-workspace-summary" id="fieldSurveySummary">Survei menggunakan struktur Tambah Data yang sama, dengan GPS, waktu, kamera, draf, dan pemeriksaan duplikat sebelum diajukan.</div>
+      <div class="survey-workspace-list" id="fieldSurveyList"><div class="survey-empty">Memuat survei…</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-reset" type="button" onclick="closeFieldSurveyWorkspace()">Tutup</button>
+      <button class="btn-submit" id="btnNewFieldSurvey" type="button" onclick="openNewFieldSurvey()">＋ Survei Baru</button>
     </div>
   </div>
 </div>
@@ -2839,6 +2907,10 @@ class GasRunner {
   findDuplicateCandidates(rowData, user, excludeId) { this._call('findDuplicateCandidates', [rowData, user, excludeId]); }
   getDataRelations(user, options) { this._call('getDataRelations', [user, options]); }
   reviewDataRelation(payload, user) { this._call('reviewDataRelation', [payload, user]); }
+  saveFieldSurvey(payload, user) { this._call('saveFieldSurvey', [payload, user]); }
+  getFieldSurveys(user, options) { this._call('getFieldSurveys', [user, options]); }
+  reviewFieldSurvey(payload, user) { this._call('reviewFieldSurvey', [payload, user]); }
+  uploadSurveyPhotos(originalDataUrl, watermarkedDataUrl, baseName, user) { this._call('uploadSurveyPhotos', [originalDataUrl, watermarkedDataUrl, baseName, user]); }
 }
 
 var _googleMapsLoadPromise = null;
@@ -2906,6 +2978,10 @@ var _lastSearchParams = null, _qualityReviewUid = null;
 var QUALITY_TARGET_STORAGE_PREFIX = 'databasePembanding:qualityTarget:v1:';
 var _fotoDataUrl = null, _fotoFilename = null;
 var _editingId = null, _editingFoto = '';
+var _dataEntryMode = 'standard';
+var _fieldSurveyRows = [], _editingSurveyId = null;
+var _surveyOriginalPhotoDataUrl = null;
+var _surveyMeta = { capturedAt:'', gpsCoordinate:'', gpsAccuracy:null, originalPhotoUrl:'', watermarkedPhotoUrl:'' };
 var _pickingLocation = false;
 
 var heatLayer = null, isHeatmap = false;
@@ -3196,12 +3272,18 @@ function applyPermissions(role) {
   var btnExport = document.getElementById('btnExport'), btnAddTop = document.getElementById('btnAddTop'), btnAddMap = document.getElementById('btnAddMap'), btnTable = document.getElementById('btnViewTable');
   var btnParameters = document.getElementById('btnParameters'), btnParametersMobile = document.getElementById('btnParametersMobile');
   var btnRelationReview = document.getElementById('btnRelationReview'), btnRelationReviewMobile = document.getElementById('btnRelationReviewMobile');
+  var btnFieldSurvey = document.getElementById('btnFieldSurvey'), btnFieldSurveyMobile = document.getElementById('btnFieldSurveyMobile'), mobileNavSurvey = document.getElementById('mobileNavSurvey'), mobileBottomNav = document.getElementById('mobileBottomNav');
   var canReviewRelations = role === 'Admin' || role === 'Superadmin';
+  var canUseFieldSurvey = role === 'Surveyor' || role === 'Admin' || role === 'Superadmin';
   if(btnExport) btnExport.disabled = false; if(btnAddTop) btnAddTop.disabled = false; if(btnAddMap) btnAddMap.disabled = false; if(btnTable) btnTable.disabled = false;
   if(btnParameters) btnParameters.style.display = role === 'Superadmin' ? '' : 'none';
   if(btnParametersMobile) btnParametersMobile.style.display = role === 'Superadmin' ? '' : 'none';
   if(btnRelationReview) btnRelationReview.style.display = canReviewRelations ? '' : 'none';
   if(btnRelationReviewMobile) btnRelationReviewMobile.style.display = canReviewRelations ? '' : 'none';
+  if(btnFieldSurvey) btnFieldSurvey.style.display = canUseFieldSurvey ? '' : 'none';
+  if(btnFieldSurveyMobile) btnFieldSurveyMobile.style.display = canUseFieldSurvey ? '' : 'none';
+  if(mobileNavSurvey) mobileNavSurvey.style.display = canUseFieldSurvey ? '' : 'none';
+  if(mobileBottomNav) mobileBottomNav.classList.toggle('survey-enabled', canUseFieldSurvey);
   if (role === 'Surveyor') { if(btnExport) btnExport.disabled = true; }
   else if (role === 'Viewer') { if(btnExport) btnExport.disabled = true; if(btnAddTop) btnAddTop.disabled = true; if(btnAddMap) btnAddMap.disabled = true; if(btnTable) btnTable.disabled = true; }
   _applyViewerMapRestrictions(role);
@@ -3209,6 +3291,12 @@ function applyPermissions(role) {
     setTimeout(function() {
       try { loadRelationReviewCount(); }
       catch (error) { console.warn('Jumlah review relasi belum dapat dimuat.', error); }
+    }, 0);
+  }
+  if (canUseFieldSurvey) {
+    setTimeout(function() {
+      try { loadFieldSurveyCount(); }
+      catch (error) { console.warn('Jumlah survei lapangan belum dapat dimuat.', error); }
     }, 0);
   }
 }
@@ -5403,17 +5491,31 @@ function handleFotoChange(input) {
   if (file.size > 5 * 1024 * 1024) { toast('Ukuran foto maks 5MB', 'error'); input.value = ''; return; }
   _fotoFilename = file.name; var reader = new FileReader();
   reader.onload = function (ev) {
+    if (_dataEntryMode === 'survey') _surveyOriginalPhotoDataUrl = ev.target.result;
     var img = new Image();
     img.onload = function () {
       var canvas = document.createElement('canvas'), MAX = 1200, w = img.width, h = img.height;
       if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
-      canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      _fotoDataUrl = canvas.toDataURL('image/jpeg', 0.82); document.getElementById('fotoPreview').src = _fotoDataUrl; document.getElementById('fotoPreviewWrap').classList.add('show'); document.getElementById('fotoStatus').textContent = 'Foto siap (' + w + '×' + h + 'px)';
+      canvas.width = w; canvas.height = h; var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+      if (_dataEntryMode === 'survey') {
+        _surveyMeta.capturedAt = new Date().toISOString();
+        if (!_surveyMeta.gpsCoordinate) _surveyMeta.gpsCoordinate = _formValue('f_koordinat');
+        var barHeight = Math.max(62, Math.round(h * .12));
+        ctx.fillStyle = 'rgba(3, 30, 50, .78)'; ctx.fillRect(0, h - barHeight, w, barHeight);
+        ctx.fillStyle = '#ffffff'; ctx.font = '700 ' + Math.max(15, Math.round(w * .018)) + 'px sans-serif';
+        ctx.fillText('SURVEI LAPANGAN · ' + (activeUsername || '-'), 16, h - barHeight + 25);
+        ctx.font = '500 ' + Math.max(12, Math.round(w * .014)) + 'px sans-serif';
+        var metaLine = _formatSurveyTime(_surveyMeta.capturedAt) + ' · ' + (_surveyMeta.gpsCoordinate || 'GPS belum tersedia');
+        if (_surveyMeta.gpsAccuracy != null) metaLine += ' · ±' + Math.round(Number(_surveyMeta.gpsAccuracy)) + ' m';
+        ctx.fillText(metaLine, 16, h - barHeight + 49);
+        _updateSurveyMetaUi();
+      }
+      _fotoDataUrl = canvas.toDataURL('image/jpeg', 0.82); document.getElementById('fotoPreview').src = _fotoDataUrl; document.getElementById('fotoPreviewWrap').classList.add('show'); document.getElementById('fotoStatus').textContent = _dataEntryMode === 'survey' ? 'Foto asli dan salinan watermark siap' : ('Foto siap (' + w + '×' + h + 'px)');
     }; img.src = ev.target.result;
   }; reader.readAsDataURL(file);
 }
 
-function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; document.getElementById('f_foto').value = ''; document.getElementById('fotoPreview').src = ''; document.getElementById('fotoPreviewWrap').classList.remove('show'); document.getElementById('fotoStatus').textContent = ''; }
+function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; _surveyOriginalPhotoDataUrl = null; if (_dataEntryMode === 'survey') { _surveyMeta.originalPhotoUrl = ''; _surveyMeta.watermarkedPhotoUrl = ''; } document.getElementById('f_foto').value = ''; document.getElementById('fotoPreview').src = ''; document.getElementById('fotoPreviewWrap').classList.remove('show'); document.getElementById('fotoStatus').textContent = ''; }
 
 function collectParams() {
   function get(group) { return Array.from(document.querySelectorAll('.cb-item[data-group="' + group + '"].checked')).map(function (el) { return el.dataset.val; }); }
@@ -7671,7 +7773,176 @@ function setView(v) {
 }
 function resetFilter() { markAnalysisStale(); document.querySelectorAll('.cb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); document.querySelectorAll('.rb-item').forEach(function (el) { el.classList.remove('checked'); el.querySelector('input').checked = false; }); var def = document.querySelector('.rb-item[data-val="Semua"]'); if (def) { def.classList.add('checked'); def.querySelector('input').checked = true; } document.getElementById('rowJalan').value = ''; document.getElementById('radius').value   = '1'; document.getElementById('mapSearch').value = ''; document.getElementById('resultCount').textContent = '–'; document.getElementById('btnAnalisa').disabled = true; document.getElementById('timeAdjRate').value = '5'; document.getElementById('btnDrawPoly').style.display='none'; if(polyLayer){polyLayer.setMap(null); polyLayer=null;} polyPoints=[]; _drawingPolygon=false; if (typeof updateFilterSummary === 'function') updateFilterSummary(); toast('Filter direset', ''); }
 
+function _newSurveyMeta() {
+  return { capturedAt:'', gpsCoordinate:'', gpsAccuracy:null, originalPhotoUrl:'', watermarkedPhotoUrl:'' };
+}
+
+function _formatSurveyTime(value) {
+  if (!value) return 'Belum diambil';
+  var date = new Date(value);
+  if (isNaN(date)) return String(value);
+  try { return date.toLocaleString('id-ID', { dateStyle:'medium', timeStyle:'medium' }); }
+  catch (error) { return date.toLocaleString('id-ID'); }
+}
+
+function _updateSurveyMetaUi() {
+  var time = document.getElementById('surveyCapturedAtText'), gps = document.getElementById('surveyGpsText'), accuracy = document.getElementById('surveyAccuracyText');
+  if (time) time.textContent = _formatSurveyTime(_surveyMeta.capturedAt);
+  if (gps) gps.textContent = _surveyMeta.gpsCoordinate || 'Belum tersedia';
+  if (accuracy) accuracy.textContent = _surveyMeta.gpsAccuracy == null ? '–' : ('±' + Math.round(Number(_surveyMeta.gpsAccuracy)) + ' m');
+}
+
+function _setDataEntryMode(mode) {
+  _dataEntryMode = mode === 'survey' ? 'survey' : 'standard';
+  var survey = _dataEntryMode === 'survey';
+  var panel = document.getElementById('surveyCapturePanel'), draftButton = document.getElementById('btnSaveSurveyDraft');
+  var photoInput = document.getElementById('f_foto'), submit = document.getElementById('btnSubmit');
+  if (panel) panel.classList.toggle('show', survey);
+  if (draftButton) draftButton.style.display = survey ? '' : 'none';
+  if (photoInput) {
+    if (survey) photoInput.setAttribute('capture', 'environment');
+    else photoInput.removeAttribute('capture');
+  }
+  if (submit) submit.textContent = survey ? '📤 Ajukan Survei' : (_editingId ? '💾 Update Data' : '💾 Simpan Data');
+  _updateSurveyMetaUi();
+}
+
+function captureSurveyLocation() {
+  if (_dataEntryMode !== 'survey') return;
+  var button = document.getElementById('btnCaptureSurveyGps');
+  if (!navigator.geolocation) { toast('Perangkat tidak menyediakan GPS browser.', 'error'); return; }
+  if (button) { button.disabled = true; button.textContent = 'Mencari…'; }
+  navigator.geolocation.getCurrentPosition(function(position) {
+    var coord = Number(position.coords.latitude).toFixed(6) + ',' + Number(position.coords.longitude).toFixed(6);
+    _surveyMeta.capturedAt = new Date(position.timestamp || Date.now()).toISOString();
+    _surveyMeta.gpsCoordinate = coord;
+    _surveyMeta.gpsAccuracy = Math.round(Number(position.coords.accuracy || 0));
+    document.getElementById('f_koordinat').value = coord;
+    _formDirty = true; saveDataDraft(); refreshDuplicatePreview(); _updateSurveyMetaUi();
+    if (button) { button.disabled = false; button.textContent = 'Perbarui GPS'; }
+    toast('GPS survei berhasil direkam.', 'success');
+  }, function(error) {
+    if (button) { button.disabled = false; button.textContent = 'Coba GPS Lagi'; }
+    var message = error && error.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi browser.' : 'GPS belum dapat diperoleh. Coba di area terbuka.';
+    toast(message, 'error');
+  }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+}
+
+function _setFieldSurveyBadges(count) {
+  var text = Number(count) > 0 ? ' (' + Number(count) + ')' : '';
+  var desktop = document.getElementById('fieldSurveyBadge'), mobile = document.getElementById('fieldSurveyBadgeMobile'), nav = document.getElementById('mobileSurveyBadge');
+  if (desktop) desktop.textContent = text;
+  if (mobile) mobile.textContent = text;
+  if (nav) { nav.textContent = Number(count) > 9 ? '9+' : String(Number(count) || ''); nav.classList.toggle('show', Number(count) > 0); }
+}
+
+function loadFieldSurveyCount() {
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (res && res.success) _setFieldSurveyBadges(res.pendingCount || 0);
+  }).withFailureHandler(function() {}).getFieldSurveys(activeUsername, { summaryOnly:true });
+}
+
+function _surveyStatusClass(status) {
+  if (status === 'Menunggu Review') return 'pending';
+  if (status === 'Disetujui') return 'approved';
+  if (status === 'Ditolak') return 'rejected';
+  return '';
+}
+
+function _fieldSurveyCard(survey, index) {
+  var row = survey.dataRow || [], title = (row[0] || 'Tanpa ID') + ' · ' + (row[7] || 'Properti belum dipilih');
+  var photo = survey.watermarkedPhotoUrl ? '<img class="survey-card-photo" src="' + _escapeHtmlAppraisal(survey.watermarkedPhotoUrl) + '" alt="Foto survei" loading="lazy">' : '<div class="survey-card-photo empty">📷</div>';
+  var canEdit = survey.submittedBy === activeUsername && (survey.status === 'Draf' || survey.status === 'Ditolak');
+  var canReview = (activeRole === 'Admin' || activeRole === 'Superadmin') && survey.status === 'Menunggu Review';
+  var actions = '<div class="survey-card-actions">';
+  if (canEdit) actions += '<button type="button" onclick="editFieldSurvey(' + index + ')">✏️ Lanjutkan</button>';
+  if (canReview) actions += '<button class="reject" type="button" onclick="reviewFieldSurveyByIndex(' + index + ',\'REJECT\')">Tolak</button><button class="approve" type="button" onclick="reviewFieldSurveyByIndex(' + index + ',\'APPROVE\')">Setujui</button>';
+  actions += '</div>';
+  var review = survey.reviewNote ? '<div class="survey-card-meta"><strong>Catatan review:</strong> ' + _escapeHtmlAppraisal(survey.reviewNote) + '</div>' : '';
+  return '<article class="survey-card">' + photo + '<div><div class="survey-card-head"><strong>' + _escapeHtmlAppraisal(title) + '</strong><span class="survey-status ' + _surveyStatusClass(survey.status) + '">' + _escapeHtmlAppraisal(survey.status) + '</span></div>' +
+    '<div class="survey-card-meta">' + _escapeHtmlAppraisal(survey.surveyId) + '<br>' + _escapeHtmlAppraisal(survey.submittedBy || '-') + ' · ' + _escapeHtmlAppraisal(survey.updatedAt || '-') + '<br>📍 ' + _escapeHtmlAppraisal(survey.gpsCoordinate || row[3] || 'Koordinat belum ada') + (survey.gpsAccuracy == null ? '' : ' · ±' + Math.round(Number(survey.gpsAccuracy)) + ' m') + '</div>' + review + actions + '</div></article>';
+}
+
+function renderFieldSurveys() {
+  var list = document.getElementById('fieldSurveyList'), summary = document.getElementById('fieldSurveySummary');
+  if (!list || !summary) return;
+  var pending = _fieldSurveyRows.filter(function(item) { return item.status === 'Menunggu Review'; }).length;
+  var drafts = _fieldSurveyRows.filter(function(item) { return item.status === 'Draf' || item.status === 'Ditolak'; }).length;
+  summary.textContent = pending + ' menunggu review · ' + drafts + ' draf/perlu perbaikan · ' + _fieldSurveyRows.length + ' total survei terlihat';
+  _setFieldSurveyBadges(pending);
+  list.innerHTML = _fieldSurveyRows.length ? _fieldSurveyRows.map(_fieldSurveyCard).join('') : '<div class="survey-empty">Belum ada survei. Tekan “Survei Baru” untuk merekam data lapangan dengan GPS dan kamera.</div>';
+}
+
+function loadFieldSurveys() {
+  var list = document.getElementById('fieldSurveyList'); if (list) list.innerHTML = '<div class="survey-empty">⏳ Memuat survei…</div>';
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { if (list) list.innerHTML = '<div class="survey-empty">Gagal memuat survei: ' + _escapeHtmlAppraisal((res && res.error) || 'Kesalahan tidak diketahui') + '<br><button type="button" onclick="loadFieldSurveys()">Coba Lagi</button></div>'; return; }
+    _fieldSurveyRows = res.surveys || []; renderFieldSurveys();
+  }).withFailureHandler(function(error) {
+    if (list) list.innerHTML = '<div class="survey-empty">Gagal memuat survei: ' + _escapeHtmlAppraisal(error.message || String(error)) + '</div>';
+  }).getFieldSurveys(activeUsername);
+}
+
+function openFieldSurveyWorkspace() {
+  if (['Surveyor','Admin','Superadmin'].indexOf(activeRole) === -1) { toast('Role ini tidak memiliki akses Mode Survei Lapangan.', 'error'); return; }
+  document.getElementById('fieldSurveyOverlay').classList.add('open'); document.body.style.overflow = 'hidden'; loadFieldSurveys();
+}
+function closeFieldSurveyWorkspace() {
+  document.getElementById('fieldSurveyOverlay').classList.remove('open');
+  if (!document.querySelector('.modal-overlay.open') && !document.querySelector('.measure-overlay.open')) document.body.style.overflow = '';
+}
+
+function openNewFieldSurvey() {
+  closeFieldSurveyWorkspace(); openModalNew();
+  _editingSurveyId = null; _surveyMeta = _newSurveyMeta(); _surveyOriginalPhotoDataUrl = null;
+  _setDataEntryMode('survey'); document.getElementById('modalTitle').textContent = '📍 Survei Lapangan Baru';
+  document.getElementById('fotoLabel').textContent = 'Foto Lapangan (kamera belakang)';
+  showDataDraftBanner(); captureSurveyLocation();
+}
+
+function _populateSurveyFormRow(row) {
+  var ids = ['f_id','f_sumber','f_hp','f_koordinat','f_alamat','f_kota','f_provinsi','f_objek','f_tipe','f_legalitas','f_lt','f_lb','f_tahunBangun','f_harga','f_frontage','f_lokasi','f_posisi','f_bentuk','f_kontur','f_row','f_elevasi','f_statusHarga','f_waktuData','f_tujuan','f_peruntukan','f_indikasi'];
+  ids.forEach(function(id, index) {
+    var field = document.getElementById(id); if (!field) return;
+    var value = row[index] == null ? '' : row[index];
+    if (field.tagName === 'SELECT' && value && !Array.from(field.options).some(function(option) { return option.value === String(value); })) _setDynamicSelectValue_(id, value);
+    else field.value = value;
+  });
+}
+
+function editFieldSurvey(index) {
+  var survey = _fieldSurveyRows[index]; if (!survey) return;
+  closeFieldSurveyWorkspace(); openModalNew(); _setDataEntryMode('survey');
+  _editingSurveyId = survey.surveyId; _surveyMeta = {
+    capturedAt:survey.capturedAt || '', gpsCoordinate:survey.gpsCoordinate || '', gpsAccuracy:survey.gpsAccuracy,
+    originalPhotoUrl:survey.originalPhotoUrl || '', watermarkedPhotoUrl:survey.watermarkedPhotoUrl || ''
+  };
+  _populateSurveyFormRow(survey.dataRow || []); _updateSurveyMetaUi();
+  if (_surveyMeta.watermarkedPhotoUrl) {
+    document.getElementById('fotoPreview').src = _surveyMeta.watermarkedPhotoUrl;
+    document.getElementById('fotoPreviewWrap').classList.add('show'); document.getElementById('fotoStatus').textContent = 'Foto survei tersimpan';
+  }
+  document.getElementById('modalTitle').textContent = '✏️ Lanjutkan Survei ' + survey.surveyId;
+  document.getElementById('fotoLabel').textContent = 'Foto Lapangan (ambil ulang untuk mengganti)';
+  _formDirty = false; document.getElementById('dataDraftBanner').hidden = true; renderDataFormReview();
+}
+
+function reviewFieldSurveyByIndex(index, action) {
+  var survey = _fieldSurveyRows[index]; if (!survey) return;
+  var note = action === 'REJECT' ? window.prompt('Alasan penolakan/perbaikan (minimal 5 karakter):', '') : window.prompt('Catatan persetujuan (opsional):', 'Survei telah diperiksa.');
+  if (note === null) return;
+  if (action === 'REJECT' && String(note).trim().length < 5) { toast('Catatan penolakan minimal 5 karakter.', 'error'); return; }
+  if (action === 'APPROVE' && !window.confirm('Setujui survei ini dan masukkan ke database pembanding?')) return;
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { toast((res && res.error) || 'Review survei gagal.', 'error'); return; }
+    toast(action === 'APPROVE' ? 'Survei disetujui dan masuk ke database.' : 'Survei dikembalikan untuk diperbaiki.', 'success');
+    loadFieldSurveys(); loadFieldSurveyCount(); if (action === 'APPROVE') doSearch();
+  }).withFailureHandler(function(error) { toast('Gagal: ' + error.message, 'error'); })
+    .reviewFieldSurvey({ surveyId:survey.surveyId, action:action, note:String(note || '').trim() }, activeUsername);
+}
+
 function openModalNew() {
+  _setDataEntryMode('standard'); _editingSurveyId = null; _surveyMeta = _newSurveyMeta(); _surveyOriginalPhotoDataUrl = null;
   _editingId = null; _editingFoto = ''; _originalKoordinat = null;
   document.getElementById('modalTitle').textContent = '➕ Tambah Data Pembanding';
   document.getElementById('f_id').disabled = false;
@@ -7684,14 +7955,14 @@ function openModalNew() {
   _dataFormIds().forEach(clearFieldError); clearFieldError('f_foto'); _formDirty = false; showDataDraftBanner();
   document.getElementById('modalOverlay').classList.add('open');
 }
-function openEditModal(id, koordinat) { var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; _setDynamicSelectValue_('f_objek', row.objek); document.getElementById('f_tipe').value = row.tipeBangunan; _setDynamicSelectValue_('f_legalitas', row.legalitas); document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; _setDynamicSelectValue_('f_statusHarga', row.statusHarga); document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); resetDataFormWizard(); _dataFormIds().forEach(clearFieldError); clearFieldError('f_foto'); _formDirty = false; document.getElementById('dataDraftBanner').hidden = true; document.getElementById('modalOverlay').classList.add('open'); }
+function openEditModal(id, koordinat) { _setDataEntryMode('standard'); var row = currentData.find(function(r) { return r.id === id && r.koordinat === koordinat; }); if (!row) return; _editingId = row.id; _editingFoto = row.foto; _originalKoordinat = row.koordinat; document.getElementById('f_id').value = row.id; document.getElementById('f_sumber').value = row.sumber; document.getElementById('f_hp').value = row.hp; document.getElementById('f_koordinat').value = row.koordinat; document.getElementById('f_alamat').value = row.alamat; document.getElementById('f_kota').value = row.kota; document.getElementById('f_provinsi').value = row.provinsi; _setDynamicSelectValue_('f_objek', row.objek); document.getElementById('f_tipe').value = row.tipeBangunan; _setDynamicSelectValue_('f_legalitas', row.legalitas); document.getElementById('f_lt').value = row.luasTanah !== '–' ? row.luasTanah : ''; document.getElementById('f_lb').value = row.luasBangunan !== '–' ? row.luasBangunan : ''; document.getElementById('f_tahunBangun').value = row.tahunBangun !== '–' ? row.tahunBangun : ''; document.getElementById('f_harga').value = row.harga; document.getElementById('f_frontage').value = row.frontage !== '–' ? row.frontage : ''; document.getElementById('f_row').value = row.lebarJalanROW !== '–' ? row.lebarJalanROW : ''; document.getElementById('f_lokasi').value = row.lokasi; document.getElementById('f_posisi').value = row.posisi; document.getElementById('f_bentuk').value = row.bentuk; document.getElementById('f_kontur').value = row.kontur; document.getElementById('f_elevasi').value = row.elevasi !== '–' ? row.elevasi : ''; _setDynamicSelectValue_('f_statusHarga', row.statusHarga); document.getElementById('f_waktuData').value = row.waktuData; document.getElementById('f_tujuan').value = row.tujuanPenilaian; document.getElementById('f_peruntukan').value = row.peruntukan; document.getElementById('f_indikasi').value = row.indikasiNilai; document.getElementById('modalTitle').textContent = '✏️ Edit Data Pembanding'; document.getElementById('btnSubmit').textContent = '💾 Update Data'; document.getElementById('f_id').disabled = true; if (_editingFoto && _editingFoto !== '–') { document.getElementById('fotoLabel').innerHTML = 'Foto Properti <span style="color:#ea4335;font-size:10px;">(Kosongkan jika tidak ingin mengganti)</span>'; } else { document.getElementById('fotoLabel').textContent = 'Foto Properti (Upload Baru)'; } removeFoto(); resetDataFormWizard(); _dataFormIds().forEach(clearFieldError); clearFieldError('f_foto'); _formDirty = false; document.getElementById('dataDraftBanner').hidden = true; document.getElementById('modalOverlay').classList.add('open'); }
 function openEditModalByUid(uid) {
   var row = (currentData || []).find(function(item) { return item._uid === uid; });
   if (!row) { toast('Data tidak ditemukan.', 'error'); return; }
   openEditModal(row.id, row.koordinat);
 }
 function closeModal(force) {
-  var closeMessage = _editingId ? 'Perubahan edit belum disimpan. Tetap tutup formulir?' : 'Perubahan belum disimpan. Tutup formulir? Draf teks tetap disimpan di perangkat ini.';
+  var closeMessage = _dataEntryMode === 'survey' ? 'Survei belum disimpan. Tutup formulir? Draf teks tetap disimpan di perangkat ini, tetapi foto perlu dipilih kembali.' : (_editingId ? 'Perubahan edit belum disimpan. Tetap tutup formulir?' : 'Perubahan belum disimpan. Tutup formulir? Draf teks tetap disimpan di perangkat ini.');
   if (!force && _formDirty && !window.confirm(closeMessage)) return;
   if (!force && _formDirty) saveDataDraft();
   document.getElementById('modalOverlay').classList.remove('open'); removeFoto();
@@ -8003,7 +8274,84 @@ function saveRelationReviewByIndex(index, reject) {
 
 function _resetDataSubmitButton(btn) {
   btn.disabled = false;
-  btn.textContent = _editingId ? '💾 Update Data' : '💾 Simpan Data';
+  btn.textContent = _dataEntryMode === 'survey' ? '📤 Ajukan Survei' : (_editingId ? '💾 Update Data' : '💾 Simpan Data');
+}
+
+function _setSurveyButtonsBusy(busy, label) {
+  var submit = document.getElementById('btnSubmit'), draft = document.getElementById('btnSaveSurveyDraft');
+  if (submit) { submit.disabled = !!busy; submit.textContent = busy ? (label || '⏳ Memproses…') : '📤 Ajukan Survei'; }
+  if (draft) { draft.disabled = !!busy; draft.textContent = busy ? 'Menunggu…' : 'Simpan Draf'; }
+}
+
+function _fieldSurveyPayload(action, duplicateDecision) {
+  var row = _buildDataFormRow(_surveyMeta.watermarkedPhotoUrl || '');
+  if (_surveyMeta.watermarkedPhotoUrl) row[26] = _surveyMeta.watermarkedPhotoUrl;
+  return {
+    surveyId:_editingSurveyId || '', action:action, dataRow:row,
+    capturedAt:_surveyMeta.capturedAt || '', gpsCoordinate:_surveyMeta.gpsCoordinate || _formValue('f_koordinat'),
+    gpsAccuracy:_surveyMeta.gpsAccuracy, originalPhotoUrl:_surveyMeta.originalPhotoUrl || '',
+    watermarkedPhotoUrl:_surveyMeta.watermarkedPhotoUrl || '', duplicateDecision:duplicateDecision || null
+  };
+}
+
+function _uploadSurveyPhotosIfNeeded(done, failed) {
+  if (!_surveyOriginalPhotoDataUrl || !_fotoDataUrl) { done(); return; }
+  _setSurveyButtonsBusy(true, '⏳ Mengupload foto…');
+  var baseName = (_formValue('f_id') || 'Tanpa-ID') + ' - ' + (activeUsername || 'Surveyor') + ' - ' + Date.now();
+  GAS.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { failed((res && res.error) || 'Upload foto survei gagal.'); return; }
+    _surveyMeta.originalPhotoUrl = res.originalUrl || '';
+    _surveyMeta.watermarkedPhotoUrl = res.watermarkedUrl || '';
+    _surveyOriginalPhotoDataUrl = null;
+    done();
+  }).withFailureHandler(function(error) { failed(error.message || String(error)); })
+    .uploadSurveyPhotos(_surveyOriginalPhotoDataUrl, _fotoDataUrl, baseName, activeUsername);
+}
+
+function _persistFieldSurvey(action, duplicateDecision) {
+  var isSubmit = action === 'submit';
+  _setSurveyButtonsBusy(true, isSubmit ? '⏳ Mengajukan…' : '⏳ Menyimpan draf…');
+  function fail(message) { _setSurveyButtonsBusy(false); toast(message, 'error'); }
+  _uploadSurveyPhotosIfNeeded(function() {
+    var payload = _fieldSurveyPayload(action, duplicateDecision);
+    GAS.script.run.withSuccessHandler(function(res) {
+      if (res && res.requiresDuplicateDecision && res.candidates && res.candidates.length) {
+        _setSurveyButtonsBusy(false);
+        _showDuplicateCandidates(res.candidates, function(decision) { _persistFieldSurvey(action, decision); }, function() {});
+        return;
+      }
+      if (!res || !res.success) { fail((res && res.error) || 'Survei belum dapat disimpan.'); return; }
+      _editingSurveyId = res.survey && res.survey.surveyId;
+      markDataFormSaved(); closeModal(true); _setSurveyButtonsBusy(false);
+      toast(isSubmit ? 'Survei diajukan kepada Admin untuk direview.' : 'Draf survei tersimpan.', 'success');
+      openFieldSurveyWorkspace(); loadFieldSurveyCount();
+    }).withFailureHandler(function(error) { fail('Gagal: ' + (error.message || String(error))); })
+      .saveFieldSurvey(payload, activeUsername);
+  }, fail);
+}
+
+function saveFieldSurveyDraft(submit) {
+  if (_dataEntryMode !== 'survey') return;
+  if (navigator.onLine === false) { saveDataDraft(); toast('Perangkat offline. Draf teks disimpan di perangkat; upload foto menunggu koneksi.', 'error'); return; }
+  if (!submit) { _persistFieldSurvey('draft', null); return; }
+  submitFieldSurvey();
+}
+
+function submitFieldSurvey() {
+  if (!validateDataForm()) return;
+  if (!_surveyMeta.capturedAt || !_surveyMeta.gpsCoordinate) { toast('Ambil GPS agar waktu dan koordinat survei tercatat sebagai metadata.', 'error'); captureSurveyLocation(); return; }
+  if ((!_surveyOriginalPhotoDataUrl || !_fotoDataUrl) && !_surveyMeta.watermarkedPhotoUrl) {
+    setDataFormStep(4); setFieldError('f_foto', 'Foto lapangan wajib diambil sebelum survei diajukan.'); toast('Foto lapangan wajib diambil.', 'error'); return;
+  }
+  _setSurveyButtonsBusy(true, '🔎 Memeriksa data serupa…');
+  GAS.script.run.withSuccessHandler(function(res) {
+    _setSurveyButtonsBusy(false);
+    if (!res || !res.success) { toast((res && res.error) || 'Pemeriksaan data serupa gagal.', 'error'); return; }
+    if (res.candidates && res.candidates.length) {
+      _showDuplicateCandidates(res.candidates, function(decision) { _persistFieldSurvey('submit', decision); }, function() {});
+    } else _persistFieldSurvey('submit', null);
+  }).withFailureHandler(function(error) { _setSurveyButtonsBusy(false); toast('Gagal memeriksa data serupa: ' + error.message, 'error'); })
+    .findDuplicateCandidates(_buildDataFormRow(_surveyMeta.watermarkedPhotoUrl || ''), activeUsername, '');
 }
 
 function _continueDataSubmit(btn, duplicateDecision) {
@@ -8027,6 +8375,7 @@ function _continueDataSubmit(btn, duplicateDecision) {
 }
 
 function submitData() {
+  if (_dataEntryMode === 'survey') { submitFieldSurvey(); return; }
   if (!validateDataForm()) return;
   
   if (!_formValue('f_koordinat')){
@@ -9626,8 +9975,12 @@ function renderDataFormReview() {
     ['ID', value('f_id')], ['Properti', value('f_objek')], ['Alamat', value('f_alamat')], ['Koordinat', value('f_koordinat')],
     ['Legalitas', value('f_legalitas')], ['Luas tanah', value('f_lt') === 'Belum diisi' ? 'Belum diisi' : value('f_lt') + ' m²'],
     ['Harga', value('f_harga') === 'Belum diisi' ? 'Belum diisi' : formatRupiah(value('f_harga'))], ['Nilai /m²', value('f_indikasi') === 'Belum diisi' ? 'Belum diisi' : formatRupiah(value('f_indikasi'))],
-    ['Waktu data', value('f_waktuData')], ['Foto', (_fotoDataUrl || (_editingId && _editingFoto && _editingFoto !== '–')) ? 'Siap' : 'Belum dipilih']
+    ['Waktu data', value('f_waktuData')], ['Foto', (_fotoDataUrl || _surveyMeta.watermarkedPhotoUrl || (_editingId && _editingFoto && _editingFoto !== '–')) ? 'Siap' : 'Belum dipilih']
   ];
+  if (_dataEntryMode === 'survey') {
+    items.push(['Waktu survei', _formatSurveyTime(_surveyMeta.capturedAt)]);
+    items.push(['Akurasi GPS', _surveyMeta.gpsAccuracy == null ? 'Belum tersedia' : ('±' + Math.round(Number(_surveyMeta.gpsAccuracy)) + ' m')]);
+  }
   review.innerHTML = '<h4>Periksa sebelum menyimpan</h4><div class="form-review-grid">' + items.map(function(item) { return '<div class="form-review-item"><span>' + item[0] + '</span><strong>' + _escapeHtmlAppraisal(item[1]) + '</strong></div>'; }).join('') + '</div><div class="form-review-note">Ringkasan ini membantu pemeriksaan input; kelayakan sebagai pembanding tetap ditentukan oleh penilai.</div>';
 }
 
@@ -9650,7 +10003,10 @@ function _dataFormIds() {
   return DATA_FORM_STEPS.reduce(function(ids, step) { return ids.concat(step.ids); }, []).filter(function(id) { return id !== 'f_foto'; });
 }
 
-function _draftStorageKey() { return DATA_DRAFT_KEY + ':' + (activeUsername || 'anonymous'); }
+function _draftStorageKey() {
+  var baseKey = DATA_DRAFT_KEY + ':' + (activeUsername || 'anonymous');
+  return _dataEntryMode === 'survey' ? (baseKey + ':survey') : baseKey;
+}
 
 function captureDataDraft() {
   var values = {}, hasValue = false;
@@ -9659,7 +10015,7 @@ function captureDataDraft() {
     values[id] = field.value;
     if (String(field.value || '').trim()) hasValue = true;
   });
-  return hasValue ? { savedAt:new Date().toISOString(), values:values } : null;
+  return hasValue ? { savedAt:new Date().toISOString(), mode:_dataEntryMode, surveyId:_editingSurveyId || '', surveyMeta:_dataEntryMode === 'survey' ? _surveyMeta : null, values:values } : null;
 }
 
 function saveDataDraft() {
@@ -9686,6 +10042,11 @@ function restoreDataDraft() {
     if (field.tagName === 'SELECT' && !Array.from(field.options).some(function(option) { return option.value === draft.values[id]; }) && typeof _setDynamicSelectValue_ === 'function') _setDynamicSelectValue_(id, draft.values[id]);
     else field.value = draft.values[id];
   });
+  if (_dataEntryMode === 'survey' && draft.surveyMeta) {
+    _editingSurveyId = draft.surveyId || null;
+    _surveyMeta = Object.assign(_newSurveyMeta(), draft.surveyMeta);
+    _updateSurveyMetaUi();
+  }
   document.getElementById('dataDraftBanner').hidden = true;
   _formDirty = true;
   toast('Draf dipulihkan. Foto perlu dipilih kembali.', 'success');

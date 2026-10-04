@@ -12,6 +12,7 @@ const WEB_APP_ORIGIN = "https://zftrh1225.github.io";
 const MAPS_API_KEY_PROPERTY = "GOOGLE_MAPS_API_KEY";
 const QUALITY_REVIEW_SHEET = "Quality_Review";
 const DATA_RELATION_SHEET = "Relasi_Data";
+const FIELD_SURVEY_SHEET = "Survei_Lapangan";
 const DUPLICATE_RELATION_TYPES = [
   "SAME_MARKET_DATA",
   "NEW_MARKET_EVENT",
@@ -60,6 +61,10 @@ function _dispatchApiAction_(action, args) {
   if (action === 'editData') return editData(args[0], args[1], args[2], args[3]);
   if (action === 'getDataRelations') return getDataRelations(args[0], args[1]);
   if (action === 'reviewDataRelation') return reviewDataRelation(args[0], args[1]);
+  if (action === 'saveFieldSurvey') return saveFieldSurvey(args[0], args[1]);
+  if (action === 'getFieldSurveys') return getFieldSurveys(args[0], args[1]);
+  if (action === 'reviewFieldSurvey') return reviewFieldSurvey(args[0], args[1]);
+  if (action === 'uploadSurveyPhotos') return uploadSurveyPhotos(args[0], args[1], args[2], args[3]);
   if (action === 'uploadFoto') return uploadFoto(args[0], args[1]);
   if (action === 'updateFoto') return updateFoto(args[0], args[1]);
   if (action === 'getFilterOptions') return getFilterOptions();
@@ -618,8 +623,9 @@ function setupSpreadsheet() {
   _ensureMasterParameterSheet_();
   _ensureQualityReviewSheet_();
   _ensureDataRelationSheet_();
+  _ensureFieldSurveySheet_();
   SpreadsheetApp.flush();
-  return "Spreadsheet siap! Database Properti, Akun, Histori, Master Parameter, Quality Review, dan Relasi Data telah disetup.";
+  return "Spreadsheet siap! Database Properti, Akun, Histori, Master Parameter, Quality Review, Relasi Data, dan Survei Lapangan telah disetup.";
 }
 
 function logActivity(username, aktivitas) {
@@ -1248,6 +1254,186 @@ function reviewDataRelation(payload, activeUser) {
   }
 }
 
+function _fieldSurveyHeaders_() {
+  return [
+    "Survey ID", "Status", "Dibuat Oleh", "Role Pembuat", "Dibuat Pada", "Diperbarui Pada",
+    "Diajukan Pada", "Direview Oleh", "Waktu Review", "Catatan Review", "Waktu Pengambilan",
+    "Koordinat GPS", "Akurasi GPS (m)", "Foto Asli", "Foto Watermark", "Data JSON",
+    "Keputusan Duplikat JSON", "ID Database"
+  ];
+}
+
+function _ensureFieldSurveySheetUnlocked_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(FIELD_SURVEY_SHEET);
+  const headers = _fieldSurveyHeaders_();
+  if (!sheet) sheet = ss.insertSheet(FIELD_SURVEY_SHEET);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground("#0369a1").setFontColor("#ffffff").setFontWeight("bold");
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function _ensureFieldSurveySheet_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try { return _ensureFieldSurveySheetUnlocked_(); }
+  finally { lock.releaseLock(); }
+}
+
+function _safeJsonParse_(value, fallback) {
+  try { return JSON.parse(String(value || "")); }
+  catch (error) { return fallback; }
+}
+
+function _fieldSurveyFromRow_(row) {
+  const capturedAt = row[10] instanceof Date && !isNaN(row[10]) ? row[10].toISOString() : String(row[10] || "");
+  return {
+    surveyId: String(row[0] || ""), status: String(row[1] || "Draf"), submittedBy: String(row[2] || ""),
+    submittedRole: String(row[3] || ""), createdAt: _reviewDateText_(row[4]), updatedAt: _reviewDateText_(row[5]),
+    submittedAt: _reviewDateText_(row[6]), reviewedBy: String(row[7] || ""), reviewedAt: _reviewDateText_(row[8]),
+    reviewNote: String(row[9] || ""), capturedAt: capturedAt, gpsCoordinate: String(row[11] || ""),
+    gpsAccuracy: row[12] === "" ? null : Number(row[12]), originalPhotoUrl: String(row[13] || ""),
+    watermarkedPhotoUrl: String(row[14] || ""), dataRow: _safeJsonParse_(row[15], []),
+    duplicateDecision: _safeJsonParse_(row[16], null), databaseId: String(row[17] || ""),
+    _sortAt: row[5] instanceof Date ? row[5].getTime() : 0
+  };
+}
+
+function _validateSubmittedFieldSurvey_(payload) {
+  const row = Array.isArray(payload.dataRow) ? payload.dataRow : [];
+  if (!String(row[0] || "").trim()) throw new Error("ID data wajib diisi sebelum survei diajukan.");
+  if (!_parseCoord(row[3], "")) throw new Error("Koordinat GPS survei belum valid.");
+  if (!_parseCoord(payload.gpsCoordinate, "") || !payload.capturedAt) throw new Error("Metadata GPS dan waktu pengambilan belum lengkap.");
+  if (_normalizeReviewCoord_(row[3]) !== _normalizeReviewCoord_(payload.gpsCoordinate)) throw new Error("Koordinat form berbeda dari bukti GPS. Ambil ulang GPS sebelum mengajukan.");
+  if (isNaN(new Date(payload.capturedAt).getTime())) throw new Error("Waktu pengambilan survei tidak valid.");
+  if (!String(payload.watermarkedPhotoUrl || "").trim()) throw new Error("Foto lapangan wajib diambil sebelum survei diajukan.");
+  const candidates = _findDuplicateCandidates_(row, "");
+  const resolved = _resolveDuplicateDecision_(candidates, payload.duplicateDecision);
+  if (resolved && resolved.required) return { candidates: candidates, requiresDecision: true };
+  return { candidates: candidates, resolved: resolved };
+}
+
+function saveFieldSurvey(payload, activeUser) {
+  try {
+    payload = payload || {};
+    const role = _requireDataEditor_(activeUser);
+    const submitting = String(payload.action || "draft").toLowerCase() === "submit";
+    const validation = submitting ? _validateSubmittedFieldSurvey_(payload) : null;
+    if (validation && validation.requiresDecision) {
+      return { success: false, requiresDuplicateDecision: true, candidates: validation.candidates };
+    }
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    let savedRow;
+    try {
+      const sheet = _ensureFieldSurveySheetUnlocked_();
+      const now = new Date();
+      const surveyId = String(payload.surveyId || "").trim() || ("SVY-" + Utilities.formatDate(now, "GMT+7", "yyyyMMddHHmmss") + "-" + Utilities.getUuid().slice(0, 6));
+      let rowIndex = -1, existing = null;
+      if (sheet.getLastRow() >= 2) {
+        const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+        for (let i = 0; i < ids.length; i++) {
+          if (String(ids[i][0]) === surveyId) { rowIndex = i + 2; existing = sheet.getRange(rowIndex, 1, 1, 18).getValues()[0]; break; }
+        }
+      }
+      if (existing && String(existing[2]) !== String(activeUser || "")) throw new Error("Draf survei hanya dapat diubah oleh pembuatnya.");
+      if (existing && ["Menunggu Review", "Disetujui", "Sedang Diproses"].indexOf(String(existing[1])) >= 0) throw new Error("Survei ini tidak dapat diubah pada status sekarang.");
+      const status = submitting ? "Menunggu Review" : "Draf";
+      const dataRow = Array.isArray(payload.dataRow) ? payload.dataRow.slice(0, 27) : [];
+      const originalPhotoUrl = String(payload.originalPhotoUrl || (existing && existing[13]) || "");
+      const watermarkedPhotoUrl = String(payload.watermarkedPhotoUrl || (existing && existing[14]) || "");
+      if (watermarkedPhotoUrl) dataRow[26] = watermarkedPhotoUrl;
+      savedRow = [
+        surveyId, status, String(activeUser || ""), role, existing ? existing[4] : now, now,
+        submitting ? now : "", "", "", "", payload.capturedAt ? new Date(payload.capturedAt) : "",
+        String(payload.gpsCoordinate || dataRow[3] || ""), payload.gpsAccuracy == null ? "" : Number(payload.gpsAccuracy),
+        originalPhotoUrl, watermarkedPhotoUrl, JSON.stringify(dataRow), JSON.stringify(payload.duplicateDecision || null), ""
+      ];
+      if (rowIndex > 0) sheet.getRange(rowIndex, 1, 1, 18).setValues([savedRow]);
+      else sheet.appendRow(savedRow);
+      SpreadsheetApp.flush();
+    } finally { lock.releaseLock(); }
+    logActivity(activeUser, (submitting ? "Mengajukan" : "Menyimpan draf") + " Survei Lapangan " + savedRow[0]);
+    return { success: true, survey: _fieldSurveyFromRow_(savedRow) };
+  } catch (error) { return { success: false, error: error.message }; }
+}
+
+function getFieldSurveys(activeUser, options) {
+  try {
+    const role = _requireDataEditor_(activeUser);
+    const sheet = _ensureFieldSurveySheet_();
+    if (sheet.getLastRow() < 2) return { success: true, surveys: [], pendingCount: 0, total: 0 };
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getValues();
+    const visible = rows.filter(function(row) {
+      return role === "Admin" || role === "Superadmin" || String(row[2]) === String(activeUser || "");
+    });
+    const pendingCount = visible.filter(function(row) { return String(row[1]) === "Menunggu Review"; }).length;
+    if (options && options.summaryOnly) return { success: true, pendingCount: pendingCount, total: visible.length };
+    const surveys = visible.map(_fieldSurveyFromRow_).sort(function(a, b) { return b._sortAt - a._sortAt; });
+    return { success: true, surveys: surveys, pendingCount: pendingCount, total: surveys.length };
+  } catch (error) { return { success: false, error: error.message }; }
+}
+
+function _requireFieldSurveyReviewer_(username) {
+  const role = _getUserRole_(username);
+  if (role !== "Admin" && role !== "Superadmin") throw new Error("Hanya Admin atau Superadmin yang dapat mereview survei lapangan.");
+  return role;
+}
+
+function reviewFieldSurvey(payload, activeUser) {
+  try {
+    _requireFieldSurveyReviewer_(activeUser);
+    payload = payload || {};
+    const surveyId = String(payload.surveyId || "").trim();
+    const action = String(payload.action || "").toUpperCase();
+    const note = String(payload.note || "").trim();
+    if (!surveyId || ["APPROVE", "REJECT"].indexOf(action) === -1) throw new Error("Keputusan review survei tidak valid.");
+    if (action === "REJECT" && note.length < 5) throw new Error("Catatan penolakan minimal 5 karakter.");
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    let rowIndex = -1, survey;
+    try {
+      const sheet = _ensureFieldSurveySheetUnlocked_();
+      if (sheet.getLastRow() < 2) throw new Error("Survei tidak ditemukan.");
+      const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getValues();
+      for (let i = 0; i < rows.length; i++) if (String(rows[i][0]) === surveyId) { rowIndex = i + 2; survey = _fieldSurveyFromRow_(rows[i]); break; }
+      if (rowIndex < 0 || !survey) throw new Error("Survei tidak ditemukan.");
+      if (survey.status !== "Menunggu Review") throw new Error("Survei ini sudah diproses atau belum diajukan.");
+      if (action === "REJECT") {
+        sheet.getRange(rowIndex, 2).setValue("Ditolak");
+        sheet.getRange(rowIndex, 8, 1, 3).setValues([[String(activeUser || ""), new Date(), note]]);
+        SpreadsheetApp.flush();
+        logActivity(activeUser, "Menolak Survei Lapangan " + surveyId);
+        return { success: true, status: "Ditolak" };
+      }
+      sheet.getRange(rowIndex, 2).setValue("Sedang Diproses");
+      SpreadsheetApp.flush();
+    } finally { lock.releaseLock(); }
+
+    const result = addData(survey.dataRow, survey.submittedBy, survey.duplicateDecision);
+    const finalLock = LockService.getScriptLock();
+    finalLock.waitLock(10000);
+    try {
+      const sheet = _ensureFieldSurveySheetUnlocked_();
+      if (!result || !result.success) {
+        sheet.getRange(rowIndex, 2).setValue("Menunggu Review");
+        SpreadsheetApp.flush();
+        return { success: false, error: (result && result.error) || "Data survei belum dapat dimasukkan ke database.", requiresDuplicateDecision: !!(result && result.requiresDuplicateDecision) };
+      }
+      sheet.getRange(rowIndex, 2).setValue("Disetujui");
+      sheet.getRange(rowIndex, 8, 1, 3).setValues([[String(activeUser || ""), new Date(), note || "Survei disetujui."]]);
+      sheet.getRange(rowIndex, 18).setValue(String(result.id || ""));
+      SpreadsheetApp.flush();
+    } finally { finalLock.releaseLock(); }
+    logActivity(activeUser, "Menyetujui Survei Lapangan " + surveyId + " menjadi data " + result.id);
+    return { success: true, status: "Disetujui", databaseId: result.id, relationWarning: result.relationWarning || "" };
+  } catch (error) { return { success: false, error: error.message }; }
+}
+
 function addData(rowData, activeUser, duplicateDecision) {
   try {
     const role = _requireDataEditor_(activeUser);
@@ -1299,11 +1485,36 @@ function editData(rowData, activeUser, originalCoord, duplicateDecision) {
   } catch (err) { return { success: false, error: err.message }; }
 }
 
+function _photoBlobFromDataUrl_(dataUrl, filename) {
+  if (!dataUrl || dataUrl.indexOf(',') === -1) throw new Error("Data foto tidak valid.");
+  const parts = dataUrl.split(',');
+  const mimeType = parts[0].split(':')[1].split(';')[0];
+  return Utilities.newBlob(Utilities.base64Decode(parts[1]), mimeType, filename || "foto.jpg");
+}
+
+function uploadSurveyPhotos(originalDataUrl, watermarkedDataUrl, baseName, activeUser) {
+  try {
+    _requireDataEditor_(activeUser);
+    const safeBase = String(baseName || "Survei").replace(/[^A-Za-z0-9 _.-]/g, "-").slice(0, 80);
+    const folders = DriveApp.getFoldersByName("DataPembanding_Foto");
+    const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder("DataPembanding_Foto");
+    const original = folder.createFile(_photoBlobFromDataUrl_(originalDataUrl, safeBase + " - ASLI.jpg"));
+    const watermarked = folder.createFile(_photoBlobFromDataUrl_(watermarkedDataUrl, safeBase + " - WATERMARK.jpg"));
+    // Bukti asli tetap privat di Drive. Hanya salinan watermark yang dipakai pada tampilan aplikasi.
+    watermarked.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return {
+      success: true,
+      originalUrl: original.getUrl(),
+      originalFileId: original.getId(),
+      watermarkedUrl: "https://drive.google.com/thumbnail?id=" + watermarked.getId() + "&sz=w1200",
+      watermarkedFileId: watermarked.getId()
+    };
+  } catch (error) { return { success: false, error: error.message }; }
+}
+
 function uploadFoto(dataUrl, filename) {
   try {
-    if (!dataUrl || dataUrl.indexOf(',') === -1) return { success: false, error: "Data foto tidak valid." };
-    const parts = dataUrl.split(','); const mimeType = parts[0].split(':')[1].split(';')[0]; const decoded = Utilities.base64Decode(parts[1]);
-    const blob = Utilities.newBlob(decoded, mimeType, filename || 'foto.jpg'); const folderName = 'DataPembanding_Foto';
+    const blob = _photoBlobFromDataUrl_(dataUrl, filename || 'foto.jpg'); const folderName = 'DataPembanding_Foto';
     const folders = DriveApp.getFoldersByName(folderName);
     const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
     const file = folder.createFile(blob); file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
