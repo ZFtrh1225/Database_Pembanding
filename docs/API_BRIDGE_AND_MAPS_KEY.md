@@ -54,7 +54,8 @@ Di **Google Cloud Console → APIs & Services → Credentials**:
 5. Pilih **API restrictions → Restrict key** dan izinkan hanya:
 
    - Maps JavaScript API
-   - Directions API, karena fitur Measurement memakai `DirectionsService`
+   - Routes API, karena fitur Measurement memakai Maps JavaScript Routes Library
+   - Directions API (opsional), hanya untuk fallback kompatibilitas sementara
 
 6. Simpan key tersebut sebagai Script Property, bukan di file GitHub.
 

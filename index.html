@@ -609,6 +609,8 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   padding: 1px 7px; font-size: 10px; font-weight: 700;
   display: none; white-space: nowrap;
 }
+.mpt-dist.route-fallback { background:rgba(245,158,11,.2); border-color:rgba(245,158,11,.4); color:#fbbf24; }
+.mpt-dist.route-loading { background:rgba(96,165,250,.17); border-color:rgba(96,165,250,.34); color:#93c5fd; }
 .mpt-card.has-val .mpt-dist { display: block; }
 .mpt-clear {
   background: none; border: none; cursor: pointer;
@@ -652,6 +654,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .msb-sum-row:last-child { border: none; }
 .msb-sum-key { color: rgba(255,255,255,.48); display: flex; align-items: center; gap: 5px; }
 .msb-sum-val { color: #fff; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; letter-spacing: .2px; }
+.msb-sum-val.route-fallback { color:#fbbf24; }
 
 .msb-footer {
   padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.07);
@@ -734,6 +737,16 @@ body.mmode-picking #measureMap, body.mmode-picking #measureMap * { cursor: cross
 }
 .mroute-loading.show { display: flex; }
 .mroute-loading .dotspin { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.25); border-top-color: #FFD966; border-radius: 50%; animation: spin .7s linear infinite; }
+.mroute-notice {
+  display:none; position:absolute; top:58px; left:50%; transform:translateX(-50%); z-index:500;
+  width:min(calc(100% - 28px),620px); padding:8px 10px; border:1px solid #bfdbfe;
+  border-radius:9px; background:rgba(239,246,255,.96); color:#1e3a8a; box-shadow:0 4px 16px rgba(15,23,42,.2);
+  font:700 10.5px/1.4 var(--font); align-items:center; justify-content:space-between; gap:10px;
+}
+.mroute-notice.show { display:flex; }
+.mroute-notice.warn { border-color:#fcd34d; background:rgba(255,251,235,.97); color:#92400e; }
+.mroute-notice.error { border-color:#fca5a5; background:rgba(254,242,242,.97); color:#991b1b; }
+.mroute-notice button { flex:none; min-height:32px; padding:5px 9px; border:1px solid currentColor; border-radius:7px; background:#fff; color:inherit; font:800 9.5px var(--font); cursor:pointer; }
 .mpick-hint {
   display: none; position: absolute; bottom: 20px; left: 50%;
   transform: translateX(-50%); z-index: 500;
@@ -1472,6 +1485,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   .toast-container { bottom:calc(var(--mobile-nav) + 10px); }
   .measure-sidebar { height:min(46dvh, 430px); max-height:min(46dvh, 430px); padding-bottom:env(safe-area-inset-bottom, 0px); }
   .measure-map-wrap { min-height:54dvh; }
+  .mroute-notice { top:104px; width:calc(100% - 20px); align-items:flex-start; }
   .iw-wrap { width:min(280px, calc(100vw - 56px)); min-width:0; }
 }
 
@@ -2442,6 +2456,7 @@ body.mmode-picking .mpick-hint { display: flex; }
     <div id="measureOsmMap" class="active"></div>
 
     <div class="mroute-loading" id="mRouteLoading"><div class="dotspin"></div><span id="mRouteLoadingTxt">Menghitung rute…</span></div>
+    <div class="mroute-notice" id="mRouteNotice" role="status" aria-live="polite"><span id="mRouteNoticeText"></span><button type="button" onclick="retryMeasurementRoutes()">Coba Hitung Lagi</button></div>
 
     <div class="mmap-keywarn" id="mKeyWarn" style="display:none;">
       <h4 id="mKeyWarnTitle">⚠️ Google Maps API Key Error</h4>
@@ -7938,14 +7953,15 @@ function toast(msg, type) {
 
 // ══════════════════════════════════════════════════════════
 // 📐 MEASUREMENT — PURE FRONTEND, TIDAK KE DATABASE
-//    (Google Maps + Directions API — API sudah dimuat di <head>)
+//    (Google Maps Routes Library + fallback jarak lurus, serta OpenStreetMap)
 // ══════════════════════════════════════════════════════════
 
 var _mMap = null, _mMapInited = false, _mPickTarget = null;
 var _mSbVisible = true;
 var _mMks = {}, _mLbls = {};            // markers, labels
-var _mRoutes = {};                       // Google Maps dashed polylines per DP id
-var _mDirSvc = null;                     // DirectionsService instance
+var _mRoutes = {};                       // Google Maps road/fallback polylines per DP id
+var _mDirSvc = null;                     // compatibility fallback DirectionsService (Legacy)
+var _mRouteClassPromise = null;           // modern google.maps.routes.Route
 var _mDpIds  = ['1','2','3','4','5','6'];
 var _mLinesVisible = true;
 var _mRouteRunId = 0;
@@ -8019,6 +8035,9 @@ function openMeasurement() {
 function closeMeasurement() {
   ++_mRouteRunId;
   _mOsmStopDashAnimation();
+  var loadingEl = document.getElementById('mRouteLoading');
+  if (loadingEl) loadingEl.classList.remove('show');
+  _mShowRouteNotice('', '');
   mCancelPick();
   document.getElementById('measureOverlay').classList.remove('open');
   document.body.style.overflow = '';
@@ -8036,7 +8055,7 @@ function toggleMSidebar() {
   }, 320);
 }
 
-// ── INIT PETA MEASUREMENT (Google Maps sudah dimuat di <head>) ────
+// ── INIT PETA MEASUREMENT ────
 function _mInitMap() {
   var el = document.getElementById('measureMap');
   if (!el || !window.google || !google.maps) return;
@@ -8057,7 +8076,7 @@ function _mInitMap() {
     gestureHandling: 'greedy'
   });
 
-  _mDirSvc = new google.maps.DirectionsService();
+  _mDirSvc = typeof google.maps.DirectionsService === 'function' ? new google.maps.DirectionsService() : null;
 
   _mMap.addListener('click', function(e){
     if (_mPickTarget === null) return;
@@ -8224,6 +8243,158 @@ function _mMakeObjLabel(coord) {
   return overlay;
 }
 
+function _mNormalizeRoutePoint(point) {
+  if (!point) return null;
+  var lat = typeof point.lat === 'function' ? point.lat() : Number(point.lat);
+  var lng = typeof point.lng === 'function' ? point.lng() : Number(point.lng);
+  return isFinite(lat) && isFinite(lng) ? { lat:lat, lng:lng } : null;
+}
+
+function _mGetRouteClass() {
+  if (_mRouteClassPromise) return _mRouteClassPromise;
+  if (!window.google || !google.maps || typeof google.maps.importLibrary !== 'function') {
+    return Promise.reject(new Error('Google Maps Routes Library belum tersedia.'));
+  }
+  _mRouteClassPromise = google.maps.importLibrary('routes').then(function(library) {
+    if (!library || typeof library.Route !== 'function' || typeof library.Route.computeRoutes !== 'function') {
+      throw new Error('Route.computeRoutes tidak tersedia.');
+    }
+    return library.Route;
+  }).catch(function(error) {
+    _mRouteClassPromise = null;
+    throw error;
+  });
+  return _mRouteClassPromise;
+}
+
+function _mComputeModernRoadRoute(origin, destination) {
+  return _mGetRouteClass().then(function(Route) {
+    return Route.computeRoutes({
+      origin:origin,
+      destination:destination,
+      travelMode:'DRIVING',
+      routingPreference:'TRAFFIC_UNAWARE',
+      units:'METRIC',
+      fields:['path','distanceMeters','durationMillis','warnings']
+    });
+  }).then(function(result) {
+    var route = result && result.routes && result.routes[0];
+    if (!route || !route.path || !route.path.length) {
+      var noRoute = new Error('Routes API tidak menemukan rute jalan.');
+      noRoute.code = 'ZERO_RESULTS';
+      throw noRoute;
+    }
+    var path = route.path.map(_mNormalizeRoutePoint).filter(Boolean);
+    if (!path.length) throw new Error('Geometri rute jalan kosong.');
+    return {
+      source:'routes', path:path,
+      meters:Number(route.distanceMeters) || 0,
+      durationMillis:Number(route.durationMillis) || 0,
+      warnings:Array.isArray(route.warnings) ? route.warnings.slice() : []
+    };
+  });
+}
+
+function _mComputeLegacyRoadRoute(origin, destination) {
+  return new Promise(function(resolve, reject) {
+    if (!_mDirSvc || typeof _mDirSvc.route !== 'function') {
+      reject(new Error('Directions Service kompatibilitas tidak tersedia.'));
+      return;
+    }
+    _mDirSvc.route({
+      origin:origin,
+      destination:destination,
+      travelMode:google.maps.TravelMode.DRIVING,
+      unitSystem:google.maps.UnitSystem.METRIC
+    }, function(response, status) {
+      if (status !== 'OK' || !response || !response.routes || !response.routes[0]) {
+        var legacyError = new Error('Directions Service: ' + (status || 'UNKNOWN_ERROR'));
+        legacyError.code = status || 'UNKNOWN_ERROR';
+        reject(legacyError);
+        return;
+      }
+      var route = response.routes[0], leg = route.legs && route.legs[0];
+      var path = (route.overview_path || []).map(_mNormalizeRoutePoint).filter(Boolean);
+      if (!path.length && leg && leg.steps) {
+        leg.steps.forEach(function(step) {
+          (step.path || []).forEach(function(point) {
+            var normalized = _mNormalizeRoutePoint(point);
+            if (normalized) path.push(normalized);
+          });
+        });
+      }
+      if (!path.length) {
+        reject(new Error('Directions Service tidak mengembalikan geometri jalan.'));
+        return;
+      }
+      resolve({
+        source:'legacy', path:path,
+        meters:leg && leg.distance ? Number(leg.distance.value) || 0 : 0,
+        durationMillis:leg && leg.duration ? (Number(leg.duration.value) || 0) * 1000 : 0,
+        warnings:Array.isArray(route.warnings) ? route.warnings.slice() : []
+      });
+    });
+  });
+}
+
+function _mFriendlyRouteError(error) {
+  var raw = String((error && (error.code || error.message)) || 'UNKNOWN_ERROR');
+  if (/PERMISSION|DENIED|ApiNotActivated|API_KEY|403/i.test(raw)) return 'Routes API belum diaktifkan atau belum diizinkan pada API key.';
+  if (/ZERO_RESULTS|NOT_FOUND/i.test(raw)) return 'Rute jalan tidak ditemukan untuk koordinat tersebut.';
+  if (/OVER_QUERY|RESOURCE_EXHAUSTED|429/i.test(raw)) return 'Kuota layanan rute sedang terlampaui.';
+  if (/INVALID/i.test(raw)) return 'Koordinat atau permintaan rute tidak valid.';
+  return 'Layanan rute Google belum dapat memberikan jalur jalan.';
+}
+
+function _mComputeRoadRoute(origin, destination) {
+  return _mComputeModernRoadRoute(origin, destination).catch(function(modernError) {
+    return _mComputeLegacyRoadRoute(origin, destination).then(function(result) {
+      result.modernError = modernError;
+      return result;
+    }).catch(function(legacyError) {
+      var finalError = new Error(_mFriendlyRouteError(modernError));
+      finalError.modernError = modernError;
+      finalError.legacyError = legacyError;
+      throw finalError;
+    });
+  });
+}
+
+function _mFormatRouteDuration(milliseconds) {
+  var minutes = Math.max(1, Math.round((Number(milliseconds) || 0) / 60000));
+  if (!milliseconds) return '';
+  if (minutes < 60) return minutes + ' mnt';
+  var hours = Math.floor(minutes / 60), remaining = minutes % 60;
+  return hours + ' jam' + (remaining ? ' ' + remaining + ' mnt' : '');
+}
+
+function _mSetDistanceState(element, text, fallback, title) {
+  if (!element) return;
+  element.textContent = text;
+  element.title = title || '';
+  element.classList.toggle('route-fallback', !!fallback);
+  element.classList.remove('route-loading');
+}
+
+var _mRouteNoticeTimer = null;
+function _mShowRouteNotice(type, message) {
+  var notice = document.getElementById('mRouteNotice'), textEl = document.getElementById('mRouteNoticeText');
+  if (!notice || !textEl) return;
+  clearTimeout(_mRouteNoticeTimer);
+  if (!type || !message) { notice.className = 'mroute-notice'; return; }
+  notice.className = 'mroute-notice show' + (type === 'success' ? '' : ' ' + type);
+  textEl.textContent = message;
+  var button = notice.querySelector && notice.querySelector('button');
+  if (button) button.style.display = type === 'success' ? 'none' : '';
+  if (type === 'success') _mRouteNoticeTimer = setTimeout(function() { notice.className = 'mroute-notice'; }, 4000);
+}
+
+function retryMeasurementRoutes() {
+  _mRouteClassPromise = null;
+  _mShowRouteNotice('', '');
+  if (!_mOsmActive) _mRedraw();
+}
+
 // ── REDRAW PETA ───────────────────────────────────────────
 function _mRedraw() {
   if (!_mMap || !window.google || !google.maps) return;
@@ -8238,7 +8409,6 @@ function _mRedraw() {
   var bounds = new google.maps.LatLngBounds();
   var hasBounds = false;
   var summaryData = [];     // dipakai untuk ringkasan setelah semua rute selesai
-  var pendingRoutes = 0;
 
   if (cObj) {
     _mMks['obj'] = _mMakePin(cObj, '#db4437', 'OBJ', true);
@@ -8252,90 +8422,101 @@ function _mRedraw() {
     var inp = document.getElementById('mCoord_'+id);
     var coord = _mParse(inp.value);
     var distEl = document.getElementById('mDist_'+id);
-    if (!coord) { if(distEl) distEl.textContent='–'; return; }
+    if (!coord) { _mSetDistanceState(distEl, '–', false, ''); return; }
 
     _mMks[id] = _mMakePin(coord, '#db4437', 'DP'+id, false);
     bounds.extend(coord); hasBounds = true;
     activeDps.push({ id: id, coord: coord, distEl: distEl });
   });
 
-  // Hitung rute Driving via Directions API untuk tiap DP terhadap OBJ
+  // Hitung rute Driving via Routes API untuk tiap DP terhadap OBJ.
   if (cObj && activeDps.length > 0) {
     var loadingEl = document.getElementById('mRouteLoading');
     if (loadingEl) {
       document.getElementById('mRouteLoadingTxt').textContent = 'Menghitung rute (' + activeDps.length + ')…';
       loadingEl.classList.add('show');
     }
-    pendingRoutes = activeDps.length;
+    _mShowRouteNotice('', '');
+    activeDps.forEach(function(dp) {
+      if (dp.distEl) {
+        dp.distEl.textContent = 'Menghitung…';
+        dp.distEl.classList.add('route-loading');
+        dp.distEl.classList.remove('route-fallback');
+      }
+    });
 
-    activeDps.forEach(function(dp){
-      _mDirSvc.route({
-        origin: cObj,
-        destination: dp.coord,
-        travelMode: google.maps.TravelMode.DRIVING,
-        unitSystem: google.maps.UnitSystem.METRIC
-      }, function(res, status){
+    Promise.all(activeDps.map(function(dp){
+      return _mComputeRoadRoute(cObj, dp.coord).then(function(result) {
         if (routeRunId !== _mRouteRunId || _mOsmActive ||
-            !document.getElementById('measureOverlay').classList.contains('open')) return;
-        var ds, meters;
-        if (status === google.maps.DirectionsStatus.OK && res && res.routes && res.routes[0]) {
-          var leg = res.routes[0].legs[0];
-          meters = leg.distance.value;
-          ds = leg.distance.text;
+            !document.getElementById('measureOverlay').classList.contains('open')) return null;
 
-          // Ikuti geometri jalan dari Directions hingga tepat ke titik pin.
-          var path = res.routes[0].overview_path || [];
-          if (!path.length && leg.steps) {
-            leg.steps.forEach(function(step) {
-              if (step.path) step.path.forEach(function(point) { path.push(point); });
-            });
-          }
-          if (!path.length) {
-            path = [cObj, dp.coord];
-            ds += ' (jalur peta tidak tersedia)';
-          }
-          path = _mRoutePathToPins(path, cObj, dp.coord);
-          _mRoutes[dp.id] = _mCreateRoutePolyline(path, _mRouteColors[dp.id] || '#0033ff');
-          _mSyncLineVisibility();
-
-          // Perluas bounds ke seluruh rute
-          path.forEach(function(p){ bounds.extend(p); });
-          hasBounds = true;
-        } else {
-          // Fallback: pakai jarak garis lurus (haversine) jika Directions gagal
-          var km = _mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng);
-          meters = km * 1000;
-          ds = _mFmtDist(km) + ' (lurus)';
-          // Garis cadangan lurus; label menandai "lurus".
-          _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
-          _mSyncLineVisibility();
-        }
-
-        if (dp.distEl) dp.distEl.textContent = ds;
+        var path = _mRoutePathToPins(result.path, cObj, dp.coord);
+        var meters = result.meters || (_mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng) * 1000);
+        var duration = _mFormatRouteDuration(result.durationMillis);
+        var ds = _mFmtMeters(meters) + (duration ? ' · ' + duration : '');
+        _mRoutes[dp.id] = _mCreateRoutePolyline(path, _mRouteColors[dp.id] || '#0033ff');
+        _mSyncLineVisibility();
+        path.forEach(function(point){ bounds.extend(point); });
+        hasBounds = true;
+        _mSetDistanceState(dp.distEl, ds, false, 'Rute jalan Google');
         _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, ds, cObj);
-        summaryData.push({ id: dp.id, dist: ds, meters: meters, color: _mRouteColors[dp.id] || '#0033ff' });
+        return {
+          id:dp.id, dist:ds, meters:meters, color:_mRouteColors[dp.id] || '#0033ff',
+          source:result.source, warnings:result.warnings || []
+        };
+      }).catch(function(error) {
+        if (routeRunId !== _mRouteRunId || _mOsmActive ||
+            !document.getElementById('measureOverlay').classList.contains('open')) return null;
 
-        pendingRoutes--;
-        if (pendingRoutes === 0) {
-          // Semua rute selesai: render ringkasan & fit bounds
-          if (summaryData.length > 0) {
-            sumEl.style.display = 'block';
-            summaryData.sort(function(a,b){ return a.meters - b.meters; });
-            sumRows.innerHTML = summaryData.map(function(r){
-              return '<div class="msb-sum-row">'
-                +'<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+r.color+';"></span> Data '+r.id+'</span>'
-                +'<span class="msb-sum-val">'+r.dist+'</span>'
-                +'</div>';
-            }).join('');
-          } else { sumEl.style.display = 'none'; }
-          if (loadingEl) loadingEl.classList.remove('show');
-          if (hasBounds) _mMap.fitBounds(bounds, 80);
-        }
+        var km = _mHaversine(cObj.lat, cObj.lng, dp.coord.lat, dp.coord.lng);
+        var ds = _mFmtDist(km) + ' · lurus';
+        var reason = (error && error.message) || _mFriendlyRouteError(error);
+        _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
+        _mSyncLineVisibility();
+        _mSetDistanceState(dp.distEl, ds, true, 'Rute jalan gagal: ' + reason);
+        _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id, ds, cObj);
+        return {
+          id:dp.id, dist:ds, meters:km * 1000, color:_mRouteColors[dp.id] || '#0033ff',
+          fallback:true, error:reason
+        };
       });
+    })).then(function(results) {
+      if (routeRunId !== _mRouteRunId || _mOsmActive ||
+          !document.getElementById('measureOverlay').classList.contains('open')) return;
+
+      summaryData = results.filter(Boolean);
+      if (summaryData.length > 0) {
+        sumEl.style.display = 'block';
+        summaryData.sort(function(a,b){ return a.meters - b.meters; });
+        sumRows.innerHTML = summaryData.map(function(r){
+          return '<div class="msb-sum-row">'
+            +'<span class="msb-sum-key"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+r.color+';"></span> Data '+r.id+'</span>'
+            +'<span class="msb-sum-val'+(r.fallback ? ' route-fallback' : '')+'">'+r.dist+'</span>'
+            +'</div>';
+        }).join('');
+      } else { sumEl.style.display = 'none'; }
+      if (loadingEl) loadingEl.classList.remove('show');
+      if (hasBounds) _mMap.fitBounds(bounds, 80);
+
+      var fallbackRows = summaryData.filter(function(row){ return row.fallback; });
+      var legacyRows = summaryData.filter(function(row){ return row.source === 'legacy'; });
+      if (fallbackRows.length) {
+        _mShowRouteNotice(
+          fallbackRows.length === summaryData.length ? 'error' : 'warn',
+          fallbackRows.length + ' dari ' + summaryData.length + ' rute tidak tersedia dan ditampilkan sebagai garis lurus. ' + fallbackRows[0].error
+        );
+      } else if (legacyRows.length) {
+        _mShowRouteNotice('warn', 'Rute jalan aktif melalui layanan kompatibilitas. Aktifkan Routes API pada project Google Cloud untuk dukungan terbaru.');
+      } else {
+        _mShowRouteNotice('success', 'Rute jalan Google aktif untuk ' + summaryData.length + ' data pembanding.');
+      }
     });
   } else {
     // Tidak ada rute yang dihitung
     sumEl.style.display = 'none';
+    var idleLoadingEl = document.getElementById('mRouteLoading');
+    if (idleLoadingEl) idleLoadingEl.classList.remove('show');
+    _mShowRouteNotice('', '');
     if (hasBounds) {
       if (activeDps.length === 0 && cObj) _mMap.setCenter(cObj), _mMap.setZoom(17);
       else _mMap.fitBounds(bounds, 80);
@@ -8406,6 +8587,10 @@ function toggleMeasureOSM() {
 
   if (_mOsmActive) {
     // Switch ke OSM
+    ++_mRouteRunId;
+    var loadingEl = document.getElementById('mRouteLoading');
+    if (loadingEl) loadingEl.classList.remove('show');
+    _mShowRouteNotice('', '');
     btn.classList.add('active');
     btn.setAttribute('aria-label', 'Beralih ke Google Maps');
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>';
@@ -8538,7 +8723,7 @@ function _mOsmRedraw() {
     var inp = document.getElementById('mCoord_' + id);
     var coord = _mParse(inp.value);
     var distEl = document.getElementById('mDist_' + id);
-    if (!coord) { if (distEl) distEl.textContent = '–'; return; }
+    if (!coord) { _mSetDistanceState(distEl, '–', false, ''); return; }
 
     var color = _mRouteColors[id] || '#0033ff';
     var mDp = L.marker([coord.lat, coord.lng], { icon: _mOsmMakeIcon('#db4437', 'DP' + id, false), zIndexOffset: 500 }).addTo(_mOsmMap);
@@ -8550,7 +8735,7 @@ function _mOsmRedraw() {
       var km = _mHaversine(cObj.lat, cObj.lng, coord.lat, coord.lng);
       var meters = km * 1000;
       var ds = _mFmtDist(km);
-      if (distEl) distEl.textContent = ds + ' (lurus)';
+      _mSetDistanceState(distEl, ds + ' (lurus)', false, 'Jarak garis lurus OpenStreetMap');
 
       // Gambar garis lurus (polyline dashed) — warna lebih kontras & tebal
       var line = L.polyline([[cObj.lat, cObj.lng], [coord.lat, coord.lng]], {
