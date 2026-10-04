@@ -116,9 +116,9 @@ async function settle() {
   const pin = c._mMakePin({ lat: -5.380964, lng: 105.284946 }, '#db4437', 'OBJ', true);
   assert.equal(pin.opts.icon.anchor.y, 46, 'Titik koordinat Google tepat di ujung pin, bukan bayangan');
   c._mMakePin = () => ({ setMap() {} });
-  const labelTexts = [];
+  const labelCalls = [];
   c._mMakeObjLabel = () => ({ setMap() {} });
-  c._mMakeLabel = (coord, id, text) => { labelTexts.push(text); return { setMap() {} }; };
+  c._mMakeLabel = (...args) => { labelCalls.push(args); return { setMap() {} }; };
   const road = [{ lat: -5.381, lng: 105.2848 }, { lat: -5.3814, lng: 105.283 }, { lat: -5.3825, lng: 105.2803 }];
   let modernMode = 'success';
   class Route {
@@ -155,7 +155,8 @@ async function settle() {
   assert.equal(c._mRoutes['1'].opts.strokeOpacity, 1);
   assert.equal(c._mRoutes['1'].opts.icons, undefined, 'Simbol berulang tidak boleh melebihi ujung pin');
   assert.equal(node('mDist_1').textContent, '790 m · 2 mnt');
-  assert.equal(labelTexts.at(-1), '790 m', 'Label pin Google hanya menampilkan jarak');
+  assert.equal(labelCalls.at(-1).length, 2, 'Label pin Google tidak menerima teks jarak');
+  assert.equal(labelCalls.at(-1)[1], '1', 'Label pin Google hanya mengidentifikasi Data 1');
   assert.match(node('mRouteNoticeText').textContent, /Rute jalan Google aktif/);
   c.mZoomMeasurement(1);
   assert.equal(c._mMap.getZoom(), 15);
@@ -171,7 +172,7 @@ async function settle() {
   assert.equal(c._mRoutes['1'].opts.path.length, 2);
   assert.equal(c._mRoutes['1'].opts.path[0].lat, -5.380964);
   assert.equal(c._mRoutes['1'].opts.path[1].lat, -5.382664);
-  assert.doesNotMatch(labelTexts.at(-1), /lurus|mnt/, 'Label fallback di atas pin tetap ringkas');
+  assert.equal(labelCalls.at(-1).length, 2, 'Label fallback tidak menerima jarak maupun status lurus');
   assert.match(node('mRouteNoticeText').textContent, /1 dari 1 rute/);
   c.dismissMeasurementRouteNotice();
   assert.equal(c.sessionStorage.value, '1', 'Peringatan yang ditutup disembunyikan selama sesi browser');
@@ -253,7 +254,9 @@ async function settle() {
   assert.match(html, /\.mmap-layer-toggle \{ grid-column:span 2;/);
   assert.match(html, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(html, /Route\.computeRoutes/);
-  assert.match(html, /<div class="mdl-pill">' \+ ds \+ '<\/div><\/div>/, 'Label pin OSM hanya berisi jarak');
+  assert.doesNotMatch(extract('_mMakeLabel'), /mdl-pill|distanceText/, 'Label pin Google hanya berisi nama data');
+  assert.doesNotMatch(extract('_mOsmRedraw'), /labelHtml[\s\S]*mdl-pill/, 'Label pin OSM tidak memuat jarak');
+  assert.match(extract('_mOsmRedraw'), /Data ' \+ id/, 'Label pin OSM tetap menampilkan nomor data');
   console.log('Measurement: Routes API, fallback, animasi OSM, toggle, zoom, dan respons terlambat OK');
 })().catch(error => {
   console.error(error);
