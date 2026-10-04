@@ -114,6 +114,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .quality-chip.good { background:#dcfce7; border-color:#86efac; color:#166534; }
 .quality-chip.warn { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
 .quality-chip.bad { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+.quality-chip.action { cursor:pointer; font-family:var(--font); }
+.quality-chip.action:hover, .quality-chip.action:focus-visible { box-shadow:0 0 0 2px rgba(45,107,228,.22); outline:none; }
+.quality-chip.neutral { background:#f1f5f9; border-color:#cbd5e1; color:#475569; }
+.data-table tbody tr.review-excluded { opacity:.62; background:#f8fafc; }
+.data-table tbody tr.review-excluded td { text-decoration-color:#94a3b8; }
+.quality-review-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.quality-review-section { border:1px solid var(--border); border-radius:10px; background:#fff; padding:12px; }
+.quality-review-section h4 { margin:0 0 9px; color:var(--navy); font-size:12px; }
+.quality-breakdown { display:grid; gap:6px; }
+.quality-breakdown-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start; padding:7px 8px; border-radius:7px; background:#f8fafc; font-size:11px; }
+.quality-breakdown-row strong { display:block; color:var(--text); }
+.quality-breakdown-row small { color:var(--text-sub); line-height:1.35; }
+.quality-impact { font-weight:800; color:#b91c1c; white-space:nowrap; }
+.quality-impact.positive { color:#15803d; }
+.quality-review-note { margin-top:8px; padding:8px; border-left:3px solid #f59e0b; background:#fffbeb; color:#78350f; font-size:11px; line-height:1.45; }
+.quality-target-summary { display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:9px; font-size:11px; color:#1e3a8a; }
+.quality-target-summary.empty { background:#f8fafc; border-color:var(--border); color:var(--text-sub); }
+.quality-target-button { border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:8px; min-height:34px; padding:6px 10px; font:700 11px var(--font); cursor:pointer; white-space:nowrap; }
+.quality-target-button.active { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
+.quality-form-help { margin-top:4px; color:var(--text-sub); font-size:10px; line-height:1.4; }
 .card-actions { display:flex; gap:5px; width:100%; }
 .card-action { flex:1; min-height:36px; display:inline-flex; align-items:center; justify-content:center; gap:4px; border:0; border-radius:7px; color:#fff; font:700 10.5px var(--font); cursor:pointer; }
 .card-action.detail { background:var(--navy); }
@@ -462,6 +482,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .mc-scenario-grid > div { min-width:0; padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; font-size:11px; color:var(--navy); }
 
 @media (max-width: 768px) {
+  .quality-review-grid { grid-template-columns:1fr; }
   .mc-var-grid3 { grid-template-columns:1fr; }
   .mc-scenario-grid { grid-template-columns:1fr; }
   #mcResultWrap > div[style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns:repeat(2,1fr) !important; }
@@ -1659,6 +1680,7 @@ body.mmode-picking .mpick-hint { display: flex; }
         </div>
       </div>
       <div class="active-filter-chips" id="activeFilterChips" aria-label="Filter aktif"></div>
+      <button class="quality-target-button" id="qualityTargetButton" type="button" onclick="openQualityTargetModal()">🎯 Profil Aset</button>
       <div class="view-toggle">
         <button class="btn-view" id="btnGPS" onclick="locateMe()" title="Lokasi Saya" style="background:#fce8e6; color:#ea4335; border-color:#ea4335; display:none;">📍 Lokasi Saya</button>
         <button class="btn-view" id="btnHeatmap" onclick="toggleHeatmap()" style="color:#ea4335; border-color:#ea4335;">🔥 Heatmap</button>
@@ -2104,6 +2126,49 @@ body.mmode-picking .mpick-hint { display: flex; }
     </div>
   </div>
 </div>
+
+<!-- MODAL PROFIL ASET TARGET UNTUK UJI KESEBANDINGAN -->
+<div class="modal-overlay" id="qualityTargetOverlay" onclick="if(event.target===this)closeQualityTargetModal()">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">🎯 Profil Aset yang Dinilai</div>
+      <button class="btn-close" onclick="closeQualityTargetModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="parameter-note"><strong>Dasar uji kesebandingan.</strong> Isi karakteristik aset target. Skor yang tampil adalah alat bantu penyaringan internal, bukan kesimpulan nilai atau pengganti pertimbangan penilai.</div>
+      <div class="modal-grid">
+        <div class="form-group span-2"><label class="form-label">Koordinat aset</label><input id="qtKoordinat" class="form-input" placeholder="-6.1744,106.8227"><div class="quality-form-help">Jika kosong, jarak memakai pusat pencarian aktif.</div></div>
+        <div class="form-group"><label class="form-label">Jenis properti</label><input id="qtObjek" class="form-input" placeholder="Tanah Bangunan"></div>
+        <div class="form-group"><label class="form-label">Legalitas</label><input id="qtLegalitas" class="form-input" placeholder="SHM"></div>
+        <div class="form-group"><label class="form-label">Luas tanah (m²)</label><input id="qtLuasTanah" class="form-input" type="number" min="0" inputmode="decimal"></div>
+        <div class="form-group"><label class="form-label">Luas bangunan (m²)</label><input id="qtLuasBangunan" class="form-input" type="number" min="0" inputmode="decimal"></div>
+        <div class="form-group"><label class="form-label">Jenis data yang diutamakan</label><select id="qtStatusData" class="form-select"><option value="">Tidak dibatasi</option><option>Penawaran</option><option>Transaksi</option><option>Sewa</option></select></div>
+        <div class="form-group"><label class="form-label">Lebar jalan / ROW (m)</label><input id="qtROW" class="form-input" type="number" min="0" inputmode="decimal"></div>
+      </div>
+      <div id="qualityTargetPreview" class="quality-target-summary empty" style="margin-top:12px;">Belum ada profil aset tersimpan.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-submit" type="button" onclick="clearQualityTargetProfile()" style="background:#fff;color:#b91c1c;border:1px solid #fecaca;">Hapus Profil</button>
+      <button class="btn-submit" type="button" onclick="closeQualityTargetModal()" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);">Batal</button>
+      <button class="btn-submit" type="button" onclick="saveQualityTargetProfile()">Simpan &amp; Hitung Ulang</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REVIEW KUALITAS DAN VERIFIKASI -->
+<div class="modal-overlay" id="qualityReviewOverlay" onclick="if(event.target===this)closeQualityReviewModal()">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-header">
+      <div class="modal-title" id="qualityReviewTitle">🛡 Review Kualitas Data</div>
+      <button class="btn-close" onclick="closeQualityReviewModal()">×</button>
+    </div>
+    <div class="modal-body" id="qualityReviewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-submit" type="button" onclick="closeQualityReviewModal()" style="background:transparent;color:var(--text-sub);border:1px solid var(--border);">Tutup</button>
+      <button class="btn-submit" id="btnSaveQualityReview" type="button" onclick="saveQualityReviewForCurrent()">💾 Simpan Review</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
   <div class="modal">
     <div class="modal-header">
@@ -2522,6 +2587,7 @@ class GasRunner {
   getFilterOptions() { this._call('getFilterOptions', []); }
   getMasterParameters(user) { this._call('getMasterParameters', [user]); }
   saveMasterParameters(rows, user) { this._call('saveMasterParameters', [rows, user]); }
+  saveQualityReview(payload, user) { this._call('saveQualityReview', [payload, user]); }
 }
 
 var _googleMapsLoadPromise = null;
@@ -2585,6 +2651,8 @@ var gMap = null, gMarkers = [], centerMarker = null, circleObj = null;
 var _gMarkerByUid = {}, _osmMarkerByUid = {}, _selectedPropertyUid = null;
 var _gMarkerCluster = null, _osmClusterGroup = null, _markerRenderVersion = 0;
 var currentData = [], currentView = 'map', _iconCounter = 0;
+var _lastSearchParams = null, _qualityReviewUid = null;
+var QUALITY_TARGET_STORAGE_PREFIX = 'databasePembanding:qualityTarget:v1:';
 var _fotoDataUrl = null, _fotoFilename = null;
 var _editingId = null, _editingFoto = '';
 var _pickingLocation = false;
@@ -3242,7 +3310,7 @@ function _syncMarkersToOSM() {
     var coord = _parseCoordJS(row.koordinat);
     if (!coord) return;
 
-    var color = colorMap[row.objek] || '#1e3a5f';
+    var color = row._excluded ? '#64748b' : (colorMap[row.objek] || '#1e3a5f');
     var pinLabel = (typeof _getPinLabel === 'function') ? _getPinLabel(row.id) : 'DP';
     var icon = L.divIcon({
       className: 'osm-custom-marker',
@@ -3336,6 +3404,8 @@ function switchAVMTab(tabName) {
 
 function initAVMAnalysis() {
   if (!currentData || currentData.length === 0) { toast('Lakukan pencarian data terlebih dahulu!', 'error'); return; }
+  var analysisData = currentData.filter(function(row) { return !row._excluded; });
+  if (analysisData.length === 0) { toast('Semua data hasil pencarian sedang dikecualikan dari analisis.', 'error'); return; }
 
   var runToken = ++_analysisRunToken;
   _analysisReady = false;
@@ -3394,7 +3464,7 @@ function initAVMAnalysis() {
   // Step 1: time-adjusted price untuk SEMUA pembanding (tanpa RaLAT dulu).
   // Sinkronkan dulu supaya kalau model tidak tersedia, AVM tetap jalan.
   var rowsForRalat = [];
-  currentData.forEach(function(row) {
+  analysisData.forEach(function(row) {
     var priceStr = String(row.indikasiNilai || '').replace(/[^0-9]/g, '');
     var price = parseFloat(priceStr);
     if (isNaN(price) || price <= 0) return;
@@ -4975,6 +5045,7 @@ function doSearch() {
   setSearchButtonLoading(true);
   setSearchState('loading');
   var params = collectParams();
+  _lastSearchParams = params;
 
   if (params.radiusKm === 'polygon' && (!params.polygon || params.polygon.length < 3)) {
       setSearchButtonLoading(false);
@@ -5008,8 +5079,10 @@ function doSearch() {
         currentData = decorateAppraisalData(currentData, params);
 
         document.getElementById('resultCount').textContent = res.total; 
-        calculateSidebarStats(currentData); 
-        document.getElementById('btnAnalisa').disabled = false;
+        var activeData = currentData.filter(function(row) { return !row._excluded; });
+        calculateSidebarStats(activeData);
+        document.getElementById('btnAnalisa').disabled = activeData.length === 0;
+        renderQualityTargetSummary();
 
         renderMarkers(currentData, params); 
         renderTable(currentData); 
@@ -5034,7 +5107,10 @@ function toggleHeatmap() {
 }
 
 function renderMarkers(data, params) {
-  if (!gMap) return;
+  if (!gMap) {
+    if (_currentMapMode === 'osm' && _osmMap) _syncMarkersToOSM();
+    return;
+  }
   var renderVersion = ++_markerRenderVersion;
   // Clear existing markers
   if (_gMarkerCluster) { _gMarkerCluster.clearMarkers(); _gMarkerCluster.setMap(null); _gMarkerCluster = null; }
@@ -5061,7 +5137,7 @@ function renderMarkers(data, params) {
     var price = parseFloat(priceStr) || 0;
     if(price > 0) { heatData.push({ location: new google.maps.LatLng(coord.lat, coord.lng), weight: price }); }
 
-    var color  = PIN_COLORS[row.objek] || '#9e9e9e';
+    var color  = row._excluded ? '#64748b' : (PIN_COLORS[row.objek] || '#9e9e9e');
     var label  = _getPinLabel(row.id);
     var marker = new google.maps.Marker({
       position: { lat: coord.lat, lng: coord.lng },
@@ -5164,7 +5240,8 @@ function moveFoto(btn, dir, max) { var container = btn.parentElement, slider = c
 function buildPopup(row) {
   function f(v) { return (v !== undefined && v !== null && String(v).trim() !== '') ? String(v).trim() : '–'; }
   function esc(v) { return f(v).replace(/'/g, "\\'"); } 
-  var isViewer = (activeRole === 'Viewer'); var disabledAttr = isViewer ? 'disabled' : '';
+  var isViewer = (activeRole === 'Viewer'); var disabledAttr = isViewer ? 'disabled' : ''; var compareDisabled = row._excluded ? 'disabled' : '';
+  var review = _getQualityReview(row);
   var rawPhotos = f(row.foto); var photos = rawPhotos !== '–' ? rawPhotos.split(',').map(function(u){ return u.trim(); }).filter(function(u){ return u.length > 0; }) : [];
   var fotoHtml = '';
   if (photos.length > 0) { var imgs = photos.map(function(url) { return '<img src="' + url + '" alt="Foto"/>'; }).join(''); var navHtml = photos.length > 1 ? '<button class="iw-foto-nav iw-foto-prev" onclick="moveFoto(this, -1, ' + photos.length + ')">❮</button><button class="iw-foto-nav iw-foto-next" onclick="moveFoto(this, 1, ' + photos.length + ')">❯</button><div class="iw-foto-count">1/' + photos.length + '</div>' : ''; fotoHtml = '<div class="iw-foto-container">' + navHtml + '<div class="iw-foto-slider" data-idx="0">' + imgs + '</div></div>'; }
@@ -5183,11 +5260,12 @@ function buildPopup(row) {
   if (f(row.sumber) !== '–') headerLabel += ' - ' + f(row.sumber);
 
   return '<div class="iw-wrap">' + fotoHtml + '<div class="iw-header"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + headerLabel.replace(/"/g,'&quot;') + '">' + headerLabel + '</span><span class="iw-badge">' + f(row.legalitas) + '</span><div style="display:flex; gap:4px;">'
-    + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" ' + disabledAttr + '>⚖️</button>'
+    + '<button class="iw-foto-btn" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="toggleCompare(\'' + row._uid + '\')" title="Bandingkan" ' + compareDisabled + '>⚖️</button>'
+    + '<button class="iw-foto-btn" style="background:#0f766e; border-color:#0f766e;" onclick="openQualityReview(\'' + row._uid + '\')" title="Review Kualitas">🛡</button>'
     + '<button class="iw-foto-btn" style="background:#1e3a5f; border-color:#1e3a5f;" onclick="openDetailModal(\'' + row._uid + '\')" title="Lihat Data">👁</button>'
     + '<button class="iw-foto-btn" style="background:#f4b400; border-color:#f4b400;" onclick="openEditModal(\'' + f(row.id) + '\', \'' + f(row.koordinat) + '\')" title="Edit Seluruh Data" ' + disabledAttr + '>✏️</button>'
     + '<button class="iw-foto-btn" onclick="triggerFotoUpdate(\'' + f(row.id) + '\',\'' + f(row.koordinat) + '\',\'' + esc(row.sumber) + '\')" title="Tambah Foto" ' + disabledAttr + '>+</button>'
-    + '</div></div><div class="iw-body">' + _iwr('Alamat', f(row.alamat)) + _iwr('Kota/Prov.', f(row.kota) + ' / ' + f(row.provinsi)) + _iwr('Tipe Bangunan', f(row.tipeBangunan)) + _iwr('Luas Tanah', f(row.luasTanah) !== '–' ? f(row.luasTanah) + ' m²' : '–') + _iwr('Luas Bangunan', f(row.luasBangunan) !== '–' ? f(row.luasBangunan) + ' m²' : '–') + _iwr('Harga', '<span class="iw-harga">' + formatRupiah(row.harga) + '</span>') + _iwr('Ind. Nilai/m²', '<span class="iw-harga">' + formatRupiah(row.indikasiNilai) + '</span>') + _iwr('ROW Jalan', f(row.lebarJalanROW) !== '–' ? f(row.lebarJalanROW) + ' m' : '–') + _iwr('Peruntukan', f(row.peruntukan)) + _iwr('Status Harga', f(row.statusHarga)) + _iwr('Waktu Data', f(row.waktuData) + getAgingFlag(row.waktuData)) + _iwr('Sumber / HP', f(row.sumber) + ' / ' + f(row.hp))
+    + '</div></div><div class="iw-body">' + _iwr('Status Review', f(review.reviewStatus) + ' · ' + f(review.verificationStatus)) + _iwr('Alamat', f(row.alamat)) + _iwr('Kota/Prov.', f(row.kota) + ' / ' + f(row.provinsi)) + _iwr('Tipe Bangunan', f(row.tipeBangunan)) + _iwr('Luas Tanah', f(row.luasTanah) !== '–' ? f(row.luasTanah) + ' m²' : '–') + _iwr('Luas Bangunan', f(row.luasBangunan) !== '–' ? f(row.luasBangunan) + ' m²' : '–') + _iwr('Harga', '<span class="iw-harga">' + formatRupiah(row.harga) + '</span>') + _iwr('Ind. Nilai/m²', '<span class="iw-harga">' + formatRupiah(row.indikasiNilai) + '</span>') + _iwr('ROW Jalan', f(row.lebarJalanROW) !== '–' ? f(row.lebarJalanROW) + ' m' : '–') + _iwr('Peruntukan', f(row.peruntukan)) + _iwr('Status Harga', f(row.statusHarga)) + _iwr('Waktu Data', f(row.waktuData) + getAgingFlag(row.waktuData)) + _iwr('Sumber / HP', f(row.sumber) + ' / ' + f(row.hp))
     + '<div class="iw-footer"><a href="' + gmapsUrl + '" target="_blank" class="btn-gmaps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> Peta Google</a><a href="' + svUrl + '" target="_blank" class="btn-gmaps btn-streetview">👤 Street View</a></div>'
     + poiHtml + '</div></div>';
 }
@@ -6734,31 +6812,107 @@ function getRowCompletenessMeta(row) {
   return { filled:filled, total:keys.length, percent:Math.round(filled / keys.length * 100), complete:filled >= Math.ceil(keys.length * .70) };
 }
 
-function getAppraisalQualityMeta(row) {
-  var completeness = getRowCompletenessMeta(row);
-  var warnings = [], score = completeness.percent;
+function _defaultQualityReviewClient() {
+  return { verificationStatus:'Belum Diverifikasi', verificationNote:'', verifiedBy:'', verifiedAt:'', reviewStatus:'Aktif', duplicateDecision:'Belum Ditinjau', qualityNote:'', updatedBy:'', updatedAt:'' };
+}
+
+function _getQualityReview(row) {
+  return Object.assign(_defaultQualityReviewClient(), row && row.qualityReview ? row.qualityReview : {});
+}
+
+function _qualityTargetStorageKey() {
+  return QUALITY_TARGET_STORAGE_PREFIX + (activeUsername || 'anonymous');
+}
+
+function getQualityTargetProfile() {
+  try {
+    var parsed = JSON.parse(localStorage.getItem(_qualityTargetStorageKey()) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) { return {}; }
+}
+
+function _qualityTargetIsActive(profile) {
+  return !!(profile && ['koordinat','objek','legalitas','luasTanah','luasBangunan','statusData','lebarJalanROW'].some(function(key) { return _hasMeaningfulValue(profile[key]); }));
+}
+
+function _relativeDifferencePct(value, target) {
+  var a = parseFloat(value), b = parseFloat(target);
+  if (!isFinite(a) || !isFinite(b) || b <= 0) return null;
+  return Math.abs(a - b) / b * 100;
+}
+
+function getComparabilityMeta(row, profile) {
+  profile = profile || getQualityTargetProfile();
+  var review = _getQualityReview(row), factors = [], score = 100;
   var yearMatch = String(row.waktuData || '').match(/(?:19|20)\d{2}/);
   var year = yearMatch ? Number(yearMatch[0]) : null;
   var age = year ? Math.max(0, new Date().getFullYear() - year) : null;
-  if (age === null) { warnings.push('Waktu data kosong'); score -= 8; }
-  else if (age > 1) { warnings.push('Data lama'); score -= Math.min(18, age * 4); }
-  if (!_hasMeaningfulValue(row.sumber)) { warnings.push('Sumber kosong'); score -= 8; }
-  if (!_hasMeaningfulValue(row.koordinat)) { warnings.push('Koordinat kosong'); score -= 10; }
-  if (!_hasMeaningfulValue(row.foto)) { warnings.push('Foto kosong'); score -= 6; }
-  if (!_hasMeaningfulValue(row.indikasiNilai) && !_hasMeaningfulValue(row.harga)) { warnings.push('Nilai kosong'); score -= 10; }
-  if (row._priceOutlier) { warnings.push('Harga ekstrem'); score -= 8; }
-  if (row._possibleDuplicate) { warnings.push('Potensi duplikat'); score -= 12; }
+  function deduct(label, points, detail) {
+    points = Math.max(0, Math.round(points || 0));
+    score -= points;
+    factors.push({ label:label, impact:-points, detail:detail || '', tone:points ? 'warn' : 'good' });
+  }
+  if (age == null) deduct('Usia data', 15, 'Tahun data tidak tersedia.');
+  else deduct('Usia data', Math.min(25, age * 6), age ? age + ' tahun dari tahun berjalan.' : 'Data tahun berjalan.');
+  if (row._distanceKm == null) deduct('Kedekatan lokasi', 15, 'Jarak belum dapat dihitung.');
+  else deduct('Kedekatan lokasi', Math.min(30, row._distanceKm * 6), (row._distanceKm < 1 ? Math.round(row._distanceKm * 1000) + ' m' : row._distanceKm.toFixed(2) + ' km') + ' dari aset/pusat pencarian.');
+  if (row._priceOutlier) deduct('Harga terhadap median', 20, 'Nilai/m² berada di luar 50%–150% median hasil.');
+  if (!_hasMeaningfulValue(row.legalitas)) deduct('Legalitas', 10, 'Legalitas pembanding belum diisi.');
+  if (review.duplicateDecision === 'Duplikat') deduct('Keputusan duplikat', 25, 'Data telah ditandai sebagai duplikat.');
+  else if (row._possibleDuplicate && review.duplicateDecision !== 'Bukan Duplikat') deduct('Potensi duplikat', 15, 'Koordinat sama dengan data lain dan belum diputuskan.');
+
+  if (_hasMeaningfulValue(profile.objek) && String(row.objek || '').toLowerCase() !== String(profile.objek).toLowerCase()) deduct('Jenis properti', 25, 'Pembanding: ' + (row.objek || 'kosong') + '; target: ' + profile.objek + '.');
+  if (_hasMeaningfulValue(profile.legalitas) && String(row.legalitas || '').toLowerCase() !== String(profile.legalitas).toLowerCase()) deduct('Legalitas target', 15, 'Pembanding: ' + (row.legalitas || 'kosong') + '; target: ' + profile.legalitas + '.');
+  var ltDiff = _relativeDifferencePct(row.luasTanah, profile.luasTanah);
+  if (ltDiff != null) deduct('Selisih luas tanah', ltDiff <= 10 ? 0 : (ltDiff <= 25 ? 5 : (ltDiff <= 50 ? 12 : 20)), ltDiff.toFixed(0) + '% dari luas tanah target.');
+  var lbDiff = _relativeDifferencePct(row.luasBangunan, profile.luasBangunan);
+  if (lbDiff != null) deduct('Selisih luas bangunan', lbDiff <= 15 ? 0 : (lbDiff <= 35 ? 5 : (lbDiff <= 60 ? 10 : 15)), lbDiff.toFixed(0) + '% dari luas bangunan target.');
+  if (_hasMeaningfulValue(profile.statusData) && String(row.statusHarga || '').toLowerCase() !== String(profile.statusData).toLowerCase()) deduct('Jenis data target', 10, 'Pembanding: ' + (row.statusHarga || 'kosong') + '; target: ' + profile.statusData + '.');
+  var rowDiff = _relativeDifferencePct(row.lebarJalanROW, profile.lebarJalanROW);
+  if (rowDiff != null && parseFloat(row.lebarJalanROW) < parseFloat(profile.lebarJalanROW)) deduct('Lebar jalan', rowDiff <= 25 ? 4 : 8, rowDiff.toFixed(0) + '% lebih kecil dari target.');
+  if (review.reviewStatus === 'Dikecualikan') {
+    score = 0;
+    factors.push({ label:'Status review', impact:0, detail:'Dikecualikan dari perbandingan dan analisis.', tone:'bad' });
+  }
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  return {
+    score:score,
+    tone:score >= 75 ? 'good' : (score >= 55 ? 'warn' : 'bad'),
+    label:review.reviewStatus === 'Dikecualikan' ? 'Dikecualikan' : (score >= 75 ? 'Kandidat kuat' : (score >= 55 ? 'Perlu ditelaah' : 'Kurang sebanding')),
+    factors:factors,
+    profileActive:_qualityTargetIsActive(profile)
+  };
+}
+
+function getAppraisalQualityMeta(row) {
+  var completeness = getRowCompletenessMeta(row), review = _getQualityReview(row);
+  var warnings = [], breakdown = [{ label:'Kelengkapan input', impact:completeness.percent, detail:completeness.filled + ' dari ' + completeness.total + ' kolom terisi.', tone:completeness.complete ? 'good' : 'warn', base:true }];
+  var score = completeness.percent;
+  function deduct(label, points, detail) {
+    warnings.push(label); score -= points;
+    breakdown.push({ label:label, impact:-points, detail:detail || '', tone:'warn' });
+  }
+  var yearMatch = String(row.waktuData || '').match(/(?:19|20)\d{2}/);
+  var year = yearMatch ? Number(yearMatch[0]) : null;
+  var age = year ? Math.max(0, new Date().getFullYear() - year) : null;
+  if (age === null) deduct('Waktu data kosong', 8, 'Tahun data tidak dapat dibaca.');
+  else if (age > 1) deduct('Data lama', Math.min(18, age * 4), age + ' tahun dari tahun berjalan.');
+  if (!_hasMeaningfulValue(row.sumber)) deduct('Sumber kosong', 8, 'Nama atau asal sumber belum dicatat.');
+  if (review.verificationStatus === 'Perlu Verifikasi Ulang') deduct('Perlu verifikasi ulang', 6, review.verificationNote || 'Status ditetapkan oleh reviewer.');
+  else if (review.verificationStatus !== 'Terverifikasi') deduct('Sumber belum diverifikasi', 3, 'Sumber tercatat belum mendapat verifikasi reviewer.');
+  if (!_hasMeaningfulValue(row.koordinat)) deduct('Koordinat kosong', 10, 'Lokasi tidak dapat diuji.');
+  if (!_hasMeaningfulValue(row.foto)) deduct('Foto kosong', 6, 'Dokumentasi visual belum tersedia.');
+  if (!_hasMeaningfulValue(row.indikasiNilai) && !_hasMeaningfulValue(row.harga)) deduct('Nilai kosong', 10, 'Harga dan indikasi nilai/m² belum tersedia.');
+  if (row._priceOutlier) deduct('Harga ekstrem', 8, 'Nilai/m² berada di luar 50%–150% median hasil.');
+  if (review.duplicateDecision === 'Duplikat') deduct('Ditandai duplikat', 20, review.qualityNote || 'Keputusan reviewer.');
+  else if (row._possibleDuplicate && review.duplicateDecision !== 'Bukan Duplikat') deduct('Potensi duplikat', 12, 'Koordinat sama dengan data lain dan belum diputuskan.');
+  if (review.reviewStatus === 'Perlu Ditelaah') warnings.push('Perlu ditelaah');
+  if (review.reviewStatus === 'Dikecualikan') warnings.push('Dikecualikan');
   score = Math.max(0, Math.min(100, Math.round(score)));
   var sourceRecorded = _hasMeaningfulValue(row.sumber) && _hasMeaningfulValue(row.hp);
   var proximityScore = row._distanceKm == null ? null : Math.max(0, Math.round(100 - Math.min(row._distanceKm, 10) * 10));
-  var comparability = 100;
-  if (age == null) comparability -= 15; else comparability -= Math.min(25, age * 6);
-  if (row._distanceKm == null) comparability -= 15; else comparability -= Math.min(30, row._distanceKm * 6);
-  if (row._priceOutlier) comparability -= 20;
-  if (!_hasMeaningfulValue(row.legalitas)) comparability -= 10;
-  if (row._possibleDuplicate) comparability -= 15;
-  comparability = Math.max(0, Math.round(comparability));
-  return { completeness:completeness, year:year, age:age, warnings:warnings, score:score, tone:score >= 80 ? 'good' : (score >= 60 ? 'warn' : 'bad'), sourceRecorded:sourceRecorded, proximityScore:proximityScore, comparability:comparability, comparabilityTone:comparability >= 75 ? 'good' : (comparability >= 55 ? 'warn' : 'bad') };
+  var comparable = getComparabilityMeta(row);
+  return { completeness:completeness, year:year, age:age, warnings:warnings, breakdown:breakdown, score:score, tone:score >= 80 ? 'good' : (score >= 60 ? 'warn' : 'bad'), sourceRecorded:sourceRecorded, verificationStatus:review.verificationStatus, reviewStatus:review.reviewStatus, duplicateDecision:review.duplicateDecision, proximityScore:proximityScore, comparability:comparable.score, comparabilityTone:comparable.tone, comparabilityLabel:comparable.label, comparabilityBreakdown:comparable.factors, targetProfileActive:comparable.profileActive };
 }
 
 function _distanceKmClient(lat1, lng1, lat2, lng2) {
@@ -6768,7 +6922,9 @@ function _distanceKmClient(lat1, lng1, lat2, lng2) {
 }
 
 function decorateAppraisalData(data, params) {
-  var prices = data.map(function(row) { return parseFloat(String(row.indikasiNilai || '').replace(/[^0-9]/g,'')) || 0; }).filter(function(v) { return v > 0; }).sort(function(a,b){ return a-b; });
+  var profile = getQualityTargetProfile();
+  data.forEach(function(row) { row._excluded = _getQualityReview(row).reviewStatus === 'Dikecualikan'; });
+  var prices = data.filter(function(row) { return !row._excluded; }).map(function(row) { return parseFloat(String(row.indikasiNilai || '').replace(/[^0-9]/g,'')) || 0; }).filter(function(v) { return v > 0; }).sort(function(a,b){ return a-b; });
   var median = prices.length ? (prices.length % 2 ? prices[(prices.length-1)/2] : (prices[prices.length/2-1]+prices[prices.length/2])/2) : 0;
   var duplicateKeys = {};
   data.forEach(function(row) {
@@ -6780,7 +6936,11 @@ function decorateAppraisalData(data, params) {
     var price = parseFloat(String(row.indikasiNilai || '').replace(/[^0-9]/g,'')) || 0;
     row._priceOutlier = !!(median && price && (price < median * .5 || price > median * 1.5));
     row._distanceKm = null;
-    if (params && params.centerLat != null && params.centerLng != null) {
+    var targetCoord = _parseCoordJS(profile.koordinat || '');
+    if (targetCoord) {
+      var coordFromTarget = _parseCoordJS(row.koordinat);
+      if (coordFromTarget) row._distanceKm = _distanceKmClient(targetCoord.lat, targetCoord.lng, coordFromTarget.lat, coordFromTarget.lng);
+    } else if (params && params.centerLat != null && params.centerLng != null) {
       var coord = _parseCoordJS(row.koordinat);
       if (coord) row._distanceKm = _distanceKmClient(params.centerLat, params.centerLng, coord.lat, coord.lng);
     }
@@ -6790,6 +6950,180 @@ function decorateAppraisalData(data, params) {
     row._quality = getAppraisalQualityMeta(row);
   });
   return data;
+}
+
+function _sourceVerificationMeta(quality) {
+  if (quality.verificationStatus === 'Terverifikasi') return { tone:'good', label:'✓ Sumber terverifikasi' };
+  if (quality.verificationStatus === 'Perlu Verifikasi Ulang') return { tone:'bad', label:'↻ Verifikasi ulang' };
+  if (quality.sourceRecorded) return { tone:'warn', label:'☎ Sumber tercatat' };
+  return { tone:'warn', label:'Sumber belum lengkap' };
+}
+
+function _renderQualityBreakdown(items) {
+  return '<div class="quality-breakdown">' + (items || []).map(function(item) {
+    var impact = item.base ? item.impact + '/100 awal' : (item.impact ? item.impact + ' poin' : '0 poin');
+    return '<div class="quality-breakdown-row"><div><strong>' + _escapeHtmlAppraisal(item.label) + '</strong><small>' + _escapeHtmlAppraisal(item.detail || '') + '</small></div><span class="quality-impact ' + (item.impact >= 0 ? 'positive' : '') + '">' + _escapeHtmlAppraisal(impact) + '</span></div>';
+  }).join('') + '</div>';
+}
+
+function _qualityTargetFormValue(id, value) {
+  var el = document.getElementById(id);
+  if (el) el.value = value == null ? '' : value;
+}
+
+function renderQualityTargetSummary(profile) {
+  profile = profile || getQualityTargetProfile();
+  var preview = document.getElementById('qualityTargetPreview');
+  var button = document.getElementById('qualityTargetButton');
+  var active = _qualityTargetIsActive(profile);
+  if (button) {
+    button.classList.toggle('active', active);
+    button.textContent = active ? '🎯 Profil Aset Aktif' : '🎯 Profil Aset';
+  }
+  if (!preview) return;
+  if (!active) {
+    preview.className = 'quality-target-summary empty';
+    preview.textContent = 'Belum ada profil aset tersimpan.';
+    return;
+  }
+  var labels = [
+    ['Koordinat', profile.koordinat], ['Properti', profile.objek], ['Legalitas', profile.legalitas],
+    ['LT', profile.luasTanah ? profile.luasTanah + ' m²' : ''], ['LB', profile.luasBangunan ? profile.luasBangunan + ' m²' : ''],
+    ['Jenis data', profile.statusData], ['ROW', profile.lebarJalanROW ? profile.lebarJalanROW + ' m' : '']
+  ].filter(function(item) { return _hasMeaningfulValue(item[1]); });
+  preview.className = 'quality-target-summary';
+  preview.innerHTML = labels.map(function(item) { return '<span><strong>' + _escapeHtmlAppraisal(item[0]) + ':</strong> ' + _escapeHtmlAppraisal(item[1]) + '</span>'; }).join('');
+}
+
+function openQualityTargetModal() {
+  var profile = getQualityTargetProfile();
+  _qualityTargetFormValue('qtKoordinat', profile.koordinat || document.getElementById('mapSearch').value.trim());
+  _qualityTargetFormValue('qtObjek', profile.objek);
+  _qualityTargetFormValue('qtLegalitas', profile.legalitas);
+  _qualityTargetFormValue('qtLuasTanah', profile.luasTanah);
+  _qualityTargetFormValue('qtLuasBangunan', profile.luasBangunan);
+  _qualityTargetFormValue('qtStatusData', profile.statusData);
+  _qualityTargetFormValue('qtROW', profile.lebarJalanROW);
+  renderQualityTargetSummary(profile);
+  document.getElementById('qualityTargetOverlay').classList.add('open');
+}
+
+function closeQualityTargetModal() { document.getElementById('qualityTargetOverlay').classList.remove('open'); }
+
+function _refreshQualityDecorations() {
+  currentData = decorateAppraisalData(currentData || [], _lastSearchParams || collectParams());
+  compareList = compareList.filter(function(uid) {
+    var row = currentData.find(function(item) { return item._uid === uid; });
+    return row && !row._excluded;
+  });
+  if (compareTargetId && compareList.indexOf(compareTargetId) === -1) compareTargetId = null;
+  updateCompareUI();
+  calculateSidebarStats(currentData.filter(function(row) { return !row._excluded; }));
+  renderTable(currentData);
+  renderMarkers(currentData, _lastSearchParams || collectParams());
+  markAnalysisStale();
+}
+
+function saveQualityTargetProfile() {
+  var coordinate = document.getElementById('qtKoordinat').value.trim();
+  if (coordinate && !_parseCoordJS(coordinate)) { toast('Koordinat profil aset tidak valid.', 'error'); return; }
+  var profile = {
+    koordinat:coordinate,
+    objek:document.getElementById('qtObjek').value.trim(),
+    legalitas:document.getElementById('qtLegalitas').value.trim(),
+    luasTanah:document.getElementById('qtLuasTanah').value,
+    luasBangunan:document.getElementById('qtLuasBangunan').value,
+    statusData:document.getElementById('qtStatusData').value,
+    lebarJalanROW:document.getElementById('qtROW').value
+  };
+  try { localStorage.setItem(_qualityTargetStorageKey(), JSON.stringify(profile)); }
+  catch (e) { toast('Profil aset tidak dapat disimpan di perangkat ini.', 'error'); return; }
+  renderQualityTargetSummary(profile);
+  _refreshQualityDecorations();
+  closeQualityTargetModal();
+  toast('Profil aset disimpan. Skor kesebandingan dihitung ulang.', 'success');
+}
+
+function clearQualityTargetProfile() {
+  try { localStorage.removeItem(_qualityTargetStorageKey()); } catch (e) {}
+  ['qtKoordinat','qtObjek','qtLegalitas','qtLuasTanah','qtLuasBangunan','qtStatusData','qtROW'].forEach(function(id) { _qualityTargetFormValue(id, ''); });
+  renderQualityTargetSummary({});
+  _refreshQualityDecorations();
+  closeQualityTargetModal();
+  toast('Profil aset dihapus. Kesebandingan kembali memakai filter aktif.', 'success');
+}
+
+function openQualityReview(uid) {
+  var row = (currentData || []).find(function(item) { return item._uid === uid; });
+  if (!row) { toast('Data tidak ditemukan.', 'error'); return; }
+  _qualityReviewUid = uid;
+  var quality = row._quality || getAppraisalQualityMeta(row), review = _getQualityReview(row);
+  var coord = _parseCoordJS(row.koordinat), duplicates = [];
+  if (coord) {
+    var key = coord.lat.toFixed(5) + ',' + coord.lng.toFixed(5);
+    duplicates = currentData.filter(function(item) {
+      var other = _parseCoordJS(item.koordinat);
+      return item._uid !== uid && other && other.lat.toFixed(5) + ',' + other.lng.toFixed(5) === key;
+    });
+  }
+  var disabled = activeRole === 'Viewer' ? ' disabled' : '';
+  var duplicateHtml = duplicates.length ? duplicates.map(function(item) {
+    return '<button class="quality-chip action warn" type="button" onclick="closeQualityReviewModal();openDetailModal(\'' + item._uid + '\')">' + _escapeHtmlAppraisal(item.id) + ' · ' + _escapeHtmlAppraisal(item.alamat || 'alamat kosong') + '</button>';
+  }).join(' ') : '<span class="quality-chip good">Tidak ada koordinat identik pada hasil ini</span>';
+  document.getElementById('qualityReviewTitle').textContent = '🛡 Review Kualitas · ' + (row.id || 'Tanpa ID');
+  document.getElementById('qualityReviewBody').innerHTML =
+    '<div class="quality-target-summary ' + (quality.targetProfileActive ? '' : 'empty') + '"><strong>' + _escapeHtmlAppraisal(quality.comparabilityLabel) + ' · ' + quality.comparability + '/100</strong><span>' + (quality.targetProfileActive ? 'Dihitung terhadap profil aset tersimpan.' : 'Profil aset belum lengkap; memakai usia dan pusat pencarian.') + '</span></div>' +
+    '<div class="quality-review-grid" style="margin-top:12px;">' +
+      '<section class="quality-review-section"><h4>Rincian skor kualitas · ' + quality.score + '/100</h4>' + _renderQualityBreakdown(quality.breakdown) + '</section>' +
+      '<section class="quality-review-section"><h4>Rincian kesebandingan · ' + quality.comparability + '/100</h4>' + _renderQualityBreakdown(quality.comparabilityBreakdown) + '</section>' +
+    '</div>' +
+    '<section class="quality-review-section" style="margin-top:12px;"><h4>Data dengan koordinat sama</h4><div class="appraisal-signals" style="display:flex;">' + duplicateHtml + '</div></section>' +
+    '<div class="quality-review-grid" style="margin-top:12px;">' +
+      '<div class="form-group"><label class="form-label">Status verifikasi sumber</label><select id="qrVerificationStatus" class="form-select"' + disabled + '><option>Belum Diverifikasi</option><option>Terverifikasi</option><option>Perlu Verifikasi Ulang</option></select></div>' +
+      '<div class="form-group"><label class="form-label">Status review data</label><select id="qrReviewStatus" class="form-select"' + disabled + '><option>Aktif</option><option>Perlu Ditelaah</option><option>Dikecualikan</option></select><div class="quality-form-help">Dikecualikan berarti tidak ikut perbandingan dan analisis.</div></div>' +
+      '<div class="form-group"><label class="form-label">Keputusan duplikat</label><select id="qrDuplicateDecision" class="form-select"' + disabled + '><option>Belum Ditinjau</option><option>Bukan Duplikat</option><option>Duplikat</option></select></div>' +
+      '<div class="form-group"><label class="form-label">Catatan verifikasi</label><textarea id="qrVerificationNote" class="form-input" maxlength="500" rows="3"' + disabled + '>' + _escapeHtmlAppraisal(review.verificationNote) + '</textarea></div>' +
+      '<div class="form-group" style="grid-column:1/-1;"><label class="form-label">Catatan kualitas / alasan keputusan</label><textarea id="qrQualityNote" class="form-input" maxlength="500" rows="3"' + disabled + '>' + _escapeHtmlAppraisal(review.qualityNote) + '</textarea></div>' +
+    '</div>' +
+    (review.verifiedBy ? '<div class="quality-review-note">Terakhir diverifikasi oleh <strong>' + _escapeHtmlAppraisal(review.verifiedBy) + '</strong> pada ' + _escapeHtmlAppraisal(review.verifiedAt || '-') + '.</div>' : '') +
+    '<div class="quality-review-note"><strong>Catatan metodologi:</strong> skor ini adalah indikator screening internal. “Lengkap” tidak otomatis berarti layak sebagai pembanding, dan label kandidat bukan kesimpulan nilai.</div>';
+  document.getElementById('qrVerificationStatus').value = review.verificationStatus;
+  document.getElementById('qrReviewStatus').value = review.reviewStatus;
+  document.getElementById('qrDuplicateDecision').value = review.duplicateDecision;
+  document.getElementById('btnSaveQualityReview').style.display = activeRole === 'Viewer' ? 'none' : '';
+  document.getElementById('qualityReviewOverlay').classList.add('open');
+}
+
+function closeQualityReviewModal() {
+  document.getElementById('qualityReviewOverlay').classList.remove('open');
+  _qualityReviewUid = null;
+}
+
+function saveQualityReviewForCurrent() {
+  var uid = _qualityReviewUid;
+  var row = (currentData || []).find(function(item) { return item._uid === uid; });
+  if (!row) { toast('Data review tidak ditemukan.', 'error'); return; }
+  var button = document.getElementById('btnSaveQualityReview');
+  var payload = {
+    id:row.id, koordinat:row.koordinat,
+    verificationStatus:document.getElementById('qrVerificationStatus').value,
+    reviewStatus:document.getElementById('qrReviewStatus').value,
+    duplicateDecision:document.getElementById('qrDuplicateDecision').value,
+    verificationNote:document.getElementById('qrVerificationNote').value,
+    qualityNote:document.getElementById('qrQualityNote').value
+  };
+  button.disabled = true; button.textContent = '⏳ Menyimpan…';
+  GAS.script.run.withSuccessHandler(function(res) {
+    button.disabled = false; button.textContent = '💾 Simpan Review';
+    if (!res || !res.success) { toast((res && res.error) || 'Review gagal disimpan.', 'error'); return; }
+    row.qualityReview = res.review;
+    _refreshQualityDecorations();
+    toast('Review kualitas berhasil disimpan.', 'success');
+    openQualityReview(uid);
+  }).withFailureHandler(function(err) {
+    button.disabled = false; button.textContent = '💾 Simpan Review';
+    toast('Gagal menyimpan review: ' + err.message, 'error');
+  }).saveQualityReview(payload, activeUsername);
 }
 
 function _firstPhoto(row) {
@@ -6811,12 +7145,14 @@ function renderTable(data) {
     var photoHtml = photo ? '<img class="mobile-card-photo" src="' + _escapeHtmlAppraisal(photo) + '" alt="" loading="lazy"/>' : '<span class="mobile-card-photo placeholder" aria-hidden="true">🏠</span>';
     var distanceChip = row._distanceKm != null ? '<span class="quality-chip good">📍 ' + (row._distanceKm < 1 ? Math.round(row._distanceKm*1000)+' m' : row._distanceKm.toFixed(1)+' km') + '</span>' : '';
     var ageChip = q.age == null ? '<span class="quality-chip warn">Waktu kosong</span>' : '<span class="quality-chip ' + (q.age > 1 ? 'bad' : 'good') + '">' + (q.age > 1 ? 'Data '+q.age+' th' : 'Data baru') + '</span>';
-    var sourceChip = '<span class="quality-chip ' + (q.sourceRecorded ? 'good' : 'warn') + '">' + (q.sourceRecorded ? '☎ Sumber tercatat' : 'Sumber belum lengkap') + '</span>';
-    var comparableChip = '<span class="quality-chip ' + q.comparabilityTone + '">Kesebandingan awal ' + q.comparability + '/100</span>';
-    var warningChip = q.warnings.length ? '<span class="quality-chip warn">⚠ ' + q.warnings.length + ' catatan</span>' : '<span class="quality-chip good">✓ Siap ditelaah</span>';
+    var sourceMeta = _sourceVerificationMeta(q);
+    var sourceChip = '<button type="button" class="quality-chip action ' + sourceMeta.tone + '" onclick="event.stopPropagation();openQualityReview(\'' + row._uid + '\')">' + sourceMeta.label + '</button>';
+    var comparableChip = '<button type="button" class="quality-chip action ' + q.comparabilityTone + '" onclick="event.stopPropagation();openQualityReview(\'' + row._uid + '\')">' + q.comparabilityLabel + ' ' + q.comparability + '/100</button>';
+    var warningChip = q.warnings.length ? '<button type="button" class="quality-chip action warn" onclick="event.stopPropagation();openQualityReview(\'' + row._uid + '\')">⚠ ' + q.warnings.length + ' catatan</button>' : '<button type="button" class="quality-chip action good" onclick="event.stopPropagation();openQualityReview(\'' + row._uid + '\')">✓ Rincian skor</button>';
+    var reviewBadge = q.reviewStatus === 'Dikecualikan' ? '<span class="quality-chip bad">Dikecualikan</span>' : (q.reviewStatus === 'Perlu Ditelaah' ? '<span class="quality-chip warn">Perlu ditelaah</span>' : '');
     var editAction = activeRole === 'Viewer' ? '' : '<button class="card-action edit" onclick="event.stopPropagation();openEditModalByUid(\'' + row._uid + '\')" title="Edit data">✏️ <span>Edit</span></button>';
-    var actions = '<div class="card-actions"><button class="card-action detail" onclick="event.stopPropagation();openDetailModal(\'' + row._uid + '\')" title="Lihat detail">👁 <span>Detail</span></button><button class="card-action compare" onclick="event.stopPropagation();toggleCompare(\'' + row._uid + '\')" title="Bandingkan">⚖️ <span>Bandingkan</span></button>' + editAction + '</div>';
-    return '<tr data-uid="' + row._uid + '" onclick="handleDataRowClick(event,\'' + row._uid + '\')"><td><div class="mobile-card-hero">' + photoHtml + '<div><div class="mobile-card-heading"><strong>' + _escapeHtmlAppraisal(f(row.id)) + '</strong><span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + cm.percent + '%</span></div><div class="appraisal-signals">' + distanceChip + ageChip + sourceChip + comparableChip + warningChip + '</div></div></div></td><td>' + actions + '</td><td><span class="badge ' + bc(row.objek) + '">' + _escapeHtmlAppraisal(f(row.tipeBangunan)) + '</span></td><td title="' + _escapeHtmlAppraisal(f(row.alamat)) + '">' + _escapeHtmlAppraisal(f(row.alamat)) + '</td><td>' + _escapeHtmlAppraisal(f(row.kota)) + '</td><td>' + _escapeHtmlAppraisal(f(row.legalitas)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasTanah)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasBangunan)) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + _escapeHtmlAppraisal(f(row.lebarJalanROW)) + '</td><td>' + _escapeHtmlAppraisal(f(row.statusHarga)) + '</td><td>' + _escapeHtmlAppraisal(f(row.waktuData)) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + _escapeHtmlAppraisal(f(row.sumber)) + ' / ' + _escapeHtmlAppraisal(f(row.hp)) + '</td></tr>';
+    var actions = '<div class="card-actions"><button class="card-action detail" onclick="event.stopPropagation();openDetailModal(\'' + row._uid + '\')" title="Lihat detail">👁 <span>Detail</span></button><button class="card-action compare" onclick="event.stopPropagation();toggleCompare(\'' + row._uid + '\')" title="Bandingkan"' + (row._excluded ? ' disabled' : '') + '>⚖️ <span>Bandingkan</span></button>' + editAction + '</div>';
+    return '<tr class="' + (row._excluded ? 'review-excluded' : '') + '" data-uid="' + row._uid + '" onclick="handleDataRowClick(event,\'' + row._uid + '\')"><td><div class="mobile-card-hero">' + photoHtml + '<div><div class="mobile-card-heading"><strong>' + _escapeHtmlAppraisal(f(row.id)) + '</strong><span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + cm.percent + '%</span></div><div class="appraisal-signals">' + distanceChip + ageChip + sourceChip + comparableChip + warningChip + reviewBadge + '</div></div></div></td><td>' + actions + '</td><td><span class="badge ' + bc(row.objek) + '">' + _escapeHtmlAppraisal(f(row.tipeBangunan)) + '</span></td><td title="' + _escapeHtmlAppraisal(f(row.alamat)) + '">' + _escapeHtmlAppraisal(f(row.alamat)) + '</td><td>' + _escapeHtmlAppraisal(f(row.kota)) + '</td><td>' + _escapeHtmlAppraisal(f(row.legalitas)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasTanah)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasBangunan)) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + _escapeHtmlAppraisal(f(row.lebarJalanROW)) + '</td><td>' + _escapeHtmlAppraisal(f(row.statusHarga)) + '</td><td>' + _escapeHtmlAppraisal(f(row.waktuData)) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + _escapeHtmlAppraisal(f(row.sumber)) + ' / ' + _escapeHtmlAppraisal(f(row.hp)) + '</td></tr>';
   }).join('');
   selectProperty(_selectedPropertyUid);
 }
@@ -6958,8 +7294,9 @@ function openDetailModal(uid) {
   var quality = row._quality || getAppraisalQualityMeta(row), photo = _firstPhoto(row);
   var heroPhoto = photo ? '<img src="' + esc(photo) + '" alt="Foto ' + esc(f(row.id)) + '" loading="lazy">' : '<div class="detail-hero-photo" aria-hidden="true">🏠</div>';
   var distance = row._distanceKm != null ? '<span class="quality-chip good">📍 ' + (row._distanceKm < 1 ? Math.round(row._distanceKm * 1000) + ' m' : row._distanceKm.toFixed(1) + ' km') + '</span>' : '';
-  var qualityNotes = quality.warnings.length ? '<span class="quality-chip warn">⚠ ' + quality.warnings.length + ' catatan kualitas</span>' : '<span class="quality-chip good">✓ Siap ditelaah</span>';
-  var hero = '<div class="detail-hero">' + heroPhoto + '<div><h3>' + esc(f(row.id)) + ' · ' + esc(f(row.objek)) + '</h3><div class="detail-hero-value">' + esc(rp(row.indikasiNilai)) + ' /m²</div><div class="appraisal-signals"><span class="quality-chip ' + quality.tone + '">Kualitas ' + quality.score + '/100</span><span class="quality-chip ' + (quality.completeness.complete ? 'good' : 'warn') + '">' + quality.completeness.percent + '% terisi</span><span class="quality-chip ' + (quality.sourceRecorded ? 'good' : 'warn') + '">' + (quality.sourceRecorded ? 'Sumber tercatat' : 'Sumber belum lengkap') + '</span><span class="quality-chip ' + quality.comparabilityTone + '">Kesebandingan awal ' + quality.comparability + '/100</span>' + distance + qualityNotes + '</div></div></div>';
+  var sourceMeta = _sourceVerificationMeta(quality);
+  var qualityNotes = quality.warnings.length ? '<button type="button" class="quality-chip action warn" onclick="closeDetailModal();openQualityReview(\'' + row._uid + '\')">⚠ ' + quality.warnings.length + ' catatan kualitas</button>' : '<button type="button" class="quality-chip action good" onclick="closeDetailModal();openQualityReview(\'' + row._uid + '\')">✓ Lihat rincian skor</button>';
+  var hero = '<div class="detail-hero">' + heroPhoto + '<div><h3>' + esc(f(row.id)) + ' · ' + esc(f(row.objek)) + '</h3><div class="detail-hero-value">' + esc(rp(row.indikasiNilai)) + ' /m²</div><div class="appraisal-signals"><button type="button" class="quality-chip action ' + quality.tone + '" onclick="closeDetailModal();openQualityReview(\'' + row._uid + '\')">Kualitas ' + quality.score + '/100</button><span class="quality-chip ' + (quality.completeness.complete ? 'good' : 'warn') + '">' + quality.completeness.percent + '% terisi</span><span class="quality-chip ' + sourceMeta.tone + '">' + sourceMeta.label + '</span><button type="button" class="quality-chip action ' + quality.comparabilityTone + '" onclick="closeDetailModal();openQualityReview(\'' + row._uid + '\')">' + quality.comparabilityLabel + ' ' + quality.comparability + '/100</button>' + distance + qualityNotes + '</div></div></div>';
 
   document.getElementById('detailBody').innerHTML =
     hero + '<table class="detail-table"><tbody>' + rowsHtml + '</tbody></table>';
@@ -7130,6 +7467,8 @@ function toggleCompare(id) {
     compareList.splice(idx, 1); 
     if (compareTargetId === id) compareTargetId = null;
   } else { 
+    var selectedRow = (currentData || []).find(function(row) { return row._uid === id; });
+    if (selectedRow && selectedRow._excluded) { toast('Data dikecualikan tidak dapat dimasukkan ke perbandingan.', 'error'); return; }
     if (compareList.length >= 4) { toast('Maksimal 4 properti', 'error'); return; } 
     compareList.push(id); 
   }
