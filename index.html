@@ -829,6 +829,9 @@ body.mmode-picking .mpick-hint { display: flex; }
 .mmap-osm-toggle:hover { background: rgba(22,163,74,1); }
 .mmap-osm-toggle.active { background: rgba(37,99,235,.9); }
 .mmap-osm-toggle.active:hover { background: rgba(37,99,235,1); }
+.mmap-osm-toggle.viewer-locked, .mmap-osm-toggle.viewer-locked:hover {
+  background:rgba(22,101,52,.92); color:#fff; cursor:not-allowed; opacity:.9;
+}
 
 #measureOsmMap {
   position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; display: none;
@@ -3014,6 +3017,40 @@ function doLogin() {
     .checkLogin(u, p);
 }
 
+function _isViewerRole(role) {
+  return String(typeof role === 'undefined' ? activeRole : role).toLowerCase() === 'viewer';
+}
+
+function _applyViewerMapRestrictions(role) {
+  var viewerOnly = _isViewerRole(role);
+  var modeButton = document.getElementById('btnModeToggle');
+  var googleOption = document.querySelector('.mode-menu-item[data-mode="gmaps"]');
+  var heatmapButton = document.getElementById('btnHeatmap');
+
+  if (googleOption) {
+    googleOption.disabled = viewerOnly;
+    googleOption.style.display = viewerOnly ? 'none' : 'flex';
+  }
+  if (modeButton) {
+    modeButton.disabled = viewerOnly;
+    modeButton.title = viewerOnly ? 'Role Viewer hanya dapat menggunakan OpenStreetMap' : '';
+    modeButton.setAttribute('aria-label', viewerOnly ? 'Mode OpenStreetMap terkunci untuk Viewer' : 'Pilih mode peta');
+  }
+  if (heatmapButton) {
+    heatmapButton.disabled = viewerOnly;
+    heatmapButton.title = viewerOnly ? 'Heatmap Google Maps tidak tersedia untuk Viewer' : '';
+    if (viewerOnly) heatmapButton.classList.remove('active');
+  }
+
+  if (viewerOnly) {
+    _closeModeMenu();
+    if (typeof isHeatmap !== 'undefined') isHeatmap = false;
+    if (typeof heatLayer !== 'undefined' && heatLayer) { heatLayer.setMap(null); heatLayer = null; }
+    switchMapMode('osm');
+  }
+  _mApplyMeasurementRoleAccess(role);
+}
+
 function applyPermissions(role) {
   var btnExport = document.getElementById('btnExport'), btnAddTop = document.getElementById('btnAddTop'), btnAddMap = document.getElementById('btnAddMap'), btnTable = document.getElementById('btnViewTable');
   var btnParameters = document.getElementById('btnParameters'), btnParametersMobile = document.getElementById('btnParametersMobile');
@@ -3022,6 +3059,7 @@ function applyPermissions(role) {
   if(btnParametersMobile) btnParametersMobile.style.display = role === 'Superadmin' ? '' : 'none';
   if (role === 'Surveyor') { if(btnExport) btnExport.disabled = true; }
   else if (role === 'Viewer') { if(btnExport) btnExport.disabled = true; if(btnAddTop) btnAddTop.disabled = true; if(btnAddMap) btnAddMap.disabled = true; if(btnTable) btnTable.disabled = true; }
+  _applyViewerMapRestrictions(role);
 }
 
 var _masterParameterRows = [];
@@ -3350,6 +3388,10 @@ function _bindOSMInteraction() {
 }
 
 function startDrawingPolygon() {
+  if (_isViewerRole()) {
+    toast('Role Viewer hanya dapat menggunakan OpenStreetMap.', 'error');
+    return;
+  }
   if (!gMap || _currentMapMode === 'osm') {
     toast('Menyiapkan Google Maps untuk menggambar area…', 'loading');
     switchMapMode('gmaps');
@@ -3420,6 +3462,7 @@ function _startInitialSearchOnce() {
 
 function toggleModeMenu(ev) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
+  if (_isViewerRole()) return;
   var menu = document.getElementById('modeMenu');
   if (!menu) return;
   menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
@@ -3438,6 +3481,10 @@ document.addEventListener('click', function(e) {
 
 function selectMapMode(mode) {
   _closeModeMenu();
+  if (mode === 'gmaps' && _isViewerRole()) {
+    toast('Mode Google Maps tidak tersedia untuk role Viewer.', 'error');
+    return;
+  }
   switchMapMode(mode);
 }
 
@@ -3457,6 +3504,12 @@ function _updateModeButtonLabel(mode) {
 }
 
 function switchMapMode(mode) {
+  if (mode === 'gmaps' && _isViewerRole()) {
+    toast('Role Viewer hanya dapat menggunakan OpenStreetMap.', 'error');
+    if (_currentMapMode !== 'osm') return switchMapMode('osm');
+    _updateModeButtonLabel('osm');
+    return false;
+  }
   if (mode === _currentMapMode && (mode !== 'gmaps' || gMap)) { _updateModeButtonLabel(mode); return; }
   _currentMapMode = mode;
 
@@ -5333,6 +5386,12 @@ function doSearch() {
 }
 
 function toggleHeatmap() {
+  if (_isViewerRole()) {
+    isHeatmap = false;
+    document.getElementById('btnHeatmap').classList.remove('active');
+    toast('Heatmap Google Maps tidak tersedia untuk role Viewer.', 'error');
+    return;
+  }
   if (!gMap || _currentMapMode !== 'gmaps') {
     toast('Heatmap menggunakan Google Maps. Menyiapkan peta…', 'loading');
     switchMapMode('gmaps');
@@ -8001,6 +8060,58 @@ var _mRouteRunId = 0;
 // Warna garis rute (Google Maps) & garis putus-putus (OSM) — saturasi tinggi & kontras tinggi
 var _mRouteColors = { '1':'#e60023','2':'#0066ff','3':'#ff6600','4':'#9c00ff','5':'#00a020','6':'#ff0088' };
 
+function _mRenderModeButton(viewerOnly) {
+  var btn = document.getElementById('btnMeasureOsm');
+  if (!btn) return;
+  var icon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+  btn.classList.toggle('viewer-locked', !!viewerOnly);
+  btn.disabled = !!viewerOnly;
+  if (viewerOnly) {
+    btn.classList.add('active');
+    btn.setAttribute('aria-label', 'Mode OpenStreetMap terkunci untuk Viewer');
+    btn.title = 'Role Viewer hanya dapat menggunakan OpenStreetMap';
+    btn.innerHTML = icon + '<span class="mmap-mode-full">OpenStreetMap</span><span class="mmap-mode-short">OSM</span>';
+    return;
+  }
+  btn.title = '';
+  btn.classList.toggle('active', _mOsmActive);
+  btn.setAttribute('aria-label', _mOsmActive ? 'Beralih ke Google Maps' : 'Beralih ke OpenStreetMap');
+  btn.innerHTML = icon + (_mOsmActive
+    ? '<span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>'
+    : '<span class="mmap-mode-full">OpenStreetMap</span><span class="mmap-mode-short">OSM</span>');
+}
+
+function _mForceViewerOsmMode() {
+  var wasGoogle = !_mOsmActive;
+  _mOsmActive = true;
+  if (wasGoogle) ++_mRouteRunId;
+  _mOsmStopDashAnimation();
+  var gMapEl = document.getElementById('measureMap');
+  var oMapEl = document.getElementById('measureOsmMap');
+  var layerToggle = document.getElementById('mMeasureLayers');
+  var loadingEl = document.getElementById('mRouteLoading');
+  if (gMapEl) gMapEl.style.display = 'none';
+  if (oMapEl) oMapEl.classList.add('active');
+  if (layerToggle) layerToggle.hidden = true;
+  if (loadingEl) loadingEl.classList.remove('show');
+  _mShowRouteNotice('', '');
+  _mRenderModeButton(true);
+
+  var overlay = document.getElementById('measureOverlay');
+  if (overlay && overlay.classList.contains('open')) {
+    if (!_mOsmInited) { _mInitMeasureOsm(); _mOsmInited = true; }
+    else if (_mOsmMap) _mOsmMap.invalidateSize();
+    _mOsmRedraw();
+    _mSyncLineVisibility();
+  }
+}
+
+function _mApplyMeasurementRoleAccess(role) {
+  var viewerOnly = _isViewerRole(role);
+  if (viewerOnly) _mForceViewerOsmMode();
+  else _mRenderModeButton(false);
+}
+
 function _mSyncLineVisibility() {
   Object.keys(_mRoutes).forEach(function(id) {
     if (_mRoutes[id]) _mRoutes[id].setMap(_mLinesVisible && !_mOsmActive ? _mMap : null);
@@ -8055,6 +8166,7 @@ function _mRoutePathToPins(path, origin, destination) {
 }
 
 function openMeasurement() {
+  _mApplyMeasurementRoleAccess(activeRole);
   document.getElementById('measureOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(function(){
@@ -8108,6 +8220,7 @@ function setMeasurementMapLayer(type) {
 
 // ── INIT PETA MEASUREMENT ────
 function _mInitMap() {
+  if (_isViewerRole()) return;
   var el = document.getElementById('measureMap');
   if (!el || !window.google || !google.maps) return;
 
@@ -8697,6 +8810,11 @@ document.addEventListener('visibilitychange', function() {
 });
 
 function toggleMeasureOSM() {
+  if (_isViewerRole()) {
+    _mForceViewerOsmMode();
+    toast('Role Viewer hanya dapat menggunakan OpenStreetMap.', 'error');
+    return;
+  }
   if (_mOsmActive && !(window.google && google.maps)) {
     toast('Menyiapkan Google Maps untuk Measurement…', 'loading');
     _ensureGoogleMapReady().then(function() { toggleMeasureOSM(); }).catch(function() {});
@@ -8960,6 +9078,7 @@ mResetAll = function() {
 // Patch map click saat OSM mode aktif - cancel pick juga di OSM
 var _origOpenMeasurement = openMeasurement;
 openMeasurement = function() {
+  _mApplyMeasurementRoleAccess(activeRole);
   document.getElementById('measureOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(function() {
