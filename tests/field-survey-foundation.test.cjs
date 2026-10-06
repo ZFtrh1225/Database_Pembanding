@@ -54,7 +54,7 @@ test('foto asli tetap privat dan hanya salinan watermark dibagikan', () => {
   assert.match(upload, /watermarked = folder\.createFile/);
   assert.match(upload, /watermarked\.setSharing/);
   assert.doesNotMatch(upload, /original\.setSharing/);
-  assert.match(extract(html, 'handleFotoChange'), /SURVEI LAPANGAN/);
+  assert.match(extract(html, '_renderSelectedPhoto'), /SURVEI LAPANGAN/);
   assert.match(extract(html, 'handleFotoChange'), /_surveyOriginalPhotoDataUrl = ev\.target\.result/);
 });
 

@@ -182,6 +182,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .survey-meta-item { min-width:0; padding:8px; border:1px solid #bae6fd; border-radius:8px; background:rgba(255,255,255,.8); }
 .survey-meta-item span { display:block; color:#64748b; font-size:9px; }
 .survey-meta-item strong { display:block; margin-top:3px; color:#0c4a6e; font-size:10.5px; overflow-wrap:anywhere; }
+.survey-meta-item.gps-good { border-color:#86efac; background:#f0fdf4; }
+.survey-meta-item.gps-good strong { color:#166534; }
+.survey-meta-item.gps-warn { border-color:#fcd34d; background:#fffbeb; }
+.survey-meta-item.gps-warn strong { color:#92400e; }
+.survey-meta-item.gps-bad { border-color:#fca5a5; background:#fff1f2; }
+.survey-meta-item.gps-bad strong { color:#991b1b; }
+.survey-gps-progress { margin-top:9px; padding:7px 9px; border-radius:8px; background:rgba(255,255,255,.72); color:#0369a1; font-size:10px; font-weight:700; line-height:1.4; }
 .survey-photo-note { margin-top:9px; color:#0c4a6e; font-size:10px; line-height:1.45; }
 .survey-workspace-summary { margin-bottom:12px; padding:10px 12px; border:1px solid #bae6fd; border-radius:10px; background:#f0f9ff; color:#0c4a6e; font-size:11px; line-height:1.5; }
 .survey-workspace-list { display:grid; gap:10px; }
@@ -1505,6 +1512,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   #mobileSurveyBadge { display:none; position:absolute; right:-12px; top:-8px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#f59e0b; color:#fff; font:700 9px/17px var(--font); }
   #mobileSurveyBadge.show { display:block; }
   .mobile-bottom-nav.survey-enabled { grid-template-columns:repeat(5,1fr); }
+  .survey-capture-head { flex-direction:column; align-items:stretch; }
+  .survey-gps-button { width:100%; min-height:44px; }
   .survey-meta-grid { grid-template-columns:1fr; }
   .survey-card { grid-template-columns:84px minmax(0,1fr); padding:10px; gap:10px; }
   .survey-card-photo { width:84px; height:84px; }
@@ -2414,7 +2423,8 @@ body.mmode-picking .mpick-hint { display: flex; }
           <div class="survey-meta-item"><span>Koordinat GPS</span><strong id="surveyGpsText">Belum tersedia</strong></div>
           <div class="survey-meta-item"><span>Akurasi</span><strong id="surveyAccuracyText">–</strong></div>
         </div>
-        <div class="survey-photo-note">Gunakan kamera perangkat untuk bukti terbaik. Draf teks tersimpan otomatis di perangkat, tetapi foto harus dipilih kembali jika browser ditutup sebelum upload.</div>
+        <div class="survey-gps-progress" id="surveyGpsProgress">GPS akan aktif otomatis saat survei dibuka.</div>
+        <div class="survey-photo-note">Akurasi membaik otomatis tanpa perlu menekan tombol berulang. Gunakan kamera perangkat untuk bukti terbaik; foto harus dipilih kembali jika browser ditutup sebelum upload.</div>
       </section>
       <div class="draft-banner" id="dataDraftBanner" hidden>
         <div><strong>Draf tersimpan ditemukan</strong><span>Form yang belum disimpan dapat dipulihkan.</span></div>
@@ -3052,6 +3062,13 @@ var _dataEntryMode = 'standard';
 var _fieldSurveyRows = [], _editingSurveyId = null;
 var _surveyOriginalPhotoDataUrl = null;
 var _surveyMeta = { capturedAt:'', gpsCoordinate:'', gpsAccuracy:null, originalPhotoUrl:'', watermarkedPhotoUrl:'' };
+var SURVEY_GPS_GOOD_ACCURACY_M = 10;
+var SURVEY_GPS_EXCELLENT_ACCURACY_M = 5;
+var SURVEY_GPS_RECENT_WINDOW_MS = 5000;
+var SURVEY_GPS_NORMAL_WAIT_MS = 12000;
+var _surveyGpsWatchId = null, _surveyGpsStatusTimer = null, _surveyGpsStartedAt = 0;
+var _surveyGpsSamples = [], _surveyGpsDuplicateTimer = null, _surveyGpsLastDuplicateAt = 0;
+var _surveyPhotoWatermarkDirty = false;
 var _pickingLocation = false;
 
 var heatLayer = null, isHeatmap = false;
@@ -5558,36 +5575,54 @@ document.addEventListener('click', function (e) {
   var rbItem = e.target.closest('.rb-item'); if (rbItem) { e.preventDefault(); document.querySelectorAll('.rb-item').forEach(function (r) { r.classList.remove('checked'); }); rbItem.classList.add('checked'); var inp = rbItem.querySelector('input'); if (inp) inp.checked = true; }
 });
 
+function _renderSelectedPhoto(sourceDataUrl, done, failed) {
+  var img = new Image();
+  img.onload = function () {
+    var canvas = document.createElement('canvas'), MAX = 1200, w = img.width, h = img.height;
+    if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+    if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+    if (_dataEntryMode === 'survey') {
+      if (!_surveyMeta.capturedAt) _surveyMeta.capturedAt = new Date().toISOString();
+      if (!_surveyMeta.gpsCoordinate) _surveyMeta.gpsCoordinate = _formValue('f_koordinat');
+      var barHeight = Math.max(62, Math.round(h * .12));
+      ctx.fillStyle = 'rgba(3, 30, 50, .78)'; ctx.fillRect(0, h - barHeight, w, barHeight);
+      ctx.fillStyle = '#ffffff'; ctx.font = '700 ' + Math.max(15, Math.round(w * .018)) + 'px sans-serif';
+      ctx.fillText('SURVEI LAPANGAN · ' + (activeUsername || '-'), 16, h - barHeight + 25);
+      ctx.font = '500 ' + Math.max(12, Math.round(w * .014)) + 'px sans-serif';
+      var metaLine = _formatSurveyTime(_surveyMeta.capturedAt) + ' · ' + (_surveyMeta.gpsCoordinate || 'GPS belum tersedia');
+      if (_surveyMeta.gpsAccuracy != null) metaLine += ' · ±' + Math.round(Number(_surveyMeta.gpsAccuracy)) + ' m';
+      ctx.fillText(metaLine, 16, h - barHeight + 49);
+      _surveyPhotoWatermarkDirty = false;
+      _updateSurveyMetaUi();
+    }
+    _fotoDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    document.getElementById('fotoPreview').src = _fotoDataUrl;
+    document.getElementById('fotoPreviewWrap').classList.add('show');
+    document.getElementById('fotoStatus').textContent = _dataEntryMode === 'survey' ? 'Foto asli dan salinan watermark siap' : ('Foto siap (' + w + '×' + h + 'px)');
+    if (done) done();
+  };
+  img.onerror = function () { if (failed) failed('Foto tidak dapat diproses.'); };
+  img.src = sourceDataUrl;
+}
+
 function handleFotoChange(input) {
   var file = input.files[0]; if (!file) return;
   if (file.size > 5 * 1024 * 1024) { toast('Ukuran foto maks 5MB', 'error'); input.value = ''; return; }
   _fotoFilename = file.name; var reader = new FileReader();
   reader.onload = function (ev) {
-    if (_dataEntryMode === 'survey') _surveyOriginalPhotoDataUrl = ev.target.result;
-    var img = new Image();
-    img.onload = function () {
-      var canvas = document.createElement('canvas'), MAX = 1200, w = img.width, h = img.height;
-      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
-      canvas.width = w; canvas.height = h; var ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
-      if (_dataEntryMode === 'survey') {
-        _surveyMeta.capturedAt = new Date().toISOString();
-        if (!_surveyMeta.gpsCoordinate) _surveyMeta.gpsCoordinate = _formValue('f_koordinat');
-        var barHeight = Math.max(62, Math.round(h * .12));
-        ctx.fillStyle = 'rgba(3, 30, 50, .78)'; ctx.fillRect(0, h - barHeight, w, barHeight);
-        ctx.fillStyle = '#ffffff'; ctx.font = '700 ' + Math.max(15, Math.round(w * .018)) + 'px sans-serif';
-        ctx.fillText('SURVEI LAPANGAN · ' + (activeUsername || '-'), 16, h - barHeight + 25);
-        ctx.font = '500 ' + Math.max(12, Math.round(w * .014)) + 'px sans-serif';
-        var metaLine = _formatSurveyTime(_surveyMeta.capturedAt) + ' · ' + (_surveyMeta.gpsCoordinate || 'GPS belum tersedia');
-        if (_surveyMeta.gpsAccuracy != null) metaLine += ' · ±' + Math.round(Number(_surveyMeta.gpsAccuracy)) + ' m';
-        ctx.fillText(metaLine, 16, h - barHeight + 49);
-        _updateSurveyMetaUi();
-      }
-      _fotoDataUrl = canvas.toDataURL('image/jpeg', 0.82); document.getElementById('fotoPreview').src = _fotoDataUrl; document.getElementById('fotoPreviewWrap').classList.add('show'); document.getElementById('fotoStatus').textContent = _dataEntryMode === 'survey' ? 'Foto asli dan salinan watermark siap' : ('Foto siap (' + w + '×' + h + 'px)');
-    }; img.src = ev.target.result;
-  }; reader.readAsDataURL(file);
+    if (_dataEntryMode === 'survey') {
+      _surveyOriginalPhotoDataUrl = ev.target.result;
+      _surveyMeta.capturedAt = new Date().toISOString();
+      _surveyPhotoWatermarkDirty = true;
+    }
+    _renderSelectedPhoto(ev.target.result, null, function(message) { toast(message, 'error'); });
+  };
+  reader.readAsDataURL(file);
 }
 
-function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; _surveyOriginalPhotoDataUrl = null; if (_dataEntryMode === 'survey') { _surveyMeta.originalPhotoUrl = ''; _surveyMeta.watermarkedPhotoUrl = ''; } document.getElementById('f_foto').value = ''; document.getElementById('fotoPreview').src = ''; document.getElementById('fotoPreviewWrap').classList.remove('show'); document.getElementById('fotoStatus').textContent = ''; }
+function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; _surveyOriginalPhotoDataUrl = null; _surveyPhotoWatermarkDirty = false; if (_dataEntryMode === 'survey') { _surveyMeta.originalPhotoUrl = ''; _surveyMeta.watermarkedPhotoUrl = ''; } document.getElementById('f_foto').value = ''; document.getElementById('fotoPreview').src = ''; document.getElementById('fotoPreviewWrap').classList.remove('show'); document.getElementById('fotoStatus').textContent = ''; }
 
 function collectParams() {
   function get(group) { return Array.from(document.querySelectorAll('.cb-item[data-group="' + group + '"].checked')).map(function (el) { return el.dataset.val; }); }
@@ -7861,10 +7896,105 @@ function _updateSurveyMetaUi() {
   var time = document.getElementById('surveyCapturedAtText'), gps = document.getElementById('surveyGpsText'), accuracy = document.getElementById('surveyAccuracyText');
   if (time) time.textContent = _formatSurveyTime(_surveyMeta.capturedAt);
   if (gps) gps.textContent = _surveyMeta.gpsCoordinate || 'Belum tersedia';
-  if (accuracy) accuracy.textContent = _surveyMeta.gpsAccuracy == null ? '–' : ('±' + Math.round(Number(_surveyMeta.gpsAccuracy)) + ' m');
+  if (accuracy) {
+    var meters = _surveyMeta.gpsAccuracy == null ? null : Math.round(Number(_surveyMeta.gpsAccuracy));
+    accuracy.textContent = meters == null ? '–' : ('±' + meters + ' m' + (meters <= SURVEY_GPS_EXCELLENT_ACCURACY_M ? ' · sangat baik' : (meters <= SURVEY_GPS_GOOD_ACCURACY_M ? ' · siap' : ' · meningkatkan')));
+    var item = accuracy.closest('.survey-meta-item');
+    if (item) {
+      item.classList.remove('gps-good', 'gps-warn', 'gps-bad');
+      if (meters != null) item.classList.add(meters <= SURVEY_GPS_GOOD_ACCURACY_M ? 'gps-good' : (meters <= 20 ? 'gps-warn' : 'gps-bad'));
+    }
+  }
+}
+
+function _surveyGpsDistanceMeters(a, b) {
+  var rad = Math.PI / 180, lat1 = a.lat * rad, lat2 = b.lat * rad;
+  var dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function _surveyGpsIsMoving(samples) {
+  if (!samples.length) return false;
+  var latest = samples[samples.length - 1];
+  if (latest.speed != null && isFinite(latest.speed) && latest.speed >= 1.5) return true;
+  if (samples.length < 2) return false;
+  var first = samples[0], elapsedSeconds = Math.max(.001, (latest.receivedAt - first.receivedAt) / 1000);
+  var uncertainty = Math.max(10, Number(first.accuracy || 0), Number(latest.accuracy || 0));
+  var distance = _surveyGpsDistanceMeters(first, latest);
+  return distance > uncertainty && (distance / elapsedSeconds) >= 1.5;
+}
+
+function _selectSurveyGpsSample(now) {
+  var cutoff = now - SURVEY_GPS_RECENT_WINDOW_MS;
+  _surveyGpsSamples = _surveyGpsSamples.filter(function(sample) { return sample.receivedAt >= cutoff; });
+  if (!_surveyGpsSamples.length) return null;
+  if (_surveyGpsIsMoving(_surveyGpsSamples)) return _surveyGpsSamples[_surveyGpsSamples.length - 1];
+  return _surveyGpsSamples.reduce(function(best, sample) {
+    if (!best || sample.accuracy < best.accuracy || (sample.accuracy === best.accuracy && sample.receivedAt > best.receivedAt)) return sample;
+    return best;
+  }, null);
+}
+
+function _setSurveyGpsProgress(message) {
+  var progress = document.getElementById('surveyGpsProgress');
+  if (progress) progress.textContent = message;
+}
+
+function _scheduleSurveyGpsDuplicatePreview() {
+  if (_surveyGpsDuplicateTimer) clearTimeout(_surveyGpsDuplicateTimer);
+  var wait = Math.max(800, 5000 - (Date.now() - _surveyGpsLastDuplicateAt));
+  _surveyGpsDuplicateTimer = setTimeout(function() {
+    _surveyGpsDuplicateTimer = null; _surveyGpsLastDuplicateAt = Date.now(); refreshDuplicatePreview();
+  }, wait);
+}
+
+function _stopSurveyGpsWatch(reason) {
+  if (_surveyGpsWatchId != null && navigator.geolocation) navigator.geolocation.clearWatch(_surveyGpsWatchId);
+  _surveyGpsWatchId = null;
+  if (_surveyGpsStatusTimer) clearTimeout(_surveyGpsStatusTimer);
+  _surveyGpsStatusTimer = null;
+  if (_surveyGpsDuplicateTimer) clearTimeout(_surveyGpsDuplicateTimer);
+  _surveyGpsDuplicateTimer = null;
+  var button = document.getElementById('btnCaptureSurveyGps');
+  if (!button) return;
+  if (reason === 'hidden') { button.disabled = true; button.textContent = 'GPS Dijeda'; }
+  else if (reason === 'save') { button.disabled = true; button.textContent = 'GPS Terkunci'; }
+}
+
+function _applySurveyGpsPosition(position) {
+  var now = Date.now(), accuracy = Number(position.coords.accuracy);
+  if (!isFinite(accuracy) || accuracy <= 0) accuracy = 9999;
+  var sample = {
+    lat:Number(position.coords.latitude), lng:Number(position.coords.longitude), accuracy:accuracy,
+    speed:position.coords.speed == null ? null : Number(position.coords.speed),
+    capturedAt:new Date(position.timestamp || now).toISOString(), receivedAt:now
+  };
+  if (!isFinite(sample.lat) || !isFinite(sample.lng)) return;
+  _surveyGpsSamples.push(sample);
+  var selected = _selectSurveyGpsSample(now); if (!selected) return;
+  _surveyMeta.gpsCoordinate = selected.lat.toFixed(6) + ',' + selected.lng.toFixed(6);
+  _surveyMeta.gpsAccuracy = Math.round(selected.accuracy);
+  if (!_surveyOriginalPhotoDataUrl) _surveyMeta.capturedAt = selected.capturedAt;
+  var coordinateField = document.getElementById('f_koordinat');
+  if (coordinateField) coordinateField.value = _surveyMeta.gpsCoordinate;
+  if (_surveyOriginalPhotoDataUrl) {
+    _surveyPhotoWatermarkDirty = true;
+    var photoStatus = document.getElementById('fotoStatus');
+    if (photoStatus) photoStatus.textContent = 'GPS diperbarui; watermark akan disinkronkan saat disimpan';
+  }
+  _formDirty = true; saveDataDraft(); _scheduleSurveyGpsDuplicatePreview(); _updateSurveyMetaUi();
+  var moving = _surveyGpsIsMoving(_surveyGpsSamples), elapsed = now - _surveyGpsStartedAt;
+  if (_surveyMeta.gpsAccuracy <= SURVEY_GPS_EXCELLENT_ACCURACY_M) _setSurveyGpsProgress('GPS sangat akurat · pemantauan tetap aktif' + (moving ? ' selama kendaraan bergerak.' : '.'));
+  else if (_surveyMeta.gpsAccuracy <= SURVEY_GPS_GOOD_ACCURACY_M) _setSurveyGpsProgress('GPS siap digunakan · pemantauan tetap aktif' + (moving ? ' mengikuti kendaraan.' : '.'));
+  else if (elapsed < SURVEY_GPS_NORMAL_WAIT_MS) _setSurveyGpsProgress('Sedang meningkatkan akurasi… ±' + _surveyMeta.gpsAccuracy + ' m');
+  else _setSurveyGpsProgress('Akurasi masih ±' + _surveyMeta.gpsAccuracy + ' m. GPS terus mencari otomatis; pindah ke area lebih terbuka jika memungkinkan.');
+  var button = document.getElementById('btnCaptureSurveyGps');
+  if (button) { button.disabled = false; button.textContent = 'Cari Ulang GPS'; }
 }
 
 function _setDataEntryMode(mode) {
+  if (mode !== 'survey') _stopSurveyGpsWatch('close');
   _dataEntryMode = mode === 'survey' ? 'survey' : 'standard';
   var survey = _dataEntryMode === 'survey';
   var panel = document.getElementById('surveyCapturePanel'), draftButton = document.getElementById('btnSaveSurveyDraft');
@@ -7883,22 +8013,33 @@ function captureSurveyLocation() {
   if (_dataEntryMode !== 'survey') return;
   var button = document.getElementById('btnCaptureSurveyGps');
   if (!navigator.geolocation) { toast('Perangkat tidak menyediakan GPS browser.', 'error'); return; }
-  if (button) { button.disabled = true; button.textContent = 'Mencari…'; }
-  navigator.geolocation.getCurrentPosition(function(position) {
-    var coord = Number(position.coords.latitude).toFixed(6) + ',' + Number(position.coords.longitude).toFixed(6);
-    _surveyMeta.capturedAt = new Date(position.timestamp || Date.now()).toISOString();
-    _surveyMeta.gpsCoordinate = coord;
-    _surveyMeta.gpsAccuracy = Math.round(Number(position.coords.accuracy || 0));
-    document.getElementById('f_koordinat').value = coord;
-    _formDirty = true; saveDataDraft(); refreshDuplicatePreview(); _updateSurveyMetaUi();
-    if (button) { button.disabled = false; button.textContent = 'Perbarui GPS'; }
-    toast('GPS survei berhasil direkam.', 'success');
+  _stopSurveyGpsWatch('restart');
+  _surveyGpsSamples = []; _surveyGpsStartedAt = Date.now();
+  if (button) { button.disabled = true; button.textContent = 'Mengunci GPS…'; }
+  _setSurveyGpsProgress('Mencari lokasi presisi… Hasil pertama akan tampil segera.');
+  _surveyGpsWatchId = navigator.geolocation.watchPosition(function(position) {
+    _applySurveyGpsPosition(position);
   }, function(error) {
+    _stopSurveyGpsWatch('error');
     if (button) { button.disabled = false; button.textContent = 'Coba GPS Lagi'; }
     var message = error && error.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi browser.' : 'GPS belum dapat diperoleh. Coba di area terbuka.';
+    _setSurveyGpsProgress(message);
     toast(message, 'error');
   }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
+  _surveyGpsStatusTimer = setTimeout(function() {
+    if (_surveyGpsWatchId == null) return;
+    if (_surveyMeta.gpsAccuracy == null) _setSurveyGpsProgress('GPS belum memberi posisi. Pastikan Lokasi Presisi aktif dan perangkat mendapat pandangan langit.');
+    else if (_surveyMeta.gpsAccuracy > SURVEY_GPS_GOOD_ACCURACY_M) _setSurveyGpsProgress('Akurasi masih ±' + _surveyMeta.gpsAccuracy + ' m. GPS terus mencari otomatis tanpa menghalangi pengisian form.');
+  }, SURVEY_GPS_NORMAL_WAIT_MS);
 }
+
+document.addEventListener('visibilitychange', function() {
+  if (_dataEntryMode !== 'survey') return;
+  var modal = document.getElementById('modalOverlay');
+  if (!modal || !modal.classList.contains('open')) return;
+  if (document.hidden) _stopSurveyGpsWatch('hidden');
+  else captureSurveyLocation();
+});
 
 function _setFieldSurveyBadges(count) {
   var text = Number(count) > 0 ? ' (' + Number(count) + ')' : '';
@@ -7996,7 +8137,7 @@ function editFieldSurvey(index) {
   }
   document.getElementById('modalTitle').textContent = '✏️ Lanjutkan Survei ' + survey.surveyId;
   document.getElementById('fotoLabel').textContent = 'Foto Lapangan (ambil ulang untuk mengganti)';
-  _formDirty = false; document.getElementById('dataDraftBanner').hidden = true; renderDataFormReview();
+  _formDirty = false; document.getElementById('dataDraftBanner').hidden = true; renderDataFormReview(); captureSurveyLocation();
 }
 
 function reviewFieldSurveyByIndex(index, action) {
@@ -8037,6 +8178,7 @@ function closeModal(force) {
   var closeMessage = _dataEntryMode === 'survey' ? 'Survei belum disimpan. Tutup formulir? Draf teks tetap disimpan di perangkat ini, tetapi foto perlu dipilih kembali.' : (_editingId ? 'Perubahan edit belum disimpan. Tetap tutup formulir?' : 'Perubahan belum disimpan. Tutup formulir? Draf teks tetap disimpan di perangkat ini.');
   if (!force && _formDirty && !window.confirm(closeMessage)) return;
   if (!force && _formDirty) saveDataDraft();
+  _stopSurveyGpsWatch('close');
   document.getElementById('modalOverlay').classList.remove('open'); removeFoto();
   _formDirty = false;
   if (!document.querySelector('.modal-overlay.open') && !document.querySelector('.measure-overlay.open')) document.body.style.overflow = '';
@@ -8368,27 +8510,35 @@ function _fieldSurveyPayload(action, duplicateDecision) {
 
 function _uploadSurveyPhotosIfNeeded(done, failed) {
   if (!_surveyOriginalPhotoDataUrl || !_fotoDataUrl) { done(); return; }
-  _setSurveyButtonsBusy(true, '⏳ Mengupload foto…');
-  var baseName = (_formValue('f_id') || 'Tanpa-ID') + ' - ' + (activeUsername || 'Surveyor') + ' - ' + Date.now();
-  GAS.script.run.withSuccessHandler(function(res) {
-    if (!res || !res.success) { failed((res && res.error) || 'Upload foto survei gagal.'); return; }
-    _surveyMeta.originalPhotoUrl = res.originalUrl || '';
-    _surveyMeta.watermarkedPhotoUrl = res.watermarkedUrl || '';
-    _surveyOriginalPhotoDataUrl = null;
-    done();
-  }).withFailureHandler(function(error) { failed(error.message || String(error)); })
-    .uploadSurveyPhotos(_surveyOriginalPhotoDataUrl, _fotoDataUrl, baseName, activeUsername);
+  function upload() {
+    _setSurveyButtonsBusy(true, '⏳ Mengupload foto…');
+    var baseName = (_formValue('f_id') || 'Tanpa-ID') + ' - ' + (activeUsername || 'Surveyor') + ' - ' + Date.now();
+    GAS.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { failed((res && res.error) || 'Upload foto survei gagal.'); return; }
+      _surveyMeta.originalPhotoUrl = res.originalUrl || '';
+      _surveyMeta.watermarkedPhotoUrl = res.watermarkedUrl || '';
+      _surveyOriginalPhotoDataUrl = null;
+      done();
+    }).withFailureHandler(function(error) { failed(error.message || String(error)); })
+      .uploadSurveyPhotos(_surveyOriginalPhotoDataUrl, _fotoDataUrl, baseName, activeUsername);
+  }
+  if (_surveyPhotoWatermarkDirty) {
+    _setSurveyButtonsBusy(true, '⏳ Menyinkronkan watermark GPS…');
+    _renderSelectedPhoto(_surveyOriginalPhotoDataUrl, upload, failed);
+  } else upload();
 }
 
 function _persistFieldSurvey(action, duplicateDecision) {
+  _stopSurveyGpsWatch('save');
   var isSubmit = action === 'submit';
   _setSurveyButtonsBusy(true, isSubmit ? '⏳ Mengajukan…' : '⏳ Menyimpan draf…');
-  function fail(message) { _setSurveyButtonsBusy(false); toast(message, 'error'); }
+  function fail(message) { _setSurveyButtonsBusy(false); toast(message, 'error'); if (_dataEntryMode === 'survey' && document.getElementById('modalOverlay').classList.contains('open')) captureSurveyLocation(); }
   _uploadSurveyPhotosIfNeeded(function() {
     var payload = _fieldSurveyPayload(action, duplicateDecision);
     GAS.script.run.withSuccessHandler(function(res) {
       if (res && res.requiresDuplicateDecision && res.candidates && res.candidates.length) {
         _setSurveyButtonsBusy(false);
+        captureSurveyLocation();
         _showDuplicateCandidates(res.candidates, function(decision) { _persistFieldSurvey(action, decision); }, function() {});
         return;
       }
