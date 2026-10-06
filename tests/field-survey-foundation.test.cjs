@@ -59,7 +59,8 @@ test('foto asli tetap privat dan hanya salinan watermark dibagikan', () => {
 });
 
 test('mode survei mobile memakai GPS, kamera, draf terpisah, dan deteksi duplikat', () => {
-  assert.match(html, /id="mobileNavSurvey"/);
+  assert.match(html, /id="mobileNavSurvey"[^>]*onclick="openNewFieldSurvey\(\)"[^>]*aria-label="Buat survei lapangan baru"/);
+  assert.match(html, /id="mobileNavSurvey"[\s\S]*?<small>Survei Baru<\/small>/);
   assert.match(html, /\.mobile-bottom-nav\.survey-enabled \{ grid-template-columns:repeat\(5,1fr\); \}/);
   assert.match(html, /id="surveyCapturePanel"/);
   assert.match(extract(html, 'captureSurveyLocation'), /enableHighAccuracy:true/);
