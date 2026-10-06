@@ -4,6 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Database Pembanding</title>
+<meta name="description" content="Aplikasi pengelolaan dan analisis data pembanding properti." />
+<meta name="theme-color" content="#1e3a5f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Pembanding" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -1727,6 +1736,7 @@ body.mmode-picking .mpick-hint { display: flex; }
         <button class="topbar-more-item" id="btnFieldSurveyMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openFieldSurveyWorkspace();">📍 <span>Survei Lapangan</span><strong id="fieldSurveyBadgeMobile"></strong></button>
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); openMeasurement();">📐 <span>Measurement</span></button>
         <button class="topbar-more-item" type="button" role="menuitem" onclick="closeTopbarMore(); exportData();">⬇️ <span>Export</span></button>
+        <button class="topbar-more-item" id="btnInstallAppMobile" style="display:none;" type="button" role="menuitem" onclick="requestPwaInstall()">📲 <span>Instal Aplikasi</span></button>
         <button class="topbar-more-item" id="btnParametersMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openParameterManager();">⚙️ <span>Kelola Parameter</span></button>
         <button class="topbar-more-item" id="btnRelationReviewMobile" style="display:none;" type="button" role="menuitem" onclick="closeTopbarMore(); openRelationReview();">🔗 <span>Review Relasi Data</span><strong id="relationReviewBadgeMobile"></strong></button>
       </div>
@@ -2750,6 +2760,66 @@ body.mmode-picking .mpick-hint { display: flex; }
 <script>
 // --- JEMBATAN PENGHUBUNG GITHUB KE GOOGLE SHEETS ---
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyJ3K-OShKJoXQ-nlCTH3AsBN5Uvinuev-Kgp5IIINxfYNPhvNBPKw3W7DkWOwuF-6b/exec";
+
+// --- PWA: instalasi aplikasi dan service worker ---
+var _deferredPwaInstallPrompt = null;
+
+function _isPwaStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function _isIosDevice() {
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+}
+
+function updatePwaInstallUi() {
+  var button = document.getElementById('btnInstallAppMobile');
+  if (!button) return;
+  button.style.display = _isPwaStandalone() ? 'none' : '';
+}
+
+async function requestPwaInstall() {
+  closeTopbarMore();
+  if (_isPwaStandalone()) {
+    toast('Aplikasi sudah terpasang di perangkat ini.', 'success');
+    updatePwaInstallUi();
+    return;
+  }
+  if (_deferredPwaInstallPrompt) {
+    _deferredPwaInstallPrompt.prompt();
+    var choice = await _deferredPwaInstallPrompt.userChoice;
+    _deferredPwaInstallPrompt = null;
+    updatePwaInstallUi();
+    if (choice && choice.outcome === 'accepted') toast('Instalasi aplikasi dimulai.', 'success');
+    return;
+  }
+  if (_isIosDevice()) {
+    toast('Di Safari, tekan Bagikan lalu pilih “Tambahkan ke Layar Utama”.', 'info');
+    return;
+  }
+  toast('Buka menu browser lalu pilih “Instal aplikasi” atau “Tambahkan ke layar utama”.', 'info');
+}
+
+window.addEventListener('beforeinstallprompt', function(event) {
+  event.preventDefault();
+  _deferredPwaInstallPrompt = event;
+  updatePwaInstallUi();
+});
+
+window.addEventListener('appinstalled', function() {
+  _deferredPwaInstallPrompt = null;
+  updatePwaInstallUi();
+  toast('Database Pembanding berhasil dipasang.', 'success');
+});
+
+updatePwaInstallUi();
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js', { scope:'./' }).catch(function(error) {
+      console.warn('Service worker PWA belum dapat didaftarkan.', error);
+    });
+  });
+}
 
 // Jembatan iframe Apps Script menghindari fetch lintas-domain dan redirect
 // ContentService yang sebelumnya memicu "Failed to fetch" / respons HTML.
