@@ -30,6 +30,8 @@ const button = {
   classList: { toggle(name, on) { assert.equal(name, 'active'); button.active = on; } },
   setAttribute(name, value) { this.attributes[name] = value; }
 };
+const legend = { hidden:true }, count = { textContent:'' }, median = { textContent:'' };
+const elements = { btnHeatmap:button, heatmapLegend:legend, heatmapCount:count, heatmapMedian:median };
 const map = { fitBounds() {} };
 class Marker {
   constructor(options) { this.map = options.map; }
@@ -44,7 +46,7 @@ class Overlay {
 }
 class HeatmapLayer { constructor(options) { this.options = options; } }
 const context = vm.createContext({
-  document: { getElementById: () => button }, window: { deck: { GoogleMapsOverlay: Overlay, HeatmapLayer } },
+  document: { getElementById: id => elements[id] || null }, window: { deck: { GoogleMapsOverlay: Overlay, HeatmapLayer } },
   deck: { GoogleMapsOverlay: Overlay, HeatmapLayer }, google: { maps: {
     LatLngBounds: class { extend() {} }, LatLng: class { constructor(lat, lng) { this.lat = lat; this.lng = lng; } }, Marker
   } },
@@ -61,7 +63,7 @@ const context = vm.createContext({
   switchMapMode: mode => { context._currentMapMode = mode; },
   toast: message => messages.push(message)
 });
-for (const name of ['_heatmapPoints', '_clearHeatmapLayer', '_syncHeatmapButton', '_renderHeatmapLayer', 'toggleHeatmap', 'renderMarkers']) {
+for (const name of ['_heatmapPoints', '_clearHeatmapLayer', '_syncHeatmapButton', '_updateHeatmapLegend', '_renderHeatmapLayer', 'toggleHeatmap', 'renderMarkers']) {
   vm.runInContext(extract(name), context);
 }
 const rows = [
@@ -83,12 +85,20 @@ context.currentData = rows;
   assert.equal(layer.options.data.length, 2, 'Titik yang dikecualikan tidak memengaruhi peta panas');
   assert.deepEqual(Array.from(layer.options.getPosition(layer.options.data[0])), [105.28, -5.38]);
   assert.equal(layer.options.getWeight(layer.options.data[0]), 0.8, 'Bobot mengikuti rasio harga terhadap median');
+  assert.equal(layer.options.aggregation, 'MEAN', 'Warna mewakili rata-rata nilai, bukan jumlah titik');
+  assert.deepEqual(Array.from(layer.options.colorDomain), [0.5, 1.75], 'Skala warna tetap antar viewport');
+  assert.equal(layer.options.opacity, 0.58);
+  assert.equal(legend.hidden, false);
+  assert.equal(count.textContent, '2 data');
+  assert.equal(median.textContent, 'Rp 2.500.000');
   assert.equal(context.gMarkers[0].map, null, 'Pin pembanding tersembunyi selama heatmap');
 
   const active = context.heatLayer;
   context.renderMarkers([rows[0]], {}, true);
   assert.equal(context.heatLayer, active, 'Pencarian ulang memperbarui lapisan yang sama');
   assert.equal(context.heatLayer.layers[0].options.data.length, 1);
+  assert.equal(count.textContent, '1 data', 'Legenda diperbarui setelah pencarian');
+  assert.equal(median.textContent, 'Rp 2.000.000');
 
   const previous = context.heatLayer;
   context.toggleHeatmap();
@@ -96,11 +106,13 @@ context.currentData = rows;
   assert.equal(previous.finalized, true, 'Konteks WebGL dilepas setelah dimatikan');
   assert.equal(context.gMarkers[0].map, map, 'Pin kembali terlihat');
   assert.equal(button.attributes['aria-pressed'], 'false');
+  assert.equal(legend.hidden, true);
 
   context.toggleHeatmap();
   await new Promise(resolve => setImmediate(resolve));
   context.renderMarkers([{ koordinat:'-5.38,105.28', indikasiNilai:'' }], {}, true);
   assert.equal(context.isHeatmap, false, 'Pencarian baru tanpa data harga mematikan heatmap');
+  assert.equal(legend.hidden, true);
   assert.equal(context.gMarkers[0].map, map, 'Pin hasil pencarian tetap tampil');
 
   context.currentData = [{ koordinat:'-5.38,105.28', indikasiNilai:'' }];
