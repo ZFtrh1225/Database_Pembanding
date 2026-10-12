@@ -144,8 +144,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .quality-target-button { border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; border-radius:8px; min-height:34px; padding:6px 10px; font:700 11px var(--font); cursor:pointer; white-space:nowrap; }
 .quality-target-button.active { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
 .quality-form-help { margin-top:4px; color:var(--text-sub); font-size:10px; line-height:1.4; }
-.card-actions { display:flex; gap:5px; width:100%; }
-.card-action { flex:1; min-height:36px; display:inline-flex; align-items:center; justify-content:center; gap:4px; border:0; border-radius:7px; color:#fff; font:700 10.5px var(--font); cursor:pointer; }
+.card-actions { display:flex; justify-content:center; gap:6px; width:100%; }
+.card-action { flex:0 0 36px; width:36px; min-height:36px; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:7px; color:#fff; font:700 16px var(--font); cursor:pointer; }
+.card-action:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.card-action:disabled { opacity:.5; cursor:not-allowed; }
 .card-action.detail { background:var(--navy); }
 .card-action.compare { background:#7c3aed; }
 .card-action.edit { background:#d97706; }
@@ -1296,9 +1298,9 @@ body.mmode-picking .mpick-hint { display: flex; }
     min-width: 36px; min-height: 36px;
     padding: 6px 10px !important; font-size: 14px !important;
   }
-  .data-table td[data-label="Aksi"] .card-action { min-height:40px; font-size:11px !important; }
+  .data-table td[data-label="Aksi"] .card-action { flex-basis:40px; width:40px; min-height:40px; font-size:16px !important; }
   .data-table td[data-label="Tipe Bangunan"] { padding-top: 6px; }
-  .data-table td[data-label="Tipe Bangunan"]::before { content: 'Tipe'; }
+  .data-table td[data-label="Tipe Bangunan"]::before { content: 'Tipe Bangunan'; }
   .data-table td[data-label="Tipe Bangunan"] .badge { font-size: 11px; padding: 3px 9px; }
   .data-table td[data-label="Alamat"] {
     flex-direction: column; align-items: flex-start; gap: 2px;
@@ -1964,9 +1966,9 @@ body.mmode-picking .mpick-hint { display: flex; }
         <table class="data-table">
           <thead>
             <tr>
-              <th>ID</th><th>Aksi</th><th>Tipe Bangunan</th><th>Tipe</th><th>Indikasi Transaksi Bangunan (Rp)</th><th>Indikasi NP Bangunan (Rp/m²)</th><th>Alamat</th><th>Kota</th>
+              <th>ID</th><th>Aksi</th><th>Alamat</th><th>Kota</th>
               <th>Legalitas</th><th>LT (m²)</th><th>LB (m²)</th>
-              <th>Harga</th><th>Ind. Nilai/m²</th><th style="text-align: center;">ROW Jalan (m)</th><th>Status Harga</th><th>Waktu Data</th><th>Sumber</th>
+              <th>Harga</th><th>Ind. Nilai/m²</th><th>Tipe Bangunan</th><th>Tipe</th><th>Indikasi Transaksi Bangunan (Rp)</th><th>Indikasi NP Bangunan (Rp/m²)</th><th style="text-align: center;">ROW Jalan (m)</th><th>Status Harga</th><th>Waktu Data</th><th>Sumber</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -7936,9 +7938,9 @@ function renderTable(data) {
     var warningChip = q.warnings.length ? '<button type="button" class="quality-chip action warn" onclick="event.stopPropagation();openQualityReview(\'' + row._uid + '\')">⚠ ' + q.warnings.length + ' catatan</button>' : '<button type="button" class="quality-chip action good" onclick="event.stopPropagation();openQualityReview(\'' + row._uid + '\')">✓ Rincian skor</button>';
     var reviewBadge = q.reviewStatus === 'Dikecualikan' ? '<span class="quality-chip bad">Dikecualikan</span>' : (q.reviewStatus === 'Perlu Ditelaah' ? '<span class="quality-chip warn">Perlu ditelaah</span>' : '');
     var primaryBadge = _isPrimaryCompare(row) ? '<span class="primary-card-badge">⭐ UTAMA</span>' : '';
-    var editAction = activeRole === 'Viewer' ? '' : '<button class="card-action edit" onclick="event.stopPropagation();openEditModalByUid(\'' + row._uid + '\')" title="Edit data">✏️ <span>Edit</span></button>';
-    var actions = '<div class="card-actions"><button class="card-action detail" onclick="event.stopPropagation();openDetailModal(\'' + row._uid + '\')" title="Lihat detail">👁 <span>Detail</span></button><button class="card-action compare" onclick="event.stopPropagation();toggleCompare(\'' + row._uid + '\')" title="Bandingkan"' + (row._excluded ? ' disabled' : '') + '>⚖️ <span>Bandingkan</span></button>' + editAction + '</div>';
-    return '<tr class="' + (row._excluded ? 'review-excluded' : '') + '" data-uid="' + row._uid + '" onclick="handleDataRowClick(event,\'' + row._uid + '\')"><td><div class="mobile-card-hero">' + photoHtml + '<div><div class="mobile-card-heading"><strong>' + _escapeHtmlAppraisal(f(row.id)) + '</strong>' + primaryBadge + '<span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + cm.percent + '%</span></div><div class="appraisal-signals">' + distanceChip + ageChip + sourceChip + comparableChip + warningChip + reviewBadge + '</div></div></div></td><td>' + actions + '</td><td><span class="badge ' + bc(row.objek) + '">' + _escapeHtmlAppraisal(f(row.tipeBangunan)) + '</span></td><td>' + _escapeHtmlAppraisal(f(row.tipe)) + '</td><td class="harga-cell">' + (row.indikasiTransaksiBangunan ? formatRupiah(row.indikasiTransaksiBangunan) : '–') + '</td><td class="harga-cell">' + (row.indikasiNpBangunan ? formatRupiah(row.indikasiNpBangunan) : '–') + '</td><td title="' + _escapeHtmlAppraisal(f(row.alamat)) + '">' + _escapeHtmlAppraisal(f(row.alamat)) + '</td><td>' + _escapeHtmlAppraisal(f(row.kota)) + '</td><td>' + _escapeHtmlAppraisal(f(row.legalitas)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasTanah)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasBangunan)) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td style="text-align: center;">' + _escapeHtmlAppraisal(f(row.lebarJalanROW)) + '</td><td>' + _escapeHtmlAppraisal(f(row.statusHarga)) + '</td><td>' + _escapeHtmlAppraisal(f(row.waktuData)) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + _escapeHtmlAppraisal(f(row.sumber)) + ' / ' + _escapeHtmlAppraisal(f(row.hp)) + '</td></tr>';
+    var editAction = activeRole === 'Viewer' ? '' : '<button class="card-action edit" onclick="event.stopPropagation();openEditModalByUid(\'' + row._uid + '\')" title="Edit data" aria-label="Edit data" type="button"><span aria-hidden="true">✏️</span></button>';
+    var actions = '<div class="card-actions"><button class="card-action detail" onclick="event.stopPropagation();openDetailModal(\'' + row._uid + '\')" title="Lihat detail" aria-label="Lihat detail" type="button"><span aria-hidden="true">👁</span></button><button class="card-action compare" onclick="event.stopPropagation();toggleCompare(\'' + row._uid + '\')" title="Bandingkan" aria-label="Bandingkan" type="button"' + (row._excluded ? ' disabled' : '') + '><span aria-hidden="true">⚖️</span></button>' + editAction + '</div>';
+    return '<tr class="' + (row._excluded ? 'review-excluded' : '') + '" data-uid="' + row._uid + '" onclick="handleDataRowClick(event,\'' + row._uid + '\')"><td><div class="mobile-card-hero">' + photoHtml + '<div><div class="mobile-card-heading"><strong>' + _escapeHtmlAppraisal(f(row.id)) + '</strong>' + primaryBadge + '<span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + cm.percent + '%</span></div><div class="appraisal-signals">' + distanceChip + ageChip + sourceChip + comparableChip + warningChip + reviewBadge + '</div></div></div></td><td>' + actions + '</td><td title="' + _escapeHtmlAppraisal(f(row.alamat)) + '">' + _escapeHtmlAppraisal(f(row.alamat)) + '</td><td>' + _escapeHtmlAppraisal(f(row.kota)) + '</td><td>' + _escapeHtmlAppraisal(f(row.legalitas)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasTanah)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasBangunan)) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td><span class="badge ' + bc(row.objek) + '">' + _escapeHtmlAppraisal(f(row.tipeBangunan)) + '</span></td><td>' + _escapeHtmlAppraisal(f(row.tipe)) + '</td><td class="harga-cell">' + (row.indikasiTransaksiBangunan ? formatRupiah(row.indikasiTransaksiBangunan) : '–') + '</td><td class="harga-cell">' + (row.indikasiNpBangunan ? formatRupiah(row.indikasiNpBangunan) : '–') + '</td><td style="text-align: center;">' + _escapeHtmlAppraisal(f(row.lebarJalanROW)) + '</td><td>' + _escapeHtmlAppraisal(f(row.statusHarga)) + '</td><td>' + _escapeHtmlAppraisal(f(row.waktuData)) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + _escapeHtmlAppraisal(f(row.sumber)) + ' / ' + _escapeHtmlAppraisal(f(row.hp)) + '</td></tr>';
   }).join('');
   selectProperty(_selectedPropertyUid);
 }
@@ -10861,9 +10863,8 @@ function updateFilterSummary() {
 
   // ----------- Patch renderTable to add data-label for mobile card view -----------
   var COL_LABELS = [
-    'ID', 'Aksi', 'Tipe Bangunan', 'Tipe', 'Indikasi Transaksi Bangunan (Rp)', 'Indikasi NP Bangunan (Rp/m²)', 'Alamat', 'Kota',
-    'Legalitas', 'LT (m²)', 'LB (m²)',
-    'Harga', 'Ind. Nilai/m²', 'ROW Jalan (m)', 'Status Harga',
+    'ID', 'Aksi', 'Alamat', 'Kota', 'Legalitas', 'LT (m²)', 'LB (m²)',
+    'Harga', 'Ind. Nilai/m²', 'Tipe Bangunan', 'Tipe', 'Indikasi Transaksi Bangunan (Rp)', 'Indikasi NP Bangunan (Rp/m²)', 'ROW Jalan (m)', 'Status Harga',
     'Waktu Data', 'Sumber'
   ];
   function applyDataLabels() {
