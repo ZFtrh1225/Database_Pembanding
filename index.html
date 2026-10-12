@@ -1252,7 +1252,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   .data-table tbody { display: flex; flex-direction: column; gap: 10px; }
   .data-table tr {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0,1fr) auto;
     gap: 6px 12px;
     background: #fff;
     border: 1px solid var(--border);
@@ -1266,7 +1266,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   .data-table tr:hover { background: #fff; }
   .data-table td {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 4px 0; max-width: none; white-space: normal;
+    padding: 4px 0; min-width:0; max-width: none; white-space: normal; overflow:visible;
     border: none; font-size: 13px;
     grid-column: 1 / -1;
   }
@@ -1294,14 +1294,23 @@ body.mmode-picking .mpick-hint { display: flex; }
     justify-content: flex-end; gap: 4px;
   }
   .data-table td[data-label="Aksi"]::before { display: none; }
-  .data-table td[data-label="Aksi"] button {
-    min-width: 36px; min-height: 36px;
-    padding: 6px 10px !important; font-size: 14px !important;
+  .data-table td[data-label="Aksi"] .card-actions { justify-content:flex-end; }
+  .data-table td[data-label="Aksi"] .card-action {
+    flex:0 0 44px; width:44px; min-width:44px; min-height:44px;
+    padding:0 !important; font-size:16px !important;
   }
-  .data-table td[data-label="Aksi"] .card-action { flex-basis:40px; width:40px; min-height:40px; font-size:16px !important; }
   .data-table td[data-label="Tipe Bangunan"] { padding-top: 6px; }
   .data-table td[data-label="Tipe Bangunan"]::before { content: 'Tipe Bangunan'; }
   .data-table td[data-label="Tipe Bangunan"] .badge { font-size: 11px; padding: 3px 9px; }
+  .data-table td[data-label="Tipe Bangunan"],
+  .data-table td[data-label="Tipe"] { gap:10px; }
+  .data-table td .building-cell-value { min-width:0; max-width:100%; overflow-wrap:anywhere; text-align:right; white-space:normal; }
+  .data-table td[data-label="Indikasi Transaksi Bangunan (Rp)"],
+  .data-table td[data-label="Indikasi NP Bangunan (Rp/m²)"] {
+    flex-direction:column; align-items:stretch; gap:3px;
+  }
+  .data-table td[data-label="Indikasi Transaksi Bangunan (Rp)"]::before { content:'Ind. Transaksi Bangunan'; }
+  .data-table td[data-label="Indikasi NP Bangunan (Rp/m²)"]::before { content:'Ind. NP Bangunan/m²'; }
   .data-table td[data-label="Alamat"] {
     flex-direction: column; align-items: flex-start; gap: 2px;
   }
@@ -7940,7 +7949,7 @@ function renderTable(data) {
     var primaryBadge = _isPrimaryCompare(row) ? '<span class="primary-card-badge">⭐ UTAMA</span>' : '';
     var editAction = activeRole === 'Viewer' ? '' : '<button class="card-action edit" onclick="event.stopPropagation();openEditModalByUid(\'' + row._uid + '\')" title="Edit data" aria-label="Edit data" type="button"><span aria-hidden="true">✏️</span></button>';
     var actions = '<div class="card-actions"><button class="card-action detail" onclick="event.stopPropagation();openDetailModal(\'' + row._uid + '\')" title="Lihat detail" aria-label="Lihat detail" type="button"><span aria-hidden="true">👁</span></button><button class="card-action compare" onclick="event.stopPropagation();toggleCompare(\'' + row._uid + '\')" title="Bandingkan" aria-label="Bandingkan" type="button"' + (row._excluded ? ' disabled' : '') + '><span aria-hidden="true">⚖️</span></button>' + editAction + '</div>';
-    return '<tr class="' + (row._excluded ? 'review-excluded' : '') + '" data-uid="' + row._uid + '" onclick="handleDataRowClick(event,\'' + row._uid + '\')"><td><div class="mobile-card-hero">' + photoHtml + '<div><div class="mobile-card-heading"><strong>' + _escapeHtmlAppraisal(f(row.id)) + '</strong>' + primaryBadge + '<span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + cm.percent + '%</span></div><div class="appraisal-signals">' + distanceChip + ageChip + sourceChip + comparableChip + warningChip + reviewBadge + '</div></div></div></td><td>' + actions + '</td><td title="' + _escapeHtmlAppraisal(f(row.alamat)) + '">' + _escapeHtmlAppraisal(f(row.alamat)) + '</td><td>' + _escapeHtmlAppraisal(f(row.kota)) + '</td><td>' + _escapeHtmlAppraisal(f(row.legalitas)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasTanah)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasBangunan)) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td><span class="badge ' + bc(row.objek) + '">' + _escapeHtmlAppraisal(f(row.tipeBangunan)) + '</span></td><td>' + _escapeHtmlAppraisal(f(row.tipe)) + '</td><td class="harga-cell">' + (row.indikasiTransaksiBangunan ? formatRupiah(row.indikasiTransaksiBangunan) : '–') + '</td><td class="harga-cell">' + (row.indikasiNpBangunan ? formatRupiah(row.indikasiNpBangunan) : '–') + '</td><td style="text-align: center;">' + _escapeHtmlAppraisal(f(row.lebarJalanROW)) + '</td><td>' + _escapeHtmlAppraisal(f(row.statusHarga)) + '</td><td>' + _escapeHtmlAppraisal(f(row.waktuData)) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + _escapeHtmlAppraisal(f(row.sumber)) + ' / ' + _escapeHtmlAppraisal(f(row.hp)) + '</td></tr>';
+    return '<tr class="' + (row._excluded ? 'review-excluded' : '') + '" data-uid="' + row._uid + '" onclick="handleDataRowClick(event,\'' + row._uid + '\')"><td><div class="mobile-card-hero">' + photoHtml + '<div><div class="mobile-card-heading"><strong>' + _escapeHtmlAppraisal(f(row.id)) + '</strong>' + primaryBadge + '<span class="data-completeness ' + (cm.complete ? 'complete' : 'incomplete') + '" title="' + cm.filled + ' dari ' + cm.total + ' kolom terisi">' + (cm.complete ? 'Lengkap' : 'Belum lengkap') + ' · ' + cm.percent + '%</span></div><div class="appraisal-signals">' + distanceChip + ageChip + sourceChip + comparableChip + warningChip + reviewBadge + '</div></div></div></td><td>' + actions + '</td><td title="' + _escapeHtmlAppraisal(f(row.alamat)) + '">' + _escapeHtmlAppraisal(f(row.alamat)) + '</td><td>' + _escapeHtmlAppraisal(f(row.kota)) + '</td><td>' + _escapeHtmlAppraisal(f(row.legalitas)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasTanah)) + '</td><td>' + _escapeHtmlAppraisal(f(row.luasBangunan)) + '</td><td class="harga-cell">' + formatRupiah(row.harga) + '</td><td class="harga-cell">' + formatRupiah(row.indikasiNilai) + '</td><td><span class="building-cell-value badge ' + bc(row.objek) + '">' + _escapeHtmlAppraisal(f(row.tipeBangunan)) + '</span></td><td><span class="building-cell-value">' + _escapeHtmlAppraisal(f(row.tipe)) + '</span></td><td class="harga-cell"><span class="building-cell-value">' + (row.indikasiTransaksiBangunan ? formatRupiah(row.indikasiTransaksiBangunan) : '–') + '</span></td><td class="harga-cell"><span class="building-cell-value">' + (row.indikasiNpBangunan ? formatRupiah(row.indikasiNpBangunan) : '–') + '</span></td><td style="text-align: center;">' + _escapeHtmlAppraisal(f(row.lebarJalanROW)) + '</td><td>' + _escapeHtmlAppraisal(f(row.statusHarga)) + '</td><td>' + _escapeHtmlAppraisal(f(row.waktuData)) + getAgingFlag(row.waktuData) + '</td><td style="max-width: none;">' + _escapeHtmlAppraisal(f(row.sumber)) + ' / ' + _escapeHtmlAppraisal(f(row.hp)) + '</td></tr>';
   }).join('');
   selectProperty(_selectedPropertyUid);
 }
