@@ -3,6 +3,59 @@
 // ============================================================
 
 const SHEET_NAME = "DataPembanding";
+const DATA_HEADERS = [
+  "ID","Sumber","HP","Koordinat","Alamat","Kota","Provinsi","Jenis Properti","Tipe Bangunan",
+  "Tipe","Indikasi Transaksi Bangunan (Rp)","Indikasi NP Bangunan (Rp/m2)","Legalitas","Luas Tanah",
+  "Luas Bangunan","Tahun Bangun","Harga","Frontage","Lokasi","Posisi","Bentuk","Kontur",
+  "Lebar Jalan (ROW)","Elevasi","Status Harga","Waktu Data","Tujuan Penilaian","Peruntukan",
+  "Indikasi Nilai /m2","Foto"
+];
+const DATA_COLUMN_COUNT = DATA_HEADERS.length;
+
+// Sisipkan J-L pada sheet lama. Semua isi, formula, dan foto lama ikut bergeser.
+function _getDataSheet_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  if (!sheet) return null;
+  let header = sheet.getRange(1, 1, 1, Math.max(1, Math.min(sheet.getLastColumn(), DATA_COLUMN_COUNT))).getValues()[0];
+  if (!String(header[0] || '').trim()) {
+    if (sheet.getLastRow() > 1) throw new Error("Header DataPembanding kosong; migrasi otomatis dihentikan agar data tidak bergeser.");
+    if (sheet.getMaxColumns() < DATA_COLUMN_COUNT) sheet.insertColumnsAfter(sheet.getMaxColumns(), DATA_COLUMN_COUNT - sheet.getMaxColumns());
+    sheet.getRange(1, 1, 1, DATA_COLUMN_COUNT).setValues([DATA_HEADERS]);
+    return sheet;
+  }
+  if (String(header[9] || '').trim() === "Tipe" && String(header[10] || '').trim() === "Indikasi Transaksi Bangunan (Rp)" && String(header[11] || '').trim() === "Indikasi NP Bangunan (Rp/m2)" && String(header[12] || '').trim() === "Legalitas") return sheet;
+  // Perbaiki skema sementara dari revisi sebelumnya tanpa menggeser isi kolom.
+  const previousDraft = String(header[9] || '').trim() === "Tipe Indikasi" &&
+    String(header[10] || '').trim() === "Transaksi Bangunan (Rp)" &&
+    String(header[12] || '').trim() === "Legalitas";
+  const legacy = String(header[9] || '').trim() === "Legalitas";
+  const columnsAlreadyInserted = [9, 10, 11].every(i => !String(header[i] || '').trim()) && String(header[12] || '').trim() === "Legalitas";
+  if (String(header[8] || '').trim() !== "Tipe Bangunan" || (!legacy && !columnsAlreadyInserted && !previousDraft)) {
+    throw new Error("Struktur DataPembanding tidak dikenali. Periksa header sebelum migrasi.");
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    header = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), DATA_COLUMN_COUNT)).getValues()[0];
+    if (String(header[9] || '').trim() === "Legalitas" ||
+        (String(header[9] || '').trim() === "Tipe Indikasi" && String(header[10] || '').trim() === "Transaksi Bangunan (Rp)" && String(header[12] || '').trim() === "Legalitas") ||
+        ([9, 10, 11].every(i => !String(header[i] || '').trim()) && String(header[12] || '').trim() === "Legalitas")) {
+      if (String(header[9] || '').trim() === "Legalitas") sheet.insertColumnsAfter(9, 3);
+      sheet.getRange(1, 1, 1, DATA_COLUMN_COUNT).setValues([DATA_HEADERS]);
+      sheet.getRange(1, 10, 1, 3).setBackground("#1e3a5f").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+      SpreadsheetApp.flush();
+    }
+  } finally { lock.releaseLock(); }
+  return sheet;
+}
+
+function _normalizeDataRow_(row) {
+  if (!Array.isArray(row)) throw new Error("Baris data tidak valid.");
+  if (row.length === 27) return row.slice(0, 9).concat(["", "", ""], row.slice(9));
+  if (row.length !== DATA_COLUMN_COUNT) throw new Error("Jumlah kolom data tidak sesuai struktur DataPembanding.");
+  return row.slice();
+}
+function _dataReadColumnCount_(sheet) { return Math.min(sheet.getMaxColumns(), DATA_COLUMN_COUNT + 1); }
 const USERS_SHEET = "Users";
 const HISTORY_SHEET = "History";
 const MODEL_SHEET = "Model_Regresi"; // TAMBAHAN: Nama sheet database model
@@ -214,17 +267,16 @@ function _readMasterParameters_() {
 }
 
 function _getAvailableDataYears_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = _getDataSheet_();
   if (!sheet || sheet.getLastRow() < 2) return [];
 
-  const totalCols = Math.max(sheet.getLastColumn(), 27);
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.min(totalCols, 28)).getValues();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, _dataReadColumnCount_(sheet)).getValues();
   const years = {};
 
   rows.forEach(function(row) {
     const coord = _parseCoord(row[3], row[4]);
     const offset = coord && coord.shifted ? 1 : 0;
-    const value = row[22 + offset];
+    const value = row[25 + offset];
     let year = "";
 
     if (value instanceof Date && !isNaN(value.getTime())) {
@@ -595,16 +647,14 @@ function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
-  const headers = [
-    "ID","Sumber","HP","Koordinat","Alamat","Kota","Provinsi","Objek","Tipe Bangunan","Legalitas","Luas Tanah","Luas Bangunan",
-    "Tahun Bangun","Harga","Frontage","Lokasi","Posisi","Bentuk","Kontur","Lebar Jalan (ROW)","Elevasi","Status Harga","Waktu Data",
-    "Tujuan Penilaian","Peruntukan","Indikasi Nilai /m2","Foto"
-  ];
+  const headers = DATA_HEADERS;
   if (!sheet.getRange(1, 1).getValue()) {
+    if (sheet.getMaxColumns() < DATA_COLUMN_COUNT) sheet.insertColumnsAfter(sheet.getMaxColumns(), DATA_COLUMN_COUNT - sheet.getMaxColumns());
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length).setBackground("#1e3a5f").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
     sheet.setFrozenRows(1); sheet.getRange(2, 3, 1000, 1).setNumberFormat('@');
   }
+  else _getDataSheet_();
 
   let userSheet = ss.getSheetByName(USERS_SHEET);
   if (!userSheet) {
@@ -674,7 +724,7 @@ function checkLogin(username, password) {
 }
 
 function getNextId() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = _getDataSheet_();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return "001";
   const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(r => parseInt(r[0], 10)).filter(n => !isNaN(n));
@@ -768,7 +818,7 @@ function getRegressionModels() {
 
 // Status kelengkapan dihitung dari 26 kolom input pengguna (B:AA).
 // ID pada kolom A tidak dihitung karena dibuat oleh sistem.
-// Minimal 70% berarti sekurang-kurangnya 19 dari 26 input harus terisi.
+// Tiga kolom baru opsional; ambang kelengkapan lama tetap 19 dari 26 input.
 const DATA_COMPLETENESS_RATIO = 0.70;
 
 function _hasDataInputValue_(value) {
@@ -784,8 +834,9 @@ function _getDataCompleteness_(row) {
   // Sumber, HP, dan Koordinat. Koordinat lama yang terpisah di D/E tetap dihitung sebagai satu input.
   var inputValues = [row[1], row[2], coord ? coord.raw : row[3]];
 
-  // Alamat sampai Foto: 23 input berikutnya. Offset menjaga kompatibilitas format koordinat lama.
-  for (var columnIndex = 4; columnIndex <= 26; columnIndex++) {
+  // Alamat sampai Foto; tiga kolom baru tidak mengubah status data lama.
+  for (var columnIndex = 4; columnIndex < DATA_COLUMN_COUNT; columnIndex++) {
+    if (columnIndex >= 9 && columnIndex <= 11) continue;
     inputValues.push(row[columnIndex + offset]);
   }
 
@@ -805,24 +856,24 @@ function _getDataCompleteness_(row) {
 
 function searchData(params) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    const sheet = _getDataSheet_();
     if (!sheet) return { success: false, error: "Sheet tidak ditemukan." };
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return { success: true, data: [], total: 0, models: {} };
-    const totalCols = Math.max(sheet.getLastColumn(), 27);
-    const rawData   = sheet.getRange(2, 1, lastRow - 1, Math.min(totalCols, 28)).getValues();
+    const rawData = sheet.getRange(2, 1, lastRow - 1, _dataReadColumnCount_(sheet)).getValues();
     let filtered = rawData.filter(row => {
       var idVal = String(row[0] || '').trim(); var coordVal = String(row[3] || '').trim();
       if (!idVal && !coordVal) return false;
-
-      if (params.jenisProprti && params.jenisProprti.length > 0) if (!params.jenisProprti.includes(row[7])) return false;
-      if (params.legalitas && params.legalitas.length > 0) if (!params.legalitas.includes(row[9])) return false;
+      const coord = _parseCoord(row[3], row[4]);
+      const offset = coord && coord.shifted ? 1 : 0;
+      if (params.jenisProprti && params.jenisProprti.length > 0) if (!params.jenisProprti.includes(row[7 + offset])) return false;
+      if (params.legalitas && params.legalitas.length > 0) if (!params.legalitas.includes(row[12 + offset])) return false;
       if (params.jenisData && params.jenisData.length > 0) {
         const norm = params.jenisData.map(j => j === "Price on Offer" ? "Penawaran" : j);
-        if (!norm.includes(row[21])) return false;
+        if (!norm.includes(row[24 + offset])) return false;
       }
-      if (params.tahun && params.tahun.length > 0) if (!params.tahun.includes(String(row[22]).substring(0, 4))) return false;
-      if (params.rowJalan && params.rowJalan !== "") if ((parseFloat(row[19]) || 0) < parseFloat(params.rowJalan)) return false;
+      if (params.tahun && params.tahun.length > 0) if (!params.tahun.includes(String(row[25 + offset]).substring(0, 4))) return false;
+      if (params.rowJalan && params.rowJalan !== "") if ((parseFloat(row[22 + offset]) || 0) < parseFloat(params.rowJalan)) return false;
       if (params.statusData) {
         const completeness = _getDataCompleteness_(row);
         if (params.statusData === "Lengkap" && !completeness.isComplete) return false;
@@ -854,11 +905,13 @@ function searchData(params) {
       return {
         id: id, sumber: _str(row[1]), hp: _formatPhone(row[2]), koordinat: coordinate,
         alamat: _str(row[4+offset]), kota: _str(row[5+offset]), provinsi: _str(row[6+offset]), objek: _str(row[7+offset]),
-        tipeBangunan: _str(row[8+offset]), legalitas: _str(row[9+offset]), luasTanah: row[10+offset], luasBangunan: row[11+offset],
-        tahunBangun: row[12+offset], harga: _str(row[13+offset]), frontage: row[14+offset], lokasi: 
-        _str(row[15+offset]), posisi: _str(row[16+offset]), bentuk: _str(row[17+offset]), kontur: _str(row[18+offset]), lebarJalanROW: row[19+offset],
-        elevasi: row[20+offset], statusHarga: _str(row[21+offset]), waktuData: _str(row[22+offset]), tujuanPenilaian: _str(row[23+offset]),
-        peruntukan: _str(row[24+offset]), indikasiNilai: _str(row[25+offset]), foto: _str(row[26+offset]) || "",
+        tipeBangunan: _str(row[8+offset]), tipe: _str(row[9+offset]),
+        indikasiTransaksiBangunan: _str(row[10+offset]), indikasiNpBangunan: _str(row[11+offset]),
+        legalitas: _str(row[12+offset]), luasTanah: row[13+offset], luasBangunan: row[14+offset],
+        tahunBangun: row[15+offset], harga: _str(row[16+offset]), frontage: row[17+offset], lokasi:
+        _str(row[18+offset]), posisi: _str(row[19+offset]), bentuk: _str(row[20+offset]), kontur: _str(row[21+offset]), lebarJalanROW: row[22+offset],
+        elevasi: row[23+offset], statusHarga: _str(row[24+offset]), waktuData: _str(row[25+offset]), tujuanPenilaian: _str(row[26+offset]),
+        peruntukan: _str(row[27+offset]), indikasiNilai: _str(row[28+offset]), foto: _str(row[29+offset]) || "",
         qualityReview: reviewMap[_qualityReviewKey_(id, coordinate)] || _emptyQualityReview_()
       };
     });
@@ -870,7 +923,11 @@ function searchData(params) {
   } catch (err) { return { success: false, error: err.message }; }
 }
 
-function _str(v) { if (v === null || v === undefined) return ''; return String(v).trim().replace(/\.0+$/, ''); }
+function _str(v) {
+  if (v === null || v === undefined) return '';
+  const text = String(v).trim();
+  return /^-?\d+\.0+$/.test(text) ? text.replace(/\.0+$/, '') : text;
+}
 
 function _requireDataEditor_(username) {
   const role = _getUserRole_(username);
@@ -931,6 +988,7 @@ function _duplicateRelativeDifference_(left, right) {
 }
 
 function _duplicateRecordFromRow_(row, sheetRow) {
+  if (!sheetRow) row = _normalizeDataRow_(row);
   const coord = _parseCoord(row[3], row[4]);
   const offset = coord && coord.shifted ? 1 : 0;
   return {
@@ -943,12 +1001,12 @@ function _duplicateRecordFromRow_(row, sheetRow) {
     kota: _str(row[5 + offset]),
     provinsi: _str(row[6 + offset]),
     objek: _str(row[7 + offset]),
-    legalitas: _str(row[9 + offset]),
-    luasTanah: row[10 + offset],
-    luasBangunan: row[11 + offset],
-    harga: row[13 + offset],
-    statusHarga: _str(row[21 + offset]),
-    waktuData: _str(row[22 + offset]),
+    legalitas: _str(row[12 + offset]),
+    luasTanah: row[13 + offset],
+    luasBangunan: row[14 + offset],
+    harga: row[16 + offset],
+    statusHarga: _str(row[24 + offset]),
+    waktuData: _str(row[25 + offset]),
     sheetRow: sheetRow || null
   };
 }
@@ -1002,10 +1060,10 @@ function _duplicateScore_(input, existing) {
 
 function _findDuplicateCandidates_(rowData, excludeId) {
   if (!Array.isArray(rowData)) throw new Error("Data pembanding tidak valid.");
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = _getDataSheet_();
   if (!sheet || sheet.getLastRow() < 2) return [];
   const input = _duplicateRecordFromRow_(rowData, null);
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(27, Math.min(sheet.getLastColumn(), 28))).getValues();
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, _dataReadColumnCount_(sheet)).getValues();
   const normalizedExcludeId = String(excludeId || "").trim();
   return rows.map(function(row, index) {
     const existing = _duplicateRecordFromRow_(row, index + 2);
@@ -1120,10 +1178,10 @@ function _relationRecordSummary_(record) {
 }
 
 function _relationDataLookup_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = _getDataSheet_();
   const lookup = {};
   if (!sheet || sheet.getLastRow() < 2) return lookup;
-  const columnCount = Math.max(27, Math.min(sheet.getLastColumn(), 28));
+  const columnCount = _dataReadColumnCount_(sheet);
   const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, columnCount).getValues();
   rows.forEach(function(row, index) {
     const record = _duplicateRecordFromRow_(row, index + 2);
@@ -1342,10 +1400,10 @@ function saveFieldSurvey(payload, activeUser) {
       if (existing && String(existing[2]) !== String(activeUser || "")) throw new Error("Draf survei hanya dapat diubah oleh pembuatnya.");
       if (existing && ["Menunggu Review", "Disetujui", "Sedang Diproses"].indexOf(String(existing[1])) >= 0) throw new Error("Survei ini tidak dapat diubah pada status sekarang.");
       const status = submitting ? "Menunggu Review" : "Draf";
-      const dataRow = Array.isArray(payload.dataRow) ? payload.dataRow.slice(0, 27) : [];
+      const dataRow = _normalizeDataRow_(Array.isArray(payload.dataRow) && payload.dataRow.length ? payload.dataRow : Array(DATA_COLUMN_COUNT).fill(""));
       const originalPhotoUrl = String(payload.originalPhotoUrl || (existing && existing[13]) || "");
       const watermarkedPhotoUrl = String(payload.watermarkedPhotoUrl || (existing && existing[14]) || "");
-      if (watermarkedPhotoUrl) dataRow[26] = watermarkedPhotoUrl;
+      if (watermarkedPhotoUrl) dataRow[29] = watermarkedPhotoUrl;
       savedRow = [
         surveyId, status, String(activeUser || ""), role, existing ? existing[4] : now, now,
         submitting ? now : "", "", "", "", payload.capturedAt ? new Date(payload.capturedAt) : "",
@@ -1437,8 +1495,9 @@ function reviewFieldSurvey(payload, activeUser) {
 function addData(rowData, activeUser, duplicateDecision) {
   try {
     const role = _requireDataEditor_(activeUser);
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    const sheet = _getDataSheet_();
     if (!sheet) throw new Error("Sheet database tidak ditemukan.");
+    rowData = _normalizeDataRow_(rowData);
     const candidates = _findDuplicateCandidates_(rowData, "");
     const resolvedDecision = _resolveDuplicateDecision_(candidates, duplicateDecision);
     if (resolvedDecision && resolvedDecision.required) {
@@ -1458,7 +1517,8 @@ function addData(rowData, activeUser, duplicateDecision) {
 function editData(rowData, activeUser, originalCoord, duplicateDecision) {
   try {
     const role = _requireDataEditor_(activeUser);
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    const sheet = _getDataSheet_();
+    rowData = _normalizeDataRow_(rowData);
     const targetId = String(rowData[0]).trim();
     const targetCoord = originalCoord ? String(originalCoord).trim() : String(rowData[3]).trim();
     const lastRow = sheet.getLastRow();
@@ -1524,13 +1584,13 @@ function uploadFoto(dataUrl, filename) {
 
 function updateFoto(koordinatTarget, fotoUrl) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME); const lastRow = sheet.getLastRow();
+    const sheet = _getDataSheet_(); const lastRow = sheet.getLastRow();
     const coordsData = sheet.getRange(2, 4, lastRow - 1, 2).getValues(); const target = _parseCoord(koordinatTarget, "");
     if (!target) return { success: false, error: "Format koordinat tidak valid." };
     for (let i = 0; i < coordsData.length; i++) {
       let rowCoord = _parseCoord(coordsData[i][0], coordsData[i][1]);
       if (rowCoord && rowCoord.lat === target.lat && rowCoord.lng === target.lng) {
-        let offset = rowCoord.shifted ? 1 : 0; let fotoCell = sheet.getRange(i + 2, 27 + offset);
+        let offset = rowCoord.shifted ? 1 : 0; let fotoCell = sheet.getRange(i + 2, 30 + offset);
         let currentPhotos = String(fotoCell.getValue() || '').trim();
         let updatedPhotos = currentPhotos ? currentPhotos + "," + fotoUrl : fotoUrl;
         fotoCell.setValue(updatedPhotos); SpreadsheetApp.flush(); return { success: true };

@@ -22,7 +22,8 @@ test('Google Maps memiliki loading, retry, dan fallback OpenStreetMap', () => {
   assert.match(html, /switchMapMode\(\\'osm\\'\)/);
   assert.match(html, /Gunakan OpenStreetMap/);
   assert.match(html, /function retryGoogleMap\(\)/);
-  assert.match(html, /Heatmap menggunakan Google Maps\. Menyiapkan peta/);
+  assert.match(html, /if \(_currentMapMode !== 'gmaps'\) switchMapMode\('gmaps'\)/);
+  assert.match(html, /Promise\.all\(\[_ensureGoogleMapReady\(\), ensureDeckHeatmap\(\)\]\)/);
   assert.match(html, /Menyiapkan Google Maps untuk Measurement/);
 });
 

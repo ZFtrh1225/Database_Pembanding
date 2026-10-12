@@ -31,9 +31,9 @@ test('formatter menerima angka mentah dan format Rupiah yang ditempel', () => {
 test('Harga dan Indikasi Nilai tidak melewati penyaring digit umum', () => {
   const numericDeclaration = html.match(/var numFields = \[([^\]]+)\]/);
   assert.ok(numericDeclaration);
-  assert.doesNotMatch(numericDeclaration[1], /f_harga|f_indikasi/);
+  assert.doesNotMatch(numericDeclaration[1], /f_harga|f_indikasi|f_indikasiTransaksiBangunan|f_indikasiNpBangunan/);
   const setup = extract(html, 'setupDataInputFormatting');
-  assert.match(setup, /\['f_harga','f_indikasi'\]/);
+  for (const field of ['f_harga','f_indikasi','f_indikasiTransaksiBangunan','f_indikasiNpBangunan']) assert.match(setup, new RegExp(field));
   assert.match(setup, /_formatCurrencyInputValue\(field\.value\)/);
   assert.doesNotMatch(setup, /Hanya menerima input angka|toast\(/);
 });
@@ -42,5 +42,7 @@ test('validasi akhir tetap memeriksa kedua kolom mata uang', () => {
   const validation = extract(html, 'validateDataForm');
   assert.match(validation, /'f_harga'/);
   assert.match(validation, /'f_indikasi'/);
+  assert.match(validation, /'f_indikasiTransaksiBangunan'/);
+  assert.match(validation, /'f_indikasiNpBangunan'/);
   assert.match(validation, /replace\(\/\\\.\/g,''\)/);
 });
