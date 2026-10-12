@@ -5,7 +5,7 @@
 const SHEET_NAME = "DataPembanding";
 const DATA_HEADERS = [
   "ID","Sumber","HP","Koordinat","Alamat","Kota","Provinsi","Jenis Properti","Tipe Bangunan",
-  "Tipe Indikasi","Transaksi Bangunan (Rp)","Indikasi NP Bangunan (Rp/m2)","Legalitas","Luas Tanah",
+  "Tipe","Indikasi Transaksi Bangunan (Rp)","Indikasi NP Bangunan (Rp/m2)","Legalitas","Luas Tanah",
   "Luas Bangunan","Tahun Bangun","Harga","Frontage","Lokasi","Posisi","Bentuk","Kontur",
   "Lebar Jalan (ROW)","Elevasi","Status Harga","Waktu Data","Tujuan Penilaian","Peruntukan",
   "Indikasi Nilai /m2","Foto"
@@ -23,10 +23,14 @@ function _getDataSheet_() {
     sheet.getRange(1, 1, 1, DATA_COLUMN_COUNT).setValues([DATA_HEADERS]);
     return sheet;
   }
-  if (String(header[9] || '').trim() === "Tipe Indikasi" && String(header[12] || '').trim() === "Legalitas") return sheet;
+  if (String(header[9] || '').trim() === "Tipe" && String(header[10] || '').trim() === "Indikasi Transaksi Bangunan (Rp)" && String(header[11] || '').trim() === "Indikasi NP Bangunan (Rp/m2)" && String(header[12] || '').trim() === "Legalitas") return sheet;
+  // Perbaiki skema sementara dari revisi sebelumnya tanpa menggeser isi kolom.
+  const previousDraft = String(header[9] || '').trim() === "Tipe Indikasi" &&
+    String(header[10] || '').trim() === "Transaksi Bangunan (Rp)" &&
+    String(header[12] || '').trim() === "Legalitas";
   const legacy = String(header[9] || '').trim() === "Legalitas";
   const columnsAlreadyInserted = [9, 10, 11].every(i => !String(header[i] || '').trim()) && String(header[12] || '').trim() === "Legalitas";
-  if (String(header[8] || '').trim() !== "Tipe Bangunan" || (!legacy && !columnsAlreadyInserted)) {
+  if (String(header[8] || '').trim() !== "Tipe Bangunan" || (!legacy && !columnsAlreadyInserted && !previousDraft)) {
     throw new Error("Struktur DataPembanding tidak dikenali. Periksa header sebelum migrasi.");
   }
   const lock = LockService.getScriptLock();
@@ -34,6 +38,7 @@ function _getDataSheet_() {
   try {
     header = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), DATA_COLUMN_COUNT)).getValues()[0];
     if (String(header[9] || '').trim() === "Legalitas" ||
+        (String(header[9] || '').trim() === "Tipe Indikasi" && String(header[10] || '').trim() === "Transaksi Bangunan (Rp)" && String(header[12] || '').trim() === "Legalitas") ||
         ([9, 10, 11].every(i => !String(header[i] || '').trim()) && String(header[12] || '').trim() === "Legalitas")) {
       if (String(header[9] || '').trim() === "Legalitas") sheet.insertColumnsAfter(9, 3);
       sheet.getRange(1, 1, 1, DATA_COLUMN_COUNT).setValues([DATA_HEADERS]);
@@ -900,8 +905,8 @@ function searchData(params) {
       return {
         id: id, sumber: _str(row[1]), hp: _formatPhone(row[2]), koordinat: coordinate,
         alamat: _str(row[4+offset]), kota: _str(row[5+offset]), provinsi: _str(row[6+offset]), objek: _str(row[7+offset]),
-        tipeBangunan: _str(row[8+offset]), tipeIndikasi: _str(row[9+offset]),
-        transaksiBangunan: _str(row[10+offset]), indikasiNpBangunan: _str(row[11+offset]),
+        tipeBangunan: _str(row[8+offset]), tipe: _str(row[9+offset]),
+        indikasiTransaksiBangunan: _str(row[10+offset]), indikasiNpBangunan: _str(row[11+offset]),
         legalitas: _str(row[12+offset]), luasTanah: row[13+offset], luasBangunan: row[14+offset],
         tahunBangun: row[15+offset], harga: _str(row[16+offset]), frontage: row[17+offset], lokasi:
         _str(row[18+offset]), posisi: _str(row[19+offset]), bentuk: _str(row[20+offset]), kontur: _str(row[21+offset]), lebarJalanROW: row[22+offset],
