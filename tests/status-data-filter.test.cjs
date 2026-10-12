@@ -31,15 +31,16 @@ function extractFunction(source, name) {
   throw new Error('Unclosed function ' + name);
 }
 
-const context = vm.createContext({ DATA_COMPLETENESS_RATIO: 0.70 });
+const context = vm.createContext({ DATA_COMPLETENESS_RATIO: 0.70, DATA_COLUMN_COUNT: 30 });
 for (const name of ['_parseCoord', '_hasDataInputValue_', '_getDataCompleteness_']) {
   vm.runInContext(extractFunction(backend, name), context);
 }
 
 function rowWithFilledInputs(count) {
-  const row = Array(27).fill('');
+  const row = Array(30).fill('');
   row[0] = '001'; // ID sistem tidak masuk hitungan.
-  for (let i = 1; i <= count; i++) row[i] = 'terisi-' + i;
+  const indices = Array.from({length:29}, (_,i) => i + 1).filter(i => i < 9 || i > 11);
+  indices.slice(0,count).forEach((index,i) => { row[index] = 'terisi-' + (i + 1); });
   return row;
 }
 
@@ -56,13 +57,13 @@ assert.equal(result.isComplete, true, '19/26 adalah batas minimum 70%');
 result = context._getDataCompleteness_(rowWithFilledInputs(26));
 assert.equal(result.isComplete, true);
 
-const legacy = Array(28).fill('');
+const legacy = Array(31).fill('');
 legacy[0] = '002';
 legacy[3] = '-5.380964';
 legacy[4] = '105.284946';
-for (let i = 1; i <= 18; i++) {
-  if (i !== 3 && i !== 4) legacy[i < 4 ? i : i + 1] = 'terisi-' + i;
-}
+legacy[1] = 'sumber'; legacy[2] = 'hp';
+Array.from({length:26},(_,i) => i + 4).filter(i => i < 9 || i > 11).slice(0,15)
+  .forEach((index,i) => { legacy[index + 1] = 'terisi-' + i; });
 result = context._getDataCompleteness_(legacy);
 assert.equal(result.total, 26, 'Koordinat D/E lama tetap dihitung sebagai satu input');
 
