@@ -58,7 +58,7 @@ test('seluruh pintu masuk Google Maps dikunci untuk Viewer', () => {
   assert.ok(toggleMeasurement.indexOf('_isViewerRole()') < toggleMeasurement.indexOf('_ensureGoogleMapReady()'),
     'guard Viewer harus dijalankan sebelum Google Maps dimuat');
   assert.match(toggleMeasurement, /_mForceViewerOsmMode\(\)/);
-  assert.match(html, /openMeasurement = function\(\) \{\s*_mApplyMeasurementRoleAccess\(activeRole\)/);
+  assert.match(html, /openMeasurement = function\(\) \{\s*_mEnsureDataCards\(\);\s*_mApplyMeasurementRoleAccess\(activeRole\)/);
 });
 
 test('Measurement menampilkan status OSM terkunci yang aksesibel', () => {

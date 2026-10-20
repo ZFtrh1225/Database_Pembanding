@@ -93,7 +93,7 @@ for (const name of [
   '_mNormalizeRoutePoint', '_mGetRouteClass', '_mComputeModernRoadRoute', '_mComputeLegacyRoadRoute',
   '_mRouteErrorText', '_mFriendlyRouteError', '_mComputeRoadRoute', '_mFormatRouteDuration', '_mSetDistanceState',
   '_mRouteNoticeDismissed', 'dismissMeasurementRouteNotice', '_mShowRouteNotice', 'retryMeasurementRoutes',
-  '_mClearLayers', '_mMakePin', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon',
+  '_mGetDataColor', '_mRunRouteQueue', '_mClearLayers', '_mMakePin', '_mRedraw', '_mOsmClearLayers', '_mOsmMakeIcon',
   '_mOsmMakeLabelIcon', '_mSyncOsmMarkerScale', '_mOsmRedraw'
 ]) vm.runInContext(extract(name), c);
 
@@ -275,7 +275,7 @@ async function settle() {
   assert.match(html, /\.mmap-layer-toggle \{ grid-column:span 2;/);
   assert.match(html, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(html, /Route\.computeRoutes/);
-  assert.match(html, /_mMakePin\(coord, _mRouteColors\[id\]/, 'Pin Google memakai warna data dari panel');
+  assert.match(html, /_mMakePin\(coord, _mGetDataColor\(id\)/, 'Pin Google memakai warna data dari panel');
   assert.match(html, /_mOsmMap\.on\('zoomend', _mSyncOsmMarkerScale\)/, 'Pin OSM merespons perubahan zoom');
   assert.doesNotMatch(extract('_mMakeLabel'), /mdl-pill|distanceText/, 'Label pin Google hanya berisi nama data');
   assert.doesNotMatch(extract('_mOsmRedraw'), /labelHtml[\s\S]*mdl-pill/, 'Label pin OSM tidak memuat jarak');
