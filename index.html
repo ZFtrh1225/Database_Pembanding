@@ -183,6 +183,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .survey-photo-button { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; min-height:44px; padding:9px 12px; border:1px solid #0284c7; border-radius:9px; background:#fff; color:#075985; font:700 11px var(--font); cursor:pointer; }
 .survey-photo-button:hover { background:#e0f2fe; }
 .survey-photo-button svg { flex:none; }
+.survey-submit-shortcut { width:100%; min-height:44px; padding:9px 12px; border:0; border-radius:9px; background:var(--navy); color:#fff; font:700 11px var(--font); cursor:pointer; }
+.survey-submit-shortcut:hover { background:var(--navy-mid); }
+.survey-submit-shortcut:disabled { opacity:.6; cursor:wait; }
+.foto-source-chooser > summary { list-style:none; }
+.foto-source-chooser > summary::-webkit-details-marker { display:none; }
+.foto-source-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
+.foto-source-options button { display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; min-height:48px; padding:10px 8px; border:1px solid var(--border); border-radius:9px; background:var(--sky); color:var(--navy); font:700 12px var(--font); cursor:pointer; }
+.foto-source-options button:hover { border-color:var(--blue); }
+.foto-source-input { display:none; }
 .survey-photo-shortcut-status { margin:0; color:#0369a1; font-size:10px; line-height:1.4; overflow-wrap:anywhere; }
 .survey-gps-button { flex:none; min-height:40px; padding:8px 11px; border:0; border-radius:9px; background:#0284c7; color:#fff; font:700 11px var(--font); cursor:pointer; }
 .survey-meta-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px; }
@@ -2485,6 +2494,7 @@ body.mmode-picking .mpick-hint { display: flex; }
               <span id="surveyPhotoShortcutLabel">Ambil Foto</span>
             </button>
             <button class="survey-gps-button" id="btnCaptureSurveyGps" type="button" onclick="captureSurveyLocation()">Ambil GPS</button>
+            <button class="survey-submit-shortcut" id="btnSubmitSurveyShortcut" type="button" onclick="submitData()">📤 Ajukan Survei</button>
             <p class="survey-photo-shortcut-status" id="surveyPhotoShortcutStatus">Pratinjau foto tersedia di langkah 5. Foto.</p>
           </div>
         </div>
@@ -2541,10 +2551,16 @@ body.mmode-picking .mpick-hint { display: flex; }
 
         <div class="form-group span-2">
           <label class="form-label" id="fotoLabel">Foto Properti</label>
-          <div class="foto-upload-area" onclick="document.getElementById('f_foto').click()">
-            <input type="file" id="f_foto" accept="image/*" onchange="handleFotoChange(this)"/>
-            <label class="foto-upload-label">📷 <span>Klik untuk pilih foto</span><br><small style="font-size:10px;color:var(--text-xs);">JPG, PNG, WEBP — maks 5MB</small></label>
-          </div>
+          <details class="foto-source-chooser" id="fotoSourceChooser">
+            <summary class="foto-upload-area">
+              <span class="foto-upload-label">📷 <span>Klik untuk pilih foto</span><br><small style="font-size:10px;color:var(--text-xs);">JPG, PNG, WEBP — maks 5MB</small></span>
+            </summary>
+            <div class="foto-source-options" role="group" aria-label="Sumber foto">
+              <button type="button" onclick="selectPhotoSource('camera')" aria-controls="f_foto">📷 Kamera</button>
+              <button type="button" onclick="selectPhotoSource('gallery')" aria-controls="f_foto">🖼 Galeri</button>
+            </div>
+          </details>
+          <input class="foto-source-input" type="file" id="f_foto" accept="image/*" onchange="handleFotoChange(this)"/>
           <div class="foto-preview-wrap" id="fotoPreviewWrap">
             <img id="fotoPreview" src="" alt="Preview"/>
             <button class="foto-remove-btn" onclick="removeFoto()">✕</button>
@@ -8002,13 +8018,21 @@ function _syncSurveyPhotoShortcut() {
   if (status && status.textContent !== statusText) status.textContent = statusText;
 }
 
-function captureSurveyPhoto() {
-  if (_dataEntryMode !== 'survey') return;
+function selectPhotoSource(source) {
+  if (source !== 'camera' && source !== 'gallery') return;
   var input = document.getElementById('f_foto');
   if (!input) return;
+  if (source === 'camera') input.setAttribute('capture', 'environment');
+  else input.removeAttribute('capture');
+  var chooser = document.getElementById('fotoSourceChooser');
+  if (chooser) chooser.open = false;
   // Keep the native picker in the tap event so mobile browsers can open it.
-  input.setAttribute('capture', 'environment');
   input.click();
+}
+
+function captureSurveyPhoto() {
+  if (_dataEntryMode !== 'survey') return;
+  selectPhotoSource('camera');
 }
 
 function _updateSurveyMetaUi() {
@@ -8617,7 +8641,13 @@ function _resetDataSubmitButton(btn) {
 
 function _setSurveyButtonsBusy(busy, label) {
   var submit = document.getElementById('btnSubmit'), draft = document.getElementById('btnSaveSurveyDraft');
-  if (submit) { submit.disabled = !!busy; submit.textContent = busy ? (label || '⏳ Memproses…') : '📤 Ajukan Survei'; }
+  var shortcut = document.getElementById('btnSubmitSurveyShortcut');
+  [submit, shortcut].forEach(function(button) {
+    if (!button) return;
+    button.disabled = !!busy;
+    button.setAttribute('aria-busy', String(!!busy));
+    button.textContent = busy ? (label || '⏳ Memproses…') : '📤 Ajukan Survei';
+  });
   if (draft) { draft.disabled = !!busy; draft.textContent = busy ? 'Menunggu…' : 'Simpan Draf'; }
 }
 
