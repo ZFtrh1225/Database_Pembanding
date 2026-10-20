@@ -674,7 +674,7 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .measure-sidebar {
   width: 290px; min-width: 290px;
   background: linear-gradient(180deg,#1e3a5f 0%,#172d4a 100%);
-  display: flex; flex-direction: column; overflow-y: auto;
+  display: flex; flex-direction: column; overflow: hidden;
   border-right: 1px solid rgba(255,255,255,.1);
   transition: width .3s ease, min-width .3s ease, opacity .3s ease;
   position: relative; z-index: 10; flex-shrink: 0;
@@ -683,8 +683,9 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   width: 0 !important; min-width: 0 !important;
   overflow: hidden; opacity: 0;
 }
-.measure-sidebar::-webkit-scrollbar { width: 4px; }
-.measure-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
+.msb-scroll { position:relative; flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; scroll-padding:10px; }
+.msb-scroll::-webkit-scrollbar { width:4px; }
+.msb-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:2px; }
 
 .msb-header {
   background: rgba(255,217,102,.1); border-bottom: 1px solid rgba(255,217,102,.2);
@@ -694,7 +695,13 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .msb-title { font-size: 13px; font-weight: 700; color: #FFD966; display: flex; align-items: center; gap: 7px; }
 .msb-sub { font-size: 10px; color: rgba(255,255,255,.45); margin-top: 2px; }
 
-.msb-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.msb-body { padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+.mpt-data-list { display:flex; flex-direction:column; gap:8px; }
+.mpt-card { scroll-margin:10px; }
+.mpt-card:focus-visible { outline:2px solid #FFD966; outline-offset:2px; }
+.mpt-card.is-new { animation:mptAdded 1.2s ease-out; }
+@keyframes mptAdded { from { background:rgba(255,217,102,.22); box-shadow:0 0 0 2px rgba(255,217,102,.5); } to { box-shadow:0 0 0 0 transparent; } }
+@media (prefers-reduced-motion:reduce) { .mpt-card.is-new { animation:none; } }
 
 .mpt-card {
   background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09);
@@ -703,9 +710,13 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .mpt-card:hover { border-color: rgba(255,255,255,.2); }
 .mpt-card.has-val { border-color: rgba(74,210,149,.4); background: rgba(74,210,149,.055); }
 
-.mpt-head { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+.mpt-head { display:grid; grid-template-columns:28px minmax(0,1fr) 32px; align-items:center; column-gap:7px; row-gap:3px; margin-bottom:7px; }
+.mpt-head .mpt-dot { grid-column:1; grid-row:1; }
+.mpt-head .mpt-label { grid-column:2; grid-row:1; min-width:0; overflow-wrap:anywhere; }
+.mpt-head .mpt-clear { grid-column:3; grid-row:1 / span 2; align-self:start; }
+.mpt-head .mpt-dist { grid-column:2; grid-row:2; justify-self:start; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 .mpt-dot {
-  width: 22px; height: 22px; border-radius: 50%;
+  width: 28px; height: 28px; border-radius: 50%;
   display: grid; place-items: center;
   font-size: 8px; font-weight: 800; color: #fff; flex-shrink: 0;
   border: 1.5px solid rgba(255,255,255,.25);
@@ -722,8 +733,8 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .mpt-card.has-val .mpt-dist { display: block; }
 .mpt-clear {
   background: none; border: none; cursor: pointer;
-  color: rgba(255,255,255,.28); font-size: 11px; padding: 0;
-  transition: color .18s; margin-left: 2px;
+  color: rgba(255,255,255,.6); font-size: 13px; padding: 0; min-width:32px; min-height:32px;
+  transition: color .18s;
 }
 .mpt-clear:hover { color: rgba(220,38,38,.8); }
 
@@ -765,10 +776,17 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .msb-sum-val.route-fallback { color:#fbbf24; }
 
 .msb-footer {
-  padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.07);
-  position: sticky; bottom: 0; flex-shrink: 0;
-  background: linear-gradient(0deg,#172d4a 60%,transparent);
+  display:flex; flex-direction:column; gap:7px; padding:10px 12px;
+  border-top:1px solid rgba(255,255,255,.12); flex-shrink:0; background:#172d4a;
 }
+.msb-add {
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:48px;
+  border:1px solid #ffe394; border-radius:10px; background:#FFD966; color:#172d4a;
+  font:700 12px var(--font); cursor:pointer; transition:background .18s, box-shadow .18s;
+}
+.msb-add:hover { background:#ffe394; box-shadow:0 3px 12px rgba(255,217,102,.15); }
+.msb-add:active { background:#f5c94d; }
+.msb-add svg { flex:none; }
 .msb-reset {
   width: 100%; background: rgba(220,38,38,.13); color: rgba(220,38,38,.75);
   border: 1px solid rgba(220,38,38,.22); border-radius: 7px;
@@ -1645,7 +1663,15 @@ body.mmode-picking .mpick-hint { display: flex; }
   #compareOverlay .compare-table .compare-target-col { min-width:155px; }
   #compareOverlay .compare-clear-primary { margin-left:0; min-height:40px; }
   .toast-container { bottom:calc(var(--mobile-nav) + 10px); }
-  .measure-sidebar { height:min(46dvh, 430px); max-height:min(46dvh, 430px); padding-bottom:env(safe-area-inset-bottom, 0px); }
+  .measure-sidebar { height:min(46dvh, 430px); max-height:min(46dvh, 430px); }
+  .msb-footer { padding-bottom:max(10px, env(safe-area-inset-bottom, 0px)); }
+  .msb-body { padding:10px; }
+  .mpt-card { padding:10px; }
+  .mpt-head { grid-template-columns:28px minmax(0,1fr) 44px; }
+  .mpt-clear { min-width:44px; min-height:44px; }
+  .mpt-input { min-height:48px; padding:10px 52px 10px 10px; font-size:16px; }
+  .mpt-pick { right:2px; min-width:44px; min-height:44px; font-size:18px; }
+  .msb-reset { min-height:44px; }
   .measure-map-wrap { min-height:54dvh; }
   .mroute-notice { top:104px; width:calc(100% - 20px); align-items:flex-start; }
   .mroute-notice button { min-height:40px; }
@@ -2605,103 +2631,22 @@ body.mmode-picking .mpick-hint { display: flex; }
       <div class="msb-sub">Ketik koordinat atau klik 📍 untuk pilih di peta</div>
     </div>
 
+    <div class="msb-scroll" id="mPointsScroll">
     <div class="msb-body">
       <!-- OBJEK PENILAIAN -->
       <div class="mpt-card" id="mpCard_obj">
         <div class="mpt-head">
           <div class="mpt-dot" style="background:#db4437;">OBJ</div>
           <span class="mpt-label">Objek Penilaian</span>
-          <button class="mpt-clear" onclick="mptClear('obj')" title="Hapus">✕</button>
+          <button class="mpt-clear" type="button" onclick="mptClear('obj')" aria-label="Hapus koordinat Objek Penilaian" title="Hapus koordinat">✕</button>
         </div>
         <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_obj" placeholder="-6.1234, 106.8234" oninput="mptInput('obj')" onblur="mptBlur('obj')"/>
-          <button class="mpt-pick" onclick="mptPick('obj')" title="Pilih di peta">📍</button>
+          <input class="mpt-input" id="mCoord_obj" aria-label="Koordinat Objek Penilaian" autocomplete="off" spellcheck="false" placeholder="-6.1234, 106.8234" oninput="mptInput('obj')" onblur="mptBlur('obj')"/>
+          <button class="mpt-pick" type="button" onclick="mptPick('obj')" aria-label="Pilih Objek Penilaian di peta" title="Pilih di peta">📍</button>
         </div>
       </div>
 
-      <!-- DATA PEMBANDING 1 -->
-      <div class="mpt-card" id="mpCard_1">
-        <div class="mpt-head">
-          <div class="mpt-dot" style="background:#2d6be4;">DP1</div>
-          <span class="mpt-label">Data 1</span>
-          <span class="mpt-dist" id="mDist_1">–</span>
-          <button class="mpt-clear" onclick="mptClear('1')" title="Hapus">✕</button>
-        </div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_1" placeholder="-6.1234, 106.8234" oninput="mptInput('1')" onblur="mptBlur('1')"/>
-          <button class="mpt-pick" onclick="mptPick('1')" title="Pilih di peta">📍</button>
-        </div>
-      </div>
-
-      <!-- DATA PEMBANDING 2 -->
-      <div class="mpt-card" id="mpCard_2">
-        <div class="mpt-head">
-          <div class="mpt-dot" style="background:#0f9d58;">DP2</div>
-          <span class="mpt-label">Data 2</span>
-          <span class="mpt-dist" id="mDist_2">–</span>
-          <button class="mpt-clear" onclick="mptClear('2')" title="Hapus">✕</button>
-        </div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_2" placeholder="-6.1234, 106.8234" oninput="mptInput('2')" onblur="mptBlur('2')"/>
-          <button class="mpt-pick" onclick="mptPick('2')" title="Pilih di peta">📍</button>
-        </div>
-      </div>
-
-      <!-- DATA PEMBANDING 3 -->
-      <div class="mpt-card" id="mpCard_3">
-        <div class="mpt-head">
-          <div class="mpt-dot" style="background:#f4b400;">DP3</div>
-          <span class="mpt-label">Data 3</span>
-          <span class="mpt-dist" id="mDist_3">–</span>
-          <button class="mpt-clear" onclick="mptClear('3')" title="Hapus">✕</button>
-        </div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_3" placeholder="-6.1234, 106.8234" oninput="mptInput('3')" onblur="mptBlur('3')"/>
-          <button class="mpt-pick" onclick="mptPick('3')" title="Pilih di peta">📍</button>
-        </div>
-      </div>
-
-      <!-- DATA PEMBANDING 4 -->
-      <div class="mpt-card" id="mpCard_4">
-        <div class="mpt-head">
-          <div class="mpt-dot" style="background:#ab47bc;">DP4</div>
-          <span class="mpt-label">Data 4</span>
-          <span class="mpt-dist" id="mDist_4">–</span>
-          <button class="mpt-clear" onclick="mptClear('4')" title="Hapus">✕</button>
-        </div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_4" placeholder="-6.1234, 106.8234" oninput="mptInput('4')" onblur="mptBlur('4')"/>
-          <button class="mpt-pick" onclick="mptPick('4')" title="Pilih di peta">📍</button>
-        </div>
-      </div>
-
-      <!-- DATA PEMBANDING 5 -->
-      <div class="mpt-card" id="mpCard_5">
-        <div class="mpt-head">
-          <div class="mpt-dot" style="background:#e67e22;">DP5</div>
-          <span class="mpt-label">Data 5</span>
-          <span class="mpt-dist" id="mDist_5">–</span>
-          <button class="mpt-clear" onclick="mptClear('5')" title="Hapus">✕</button>
-        </div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_5" placeholder="-6.1234, 106.8234" oninput="mptInput('5')" onblur="mptBlur('5')"/>
-          <button class="mpt-pick" onclick="mptPick('5')" title="Pilih di peta">📍</button>
-        </div>
-      </div>
-
-      <!-- DATA PEMBANDING 6 -->
-      <div class="mpt-card" id="mpCard_6">
-        <div class="mpt-head">
-          <div class="mpt-dot" style="background:#16a34a;">DP6</div>
-          <span class="mpt-label">Data 6</span>
-          <span class="mpt-dist" id="mDist_6">–</span>
-          <button class="mpt-clear" onclick="mptClear('6')" title="Hapus">✕</button>
-        </div>
-        <div class="mpt-coord-wrap">
-          <input class="mpt-input" id="mCoord_6" placeholder="-6.1234, 106.8234" oninput="mptInput('6')" onblur="mptBlur('6')"/>
-          <button class="mpt-pick" onclick="mptPick('6')" title="Pilih di peta">📍</button>
-        </div>
-      </div>
+      <div class="mpt-data-list" id="mDataCards"></div>
     </div>
 
     <!-- Summary jarak -->
@@ -2713,8 +2658,14 @@ body.mmode-picking .mpick-hint { display: flex; }
       <div id="mSummaryRows"></div>
     </div>
 
+    </div><!-- .msb-scroll -->
     <div class="msb-footer">
-      <button class="msb-reset" onclick="mResetAll()">
+      <button class="msb-add" id="mAddData" type="button" onclick="mAddMeasurementData()" aria-controls="mDataCards">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Tambah Data</span>
+      </button>
+      <span class="sr-only" id="mDataStatus" role="status" aria-live="polite"></span>
+      <button class="msb-reset" type="button" onclick="mResetAll()">
         ↺ Reset Semua Titik
       </button>
     </div>
@@ -9167,12 +9118,94 @@ var _mRoutes = {};                       // Google Maps road/fallback polylines 
 var _mDirSvc = null;                     // compatibility fallback DirectionsService (Legacy)
 var _mRouteClassPromise = null;           // modern google.maps.routes.Route
 var _mMapType = 'roadmap';
-var _mDpIds  = ['1','2','3','4','5','6'];
+var _mDpIds = [];                       // Registered cards, including dynamically added data
 var _mLinesVisible = true;
 var _mRouteRunId = 0;
 
-// Warna garis rute (Google Maps) & garis putus-putus (OSM) — saturasi tinggi & kontras tinggi
-var _mRouteColors = { '1':'#e60023','2':'#0066ff','3':'#ff6600','4':'#9c00ff','5':'#00a020','6':'#ff0088' };
+// Satu sumber warna untuk kartu, pin, garis, dan ringkasan di kedua peta.
+var _mRouteColors = { '1':'#2d6be4','2':'#0f9d58','3':'#d69e00','4':'#ab47bc','5':'#e67e22','6':'#0891b2' };
+
+function _mGetDataColor(id) {
+  if (!_mRouteColors[id]) {
+    // Golden-angle spacing; keep red reserved for the valuation object.
+    var index = Number(id) - 7;
+    var hue = 20 + ((238 + index * 137.508) % 320);
+    var lightness = 47 + (Math.floor(index / 12) % 3) * 6;
+    _mRouteColors[id] = 'hsl(' + hue.toFixed(3) + ', 76%, ' + lightness + '%)';
+  }
+  return _mRouteColors[id];
+}
+
+function _mAppendDataCard() {
+  var list = document.getElementById('mDataCards');
+  if (!list) return null;
+  var id = String(_mDpIds.length + 1);
+  var color = _mGetDataColor(id);
+  var card = document.createElement('div');
+  card.className = 'mpt-card';
+  card.id = 'mpCard_' + id;
+  card.tabIndex = -1;
+  card.setAttribute('role', 'group');
+  card.setAttribute('aria-labelledby', 'mDataLabel_' + id);
+  card.innerHTML = '<div class="mpt-head">'
+    + '<div class="mpt-dot" style="background:' + color + ';" aria-hidden="true">DP' + id + '</div>'
+    + '<span class="mpt-label" id="mDataLabel_' + id + '">Data ' + id + '</span>'
+    + '<span class="mpt-dist" id="mDist_' + id + '">–</span>'
+    + '<button class="mpt-clear" type="button" title="Hapus koordinat" aria-label="Hapus koordinat Data ' + id + '">✕</button>'
+    + '</div><div class="mpt-coord-wrap">'
+    + '<input class="mpt-input" id="mCoord_' + id + '" aria-label="Koordinat Data ' + id + '" placeholder="-6.1234, 106.8234" autocomplete="off" spellcheck="false"/>'
+    + '<button class="mpt-pick" type="button" title="Pilih di peta" aria-label="Pilih Data ' + id + ' di peta">📍</button>'
+    + '</div>';
+  var input = card.querySelector('.mpt-input');
+  input.addEventListener('input', function() { mptInput(id); });
+  input.addEventListener('blur', function() { mptBlur(id); });
+  card.querySelector('.mpt-clear').addEventListener('click', function() { mptClear(id); });
+  card.querySelector('.mpt-pick').addEventListener('click', function() { mptPick(id); });
+  list.appendChild(card);
+  _mDpIds.push(id);
+  return card;
+}
+
+function _mEnsureDataCards() {
+  // Initialize once; reopening Measurement keeps the current session's cards.
+  while (_mDpIds.length < 6) {
+    if (!_mAppendDataCard()) break;
+  }
+}
+
+function mAddMeasurementData() {
+  _mEnsureDataCards();
+  var card = _mAppendDataCard();
+  if (!card) return;
+  card.classList.add('is-new');
+  // Focus the card, keeping the phone keyboard closed until the input is tapped.
+  card.focus({ preventScroll:true });
+  var scroller = document.getElementById('mPointsScroll');
+  if (scroller) {
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scroller.scrollTo({ top:Math.max(0, card.offsetTop - 10), behavior:reduceMotion ? 'auto' : 'smooth' });
+  }
+  var status = document.getElementById('mDataStatus');
+  if (status) status.textContent = 'Data ' + _mDpIds[_mDpIds.length - 1] + ' ditambahkan. ' + _mDpIds.length + ' data tersedia.';
+  // An empty card must not redraw the map or request routes.
+}
+
+// Limit simultaneous road requests as the number of comparables grows.
+function _mRunRouteQueue(items, task, isCurrent) {
+  var next = 0, results = new Array(items.length);
+  function worker() {
+    if (next >= items.length || !isCurrent()) return Promise.resolve();
+    var index = next++;
+    return Promise.resolve().then(function() {
+      if (!isCurrent()) return null;
+      return task(items[index]);
+    }).then(function(result) {
+      results[index] = result;
+      return worker();
+    });
+  }
+  return Promise.all(items.slice(0, 3).map(worker)).then(function() { return results; });
+}
 
 function _mRenderModeButton(viewerOnly) {
   var btn = document.getElementById('btnMeasureOsm');
@@ -9280,6 +9313,7 @@ function _mRoutePathToPins(path, origin, destination) {
 }
 
 function openMeasurement() {
+  _mEnsureDataCards();
   _mApplyMeasurementRoleAccess(activeRole);
   document.getElementById('measureOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -9771,7 +9805,7 @@ function _mRedraw() {
     var distEl = document.getElementById('mDist_'+id);
     if (!coord) { _mSetDistanceState(distEl, '–', false, ''); return; }
 
-    _mMks[id] = _mMakePin(coord, _mRouteColors[id] || '#0033ff', 'Data '+id, false);
+    _mMks[id] = _mMakePin(coord, _mGetDataColor(id), 'Data '+id, false);
     bounds.extend(coord); hasBounds = true;
     activeDps.push({ id: id, coord: coord, distEl: distEl });
   });
@@ -9792,7 +9826,7 @@ function _mRedraw() {
       }
     });
 
-    Promise.all(activeDps.map(function(dp){
+    _mRunRouteQueue(activeDps, function(dp){
       return _mComputeRoadRoute(cObj, dp.coord).then(function(result) {
         if (routeRunId !== _mRouteRunId || _mOsmActive ||
             !document.getElementById('measureOverlay').classList.contains('open')) return null;
@@ -9802,14 +9836,14 @@ function _mRedraw() {
         var duration = _mFormatRouteDuration(result.durationMillis);
         var distanceText = _mFmtMeters(meters);
         var ds = distanceText + (duration ? ' · ' + duration : '');
-        _mRoutes[dp.id] = _mCreateRoutePolyline(path, _mRouteColors[dp.id] || '#0033ff');
+        _mRoutes[dp.id] = _mCreateRoutePolyline(path, _mGetDataColor(dp.id));
         _mSyncLineVisibility();
         path.forEach(function(point){ bounds.extend(point); });
         hasBounds = true;
         _mSetDistanceState(dp.distEl, ds, false, 'Rute jalan Google');
         _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id);
         return {
-          id:dp.id, dist:ds, meters:meters, color:_mRouteColors[dp.id] || '#0033ff',
+          id:dp.id, dist:ds, meters:meters, color:_mGetDataColor(dp.id),
           source:result.source, warnings:result.warnings || []
         };
       }).catch(function(error) {
@@ -9820,16 +9854,19 @@ function _mRedraw() {
         var distanceText = _mFmtDist(km);
         var ds = distanceText + ' · lurus';
         var reason = (error && error.message) || _mFriendlyRouteError(error);
-        _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mRouteColors[dp.id] || '#0033ff');
+        _mRoutes[dp.id] = _mCreateRoutePolyline([cObj, dp.coord], _mGetDataColor(dp.id));
         _mSyncLineVisibility();
         _mSetDistanceState(dp.distEl, ds, true, 'Rute jalan gagal: ' + reason);
         _mLbls[dp.id] = _mMakeLabel(dp.coord, dp.id);
         return {
-          id:dp.id, dist:ds, meters:km * 1000, color:_mRouteColors[dp.id] || '#0033ff',
+          id:dp.id, dist:ds, meters:km * 1000, color:_mGetDataColor(dp.id),
           fallback:true, error:reason
         };
       });
-    })).then(function(results) {
+    }, function() {
+      return routeRunId === _mRouteRunId && !_mOsmActive &&
+        document.getElementById('measureOverlay').classList.contains('open');
+    }).then(function(results) {
       if (routeRunId !== _mRouteRunId || _mOsmActive ||
           !document.getElementById('measureOverlay').classList.contains('open')) return;
 
@@ -10098,7 +10135,7 @@ function _mOsmRedraw() {
     var distEl = document.getElementById('mDist_' + id);
     if (!coord) { _mSetDistanceState(distEl, '–', false, ''); return; }
 
-    var color = _mRouteColors[id] || '#0033ff';
+    var color = _mGetDataColor(id);
     var mDp = L.marker([coord.lat, coord.lng], { icon: _mOsmMakeIcon(color, false), zIndexOffset: 500 }).addTo(_mOsmMap);
     mDp._mPinMeta = { color:color, isObj:false };
     _mOsmMarkers.push(mDp);
@@ -10178,6 +10215,7 @@ mptClear = function(id) {
 };
 var _origMResetAll = mResetAll;
 mResetAll = function() {
+  mCancelPick();
   ['obj'].concat(_mDpIds).forEach(function(id) {
     var inp = document.getElementById('mCoord_' + id);
     if (inp) { inp.value = ''; inp.className = 'mpt-input'; }
@@ -10192,6 +10230,7 @@ mResetAll = function() {
 // Patch map click saat OSM mode aktif - cancel pick juga di OSM
 var _origOpenMeasurement = openMeasurement;
 openMeasurement = function() {
+  _mEnsureDataCards();
   _mApplyMeasurementRoleAccess(activeRole);
   document.getElementById('measureOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
