@@ -179,6 +179,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .survey-capture-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .survey-capture-head strong { display:block; color:#075985; font-size:12px; }
 .survey-capture-head small { display:block; margin-top:3px; color:#0369a1; font-size:10px; line-height:1.4; }
+.survey-capture-actions { display:flex; flex-direction:column; gap:8px; flex:none; width:180px; }
+.survey-photo-button { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; min-height:44px; padding:9px 12px; border:1px solid #0284c7; border-radius:9px; background:#fff; color:#075985; font:700 11px var(--font); cursor:pointer; }
+.survey-photo-button:hover { background:#e0f2fe; }
+.survey-photo-button svg { flex:none; }
+.survey-photo-shortcut-status { margin:0; color:#0369a1; font-size:10px; line-height:1.4; overflow-wrap:anywhere; }
 .survey-gps-button { flex:none; min-height:40px; padding:8px 11px; border:0; border-radius:9px; background:#0284c7; color:#fff; font:700 11px var(--font); cursor:pointer; }
 .survey-meta-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:10px; }
 .survey-meta-item { min-width:0; padding:8px; border:1px solid #bae6fd; border-radius:8px; background:rgba(255,255,255,.8); }
@@ -1555,6 +1560,7 @@ body.mmode-picking .mpick-hint { display: flex; }
   #mobileSurveyBadge.show { display:block; }
   .mobile-bottom-nav.survey-enabled { grid-template-columns:repeat(5,1fr); }
   .survey-capture-head { flex-direction:column; align-items:stretch; }
+  .survey-capture-actions { width:100%; }
   .survey-gps-button { width:100%; min-height:44px; }
   .survey-meta-grid { grid-template-columns:1fr; }
   .survey-card { grid-template-columns:84px minmax(0,1fr); padding:10px; gap:10px; }
@@ -2473,7 +2479,14 @@ body.mmode-picking .mpick-hint { display: flex; }
       <section class="survey-capture-panel" id="surveyCapturePanel" aria-live="polite">
         <div class="survey-capture-head">
           <div><strong>📍 Bukti Survei Lapangan</strong><small>GPS dan waktu pengambilan dicatat sebagai metadata. Foto tampilan diberi watermark; foto asli tetap tanpa perubahan.</small></div>
-          <button class="survey-gps-button" id="btnCaptureSurveyGps" type="button" onclick="captureSurveyLocation()">Ambil GPS</button>
+          <div class="survey-capture-actions">
+            <button class="survey-photo-button" id="btnCaptureSurveyPhoto" type="button" onclick="captureSurveyPhoto()" aria-controls="f_foto" aria-describedby="surveyPhotoShortcutStatus">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span id="surveyPhotoShortcutLabel">Ambil Foto</span>
+            </button>
+            <button class="survey-gps-button" id="btnCaptureSurveyGps" type="button" onclick="captureSurveyLocation()">Ambil GPS</button>
+            <p class="survey-photo-shortcut-status" id="surveyPhotoShortcutStatus">Pratinjau foto tersedia di langkah 5. Foto.</p>
+          </div>
         </div>
         <div class="survey-meta-grid">
           <div class="survey-meta-item"><span>Waktu pengambilan</span><strong id="surveyCapturedAtText">Belum diambil</strong></div>
@@ -5604,6 +5617,7 @@ function _renderSelectedPhoto(sourceDataUrl, done, failed) {
     document.getElementById('fotoPreview').src = _fotoDataUrl;
     document.getElementById('fotoPreviewWrap').classList.add('show');
     document.getElementById('fotoStatus').textContent = _dataEntryMode === 'survey' ? 'Foto asli dan salinan watermark siap' : ('Foto siap (' + w + '×' + h + 'px)');
+    _syncSurveyPhotoShortcut();
     if (done) done();
   };
   img.onerror = function () { if (failed) failed('Foto tidak dapat diproses.'); };
@@ -5625,7 +5639,7 @@ function handleFotoChange(input) {
   reader.readAsDataURL(file);
 }
 
-function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; _surveyOriginalPhotoDataUrl = null; _surveyPhotoWatermarkDirty = false; if (_dataEntryMode === 'survey') { _surveyMeta.originalPhotoUrl = ''; _surveyMeta.watermarkedPhotoUrl = ''; } document.getElementById('f_foto').value = ''; document.getElementById('fotoPreview').src = ''; document.getElementById('fotoPreviewWrap').classList.remove('show'); document.getElementById('fotoStatus').textContent = ''; }
+function removeFoto() { _fotoDataUrl = null; _fotoFilename = null; _surveyOriginalPhotoDataUrl = null; _surveyPhotoWatermarkDirty = false; if (_dataEntryMode === 'survey') { _surveyMeta.originalPhotoUrl = ''; _surveyMeta.watermarkedPhotoUrl = ''; } document.getElementById('f_foto').value = ''; document.getElementById('fotoPreview').src = ''; document.getElementById('fotoPreviewWrap').classList.remove('show'); document.getElementById('fotoStatus').textContent = ''; _syncSurveyPhotoShortcut(); }
 
 function collectParams() {
   function get(group) { return Array.from(document.querySelectorAll('.cb-item[data-group="' + group + '"].checked')).map(function (el) { return el.dataset.val; }); }
@@ -7978,7 +7992,27 @@ function _formatSurveyTime(value) {
   catch (error) { return date.toLocaleString('id-ID'); }
 }
 
+function _syncSurveyPhotoShortcut() {
+  var label = document.getElementById('surveyPhotoShortcutLabel');
+  var status = document.getElementById('surveyPhotoShortcutStatus');
+  var hasPhoto = !!(_fotoDataUrl || _surveyOriginalPhotoDataUrl || _surveyMeta.watermarkedPhotoUrl);
+  var labelText = hasPhoto ? 'Ganti Foto' : 'Ambil Foto';
+  var statusText = hasPhoto ? 'Foto siap · pratinjau di langkah 5. Foto.' : 'Pratinjau foto tersedia di langkah 5. Foto.';
+  if (label && label.textContent !== labelText) label.textContent = labelText;
+  if (status && status.textContent !== statusText) status.textContent = statusText;
+}
+
+function captureSurveyPhoto() {
+  if (_dataEntryMode !== 'survey') return;
+  var input = document.getElementById('f_foto');
+  if (!input) return;
+  // Keep the native picker in the tap event so mobile browsers can open it.
+  input.setAttribute('capture', 'environment');
+  input.click();
+}
+
 function _updateSurveyMetaUi() {
+  _syncSurveyPhotoShortcut();
   var time = document.getElementById('surveyCapturedAtText'), gps = document.getElementById('surveyGpsText'), accuracy = document.getElementById('surveyAccuracyText');
   if (time) time.textContent = _formatSurveyTime(_surveyMeta.capturedAt);
   if (gps) gps.textContent = _surveyMeta.gpsCoordinate || 'Belum tersedia';
