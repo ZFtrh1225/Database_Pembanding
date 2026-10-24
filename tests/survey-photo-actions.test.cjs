@@ -114,22 +114,13 @@ test('Identity submission requires GPS and directs missing photos to step 5', ()
   assert.equal(invalidField, 'f_foto');
 });
 
-test('Identity submission uses the existing duplicate review and persistence flow', () => {
-  const { context:c, nodes } = setup();
-  let checked = 0, persisted = null, success;
+test('Identity submission hands the validated survey to background persistence', () => {
+  const { context:c } = setup();
+  let persisted = null;
   c._surveyMeta.watermarkedPhotoUrl = 'https://example.test/survey.jpg';
   c.activeUsername = 'Surveyor';
   c._buildDataFormRow = () => ['DP1'];
   c._persistFieldSurvey = (action, decision) => { persisted = { action, decision }; };
-  const run = {
-    withSuccessHandler(fn) { success = fn; return this; },
-    withFailureHandler() { return this; },
-    findDuplicateCandidates() { checked++; }
-  };
-  c.GAS = { script:{ run } };
   clickIdentitySubmit(c);
-  assert.equal(checked, 1);
-  assert.equal(nodes.get('btnSubmitSurveyShortcut').disabled, true);
-  success({ success:true, candidates:[] });
   assert.deepEqual(persisted, { action:'submit', decision:null });
 });

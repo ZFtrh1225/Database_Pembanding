@@ -66,6 +66,6 @@ test('mode survei mobile memakai GPS, kamera, draf terpisah, dan deteksi duplika
   assert.match(extract(html, 'captureSurveyLocation'), /enableHighAccuracy:true/);
   assert.match(extract(html, '_setDataEntryMode'), /setAttribute\('capture', 'environment'\)/);
   assert.match(extract(html, '_draftStorageKey'), /baseKey \+ ':survey'/);
-  assert.match(extract(html, 'submitFieldSurvey'), /findDuplicateCandidates/);
+  assert.match(extract(html, '_processSurveyUploadQueue'), /findDuplicateCandidates/);
   assert.match(extract(html, 'submitFieldSurvey'), /_persistFieldSurvey\('submit'/);
 });
