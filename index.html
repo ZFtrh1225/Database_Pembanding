@@ -508,6 +508,13 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .foto-preview-wrap img { width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px; display: block; }
 .foto-remove-btn { position: absolute; top: 6px; right: 6px; background: rgba(220,38,38,.85); color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 13px; cursor: pointer; display: grid; place-items: center; font-weight: 700; }
 .foto-status { font-size: 11px; color: var(--text-sub); margin-top: 6px; text-align: center; }
+.survey-upload-tray { position:fixed; right:12px; bottom:calc(80px + env(safe-area-inset-bottom, 0px)); z-index:9001; width:min(340px,calc(100vw - 24px)); border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--navy); box-shadow:var(--shadow-lg); font-size:12px; }
+.survey-upload-tray[hidden] { display:none; }
+.survey-upload-tray summary { padding:12px; cursor:pointer; font-weight:700; }
+.survey-upload-list { padding:0 12px 12px; max-height:30vh; overflow:auto; overflow-wrap:anywhere; }
+.survey-upload-item { padding:10px 0; border-top:1px solid var(--border); }
+.survey-upload-item span, .survey-upload-note { display:block; color:var(--text-sub); font-size:11px; margin-top:4px; }
+.survey-upload-item button { margin-top:8px; min-height:44px; padding:8px 12px; border:1px solid var(--blue); border-radius:8px; color:var(--blue); background:var(--surface); font:inherit; cursor:pointer; }
 
 .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 999999; display: flex; flex-direction: column; gap: 8px; }
 .toast { background: var(--navy); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 500; box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 8px; animation: toastIn .3s ease; max-width: 320px; }
@@ -2581,6 +2588,10 @@ body.mmode-picking .mpick-hint { display: flex; }
 </div>
 
 <!-- RUANG KERJA SURVEI LAPANGAN -->
+<details class="survey-upload-tray" id="surveyUploadTray" hidden>
+  <summary id="surveyUploadSummary" aria-live="polite" aria-atomic="true">Antrean survei</summary>
+  <div class="survey-upload-list" id="surveyUploadList"></div>
+</details>
 <div class="modal-overlay" id="fieldSurveyOverlay" onclick="if(event.target===this)closeFieldSurveyWorkspace()">
   <div class="modal" style="max-width:860px;">
     <div class="modal-header">
@@ -3082,6 +3093,7 @@ var _fotoDataUrl = null, _fotoFilename = null;
 var _editingId = null, _editingFoto = '';
 var _dataEntryMode = 'standard';
 var _fieldSurveyRows = [], _editingSurveyId = null;
+var _surveyUploadJobs = [], _surveyUploadRunning = false, _surveyUploadSequence = 0;
 var _surveyOriginalPhotoDataUrl = null;
 var _surveyMeta = { capturedAt:'', gpsCoordinate:'', gpsAccuracy:null, originalPhotoUrl:'', watermarkedPhotoUrl:'' };
 var SURVEY_GPS_GOOD_ACCURACY_M = 10;
@@ -8270,6 +8282,7 @@ function _populateSurveyFormRow(row) {
 
 function editFieldSurvey(index) {
   var survey = _fieldSurveyRows[index]; if (!survey) return;
+  if (_surveyUploadJobs.some(function(job) { return job.payload.surveyId === survey.surveyId; })) { toast('Survei ini masih ada dalam antrean pengajuan.', 'error'); return; }
   closeFieldSurveyWorkspace(); openModalNew(); _setDataEntryMode('survey');
   _editingSurveyId = survey.surveyId; _surveyMeta = {
     capturedAt:survey.capturedAt || '', gpsCoordinate:survey.gpsCoordinate || '', gpsAccuracy:survey.gpsAccuracy,
@@ -8682,7 +8695,157 @@ function _uploadSurveyPhotosIfNeeded(done, failed) {
   } else upload();
 }
 
+// Each job owns its data and photos. Background callbacks never read or reset the active form.
+function _renderSurveyUploadQueue() {
+  var tray = document.getElementById('surveyUploadTray');
+  tray.hidden = !_surveyUploadJobs.length;
+  var waiting = _surveyUploadJobs.filter(function(job) { return job.status === 'failed' || job.status === 'decision'; }).length;
+  document.getElementById('surveyUploadSummary').textContent = '📤 ' + _surveyUploadJobs.length + ' survei belum selesai' + (waiting ? ' · ' + waiting + ' perlu tindakan' : ' · mengirim');
+  document.getElementById('surveyUploadList').innerHTML = '<p class="survey-upload-note">Anda bisa mengisi survei berikutnya. Tetap buka aplikasi sampai antrean selesai; antrean belum tersimpan di perangkat.</p>' + _surveyUploadJobs.map(function(job) {
+    var action = job.status === 'failed' ? 'Coba Lagi' : (job.status === 'decision' ? 'Periksa Data Serupa' : '');
+    return '<div class="survey-upload-item"><strong>' + _escapeHtmlAppraisal(job.label) + '</strong><span>' + _escapeHtmlAppraisal(job.message) + '</span>' + (action ? '<button type="button" onclick="retrySurveyUpload(' + job.id + ')">' + action + '</button>' : '') + '</div>';
+  }).join('');
+}
+
+function _queueFieldSurvey(duplicateDecision) {
+  _stopSurveyGpsWatch('save');
+  var payload = JSON.parse(JSON.stringify(_fieldSurveyPayload('submit', duplicateDecision)));
+  // A stable ID also lets a retry reconcile a save whose response was lost.
+  if (!payload.surveyId) payload.surveyId = 'SVY-' + Date.now() + '-' + _newGasBridgeNonce();
+  var job = {
+    id:++_surveyUploadSequence, user:activeUsername, payload:payload,
+    label:String(payload.dataRow[0] || 'Survei'), original:_surveyOriginalPhotoDataUrl,
+    photo:_fotoDataUrl, watermarkDirty:_surveyPhotoWatermarkDirty,
+    checked:!!duplicateDecision, status:'queued', message:'Menunggu giliran', saveAttempted:false
+  };
+  _surveyUploadJobs.push(job);
+  markDataFormSaved(); closeModal(true); _setSurveyButtonsBusy(false);
+  _renderSurveyUploadQueue();
+  toast(job.label + ' masuk antrean. Anda bisa membuat survei baru.', 'success');
+  _processSurveyUploadQueue();
+}
+
+function _renderQueuedSurveyPhoto(job, done, failed) {
+  var img = new Image();
+  img.onload = function() {
+    try {
+      var canvas = document.createElement('canvas'), w = img.width, h = img.height, max = 1200;
+      if (w > max) { h = Math.round(h * max / w); w = max; }
+      if (h > max) { w = Math.round(w * max / h); h = max; }
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d'), meta = job.payload;
+      ctx.drawImage(img, 0, 0, w, h);
+      var barHeight = Math.max(62, Math.round(h * .12));
+      ctx.fillStyle = 'rgba(3, 30, 50, .78)'; ctx.fillRect(0, h - barHeight, w, barHeight);
+      ctx.fillStyle = '#ffffff'; ctx.font = '700 ' + Math.max(15, Math.round(w * .018)) + 'px sans-serif';
+      ctx.fillText('SURVEI LAPANGAN · ' + (job.user || '-'), 16, h - barHeight + 25);
+      ctx.font = '500 ' + Math.max(12, Math.round(w * .014)) + 'px sans-serif';
+      var line = _formatSurveyTime(meta.capturedAt) + ' · ' + meta.gpsCoordinate;
+      if (meta.gpsAccuracy != null) line += ' · ±' + Math.round(Number(meta.gpsAccuracy)) + ' m';
+      ctx.fillText(line, 16, h - barHeight + 49);
+      job.photo = canvas.toDataURL('image/jpeg', .82); job.watermarkDirty = false;
+      done();
+    } catch (error) { failed(error.message || 'Watermark tidak dapat diproses.'); }
+  };
+  img.onerror = function() { failed('Foto tidak dapat diproses.'); };
+  img.src = job.original;
+}
+
+function _processSurveyUploadQueue() {
+  if (_surveyUploadRunning) return;
+  var job = _surveyUploadJobs.find(function(item) { return item.status === 'queued'; });
+  if (!job) return;
+  _surveyUploadRunning = true; job.status = 'running';
+  function progress(message) { job.message = message; _renderSurveyUploadQueue(); }
+  function release() { _surveyUploadRunning = false; _renderSurveyUploadQueue(); _processSurveyUploadQueue(); }
+  function fail(message) { job.status = 'failed'; job.message = String(message); release(); }
+  function decision(res) {
+    job.status = 'decision'; job.candidates = res.candidates; job.checked = false;
+    job.message = 'Data serupa ditemukan. Periksa sebelum melanjutkan.'; release();
+  }
+  function success() {
+    _surveyUploadJobs = _surveyUploadJobs.filter(function(item) { return item !== job; });
+    job.original = null; job.photo = null;
+    toast(job.label + ': survei diajukan kepada Admin untuk direview.', 'success');
+    // Refresh only the list that is already open; never open it over a new survey.
+    if (activeUsername === job.user) {
+      loadFieldSurveyCount();
+      if (document.getElementById('fieldSurveyOverlay').classList.contains('open')) loadFieldSurveys();
+    }
+    release();
+  }
+  function save() {
+    progress('Menyimpan pengajuan…'); job.saveAttempted = true;
+    GAS.script.run.withSuccessHandler(function(res) {
+      if (res && res.requiresDuplicateDecision && res.candidates && res.candidates.length) { decision(res); return; }
+      if (!res || !res.success) { fail((res && res.error) || 'Survei belum dapat disimpan.'); return; }
+      success();
+    }).withFailureHandler(function(error) { fail('Gagal menyimpan: ' + (error.message || String(error))); })
+      .saveFieldSurvey(job.payload, job.user);
+  }
+  function upload() {
+    if (!job.original || !job.photo) { save(); return; }
+    progress('Mengupload foto…');
+    GAS.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success || !res.originalUrl || !res.watermarkedUrl) { fail((res && res.error) || 'Upload foto survei gagal.'); return; }
+      job.payload.originalPhotoUrl = res.originalUrl;
+      job.payload.watermarkedPhotoUrl = res.watermarkedUrl;
+      job.payload.dataRow[29] = res.watermarkedUrl;
+      job.original = null; job.photo = null;
+      save();
+    }).withFailureHandler(function(error) { fail('Gagal upload: ' + (error.message || String(error))); })
+      .uploadSurveyPhotos(job.original, job.photo, job.payload.surveyId + ' - ' + job.user, job.user);
+  }
+  function prepare() {
+    if (job.watermarkDirty && job.original) {
+      progress('Menyinkronkan watermark GPS…'); _renderQueuedSurveyPhoto(job, upload, fail);
+    } else upload();
+  }
+  function check() {
+    if (job.checked) { prepare(); return; }
+    progress('Memeriksa data serupa…');
+    GAS.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { fail((res && res.error) || 'Pemeriksaan data serupa gagal.'); return; }
+      if (res.candidates && res.candidates.length) { decision(res); return; }
+      job.checked = true; prepare();
+    }).withFailureHandler(function(error) { fail(error.message || String(error)); })
+      .findDuplicateCandidates(job.payload.dataRow, job.user, '');
+  }
+  if (job.saveAttempted) {
+    progress('Memeriksa hasil pengajuan sebelumnya…');
+    GAS.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { fail((res && res.error) || 'Hasil pengajuan belum dapat diperiksa.'); return; }
+      var saved = (res.surveys || []).find(function(item) { return item.surveyId === job.payload.surveyId; });
+      if (saved && saved.status !== 'Draf' && saved.status !== 'Ditolak') { success(); return; }
+      check();
+    }).withFailureHandler(function(error) { fail(error.message || String(error)); }).getFieldSurveys(job.user);
+  } else check();
+}
+
+function retrySurveyUpload(id) {
+  var job = _surveyUploadJobs.find(function(item) { return item.id === id; });
+  if (!job || (job.status !== 'failed' && job.status !== 'decision')) return;
+  if (activeUsername !== job.user) { toast('Gunakan akun pembuat survei untuk melanjutkan.', 'error'); return; }
+  if (job.status === 'decision') {
+    if (document.querySelector('.modal-overlay.open, .measure-overlay.open')) { toast('Simpan draf atau tutup dialog aktif sebelum memeriksa data serupa.', 'error'); return; }
+    document.getElementById('surveyUploadTray').open = false;
+    _showDuplicateCandidates(job.candidates, function(choice) {
+      job.payload.duplicateDecision = JSON.parse(JSON.stringify(choice)); job.checked = true;
+      if (!document.querySelector('.modal-overlay.open, .measure-overlay.open')) document.body.style.overflow = '';
+      job.status = 'queued'; job.message = 'Menunggu giliran'; _renderSurveyUploadQueue(); _processSurveyUploadQueue();
+    }, function() {});
+    return;
+  }
+  job.status = 'queued'; job.message = 'Menunggu giliran'; _renderSurveyUploadQueue(); _processSurveyUploadQueue();
+}
+
+window.addEventListener('beforeunload', function(event) {
+  if (!_surveyUploadJobs.length) return;
+  event.preventDefault(); event.returnValue = '';
+});
+
 function _persistFieldSurvey(action, duplicateDecision) {
+  if (action === 'submit') { _queueFieldSurvey(duplicateDecision); return; }
   _stopSurveyGpsWatch('save');
   var isSubmit = action === 'submit';
   _setSurveyButtonsBusy(true, isSubmit ? '⏳ Mengajukan…' : '⏳ Menyimpan draf…');
@@ -8719,15 +8882,7 @@ function submitFieldSurvey() {
   if ((!_surveyOriginalPhotoDataUrl || !_fotoDataUrl) && !_surveyMeta.watermarkedPhotoUrl) {
     setDataFormStep(4); setFieldError('f_foto', 'Foto lapangan wajib diambil sebelum survei diajukan.'); toast('Foto lapangan wajib diambil.', 'error'); return;
   }
-  _setSurveyButtonsBusy(true, '🔎 Memeriksa data serupa…');
-  GAS.script.run.withSuccessHandler(function(res) {
-    _setSurveyButtonsBusy(false);
-    if (!res || !res.success) { toast((res && res.error) || 'Pemeriksaan data serupa gagal.', 'error'); return; }
-    if (res.candidates && res.candidates.length) {
-      _showDuplicateCandidates(res.candidates, function(decision) { _persistFieldSurvey('submit', decision); }, function() {});
-    } else _persistFieldSurvey('submit', null);
-  }).withFailureHandler(function(error) { _setSurveyButtonsBusy(false); toast('Gagal memeriksa data serupa: ' + error.message, 'error'); })
-    .findDuplicateCandidates(_buildDataFormRow(_surveyMeta.watermarkedPhotoUrl || ''), activeUsername, '');
+  _persistFieldSurvey('submit', null);
 }
 
 function _continueDataSubmit(btn, duplicateDecision) {

@@ -34,6 +34,15 @@ File asli tidak diberi izin publik dan tidak diubah. Salinan watermark berisi us
 - Pemantauan dihentikan ketika halaman disembunyikan, formulir ditutup, atau survei disimpan; saat halaman aktif kembali GPS dimulai lagi.
 - Jika GPS berubah setelah foto dipilih, salinan watermark dibuat ulang dengan metadata terbaru sebelum upload. Foto asli tidak diubah.
 
+## Pengajuan di latar belakang
+
+- **Ajukan Survei** memindahkan salinan data, GPS, waktu, akun pembuat, dan foto ke antrean pengajuan. Formulir langsung ditutup; **+ Survei Baru** dapat digunakan sementara unggahan berjalan.
+- Antrean mengirim satu survei setiap giliran. Panel **survei belum selesai** menampilkan tahap pemeriksaan duplikat, watermark, unggah foto, dan penyimpanan pengajuan.
+- Jika ditemukan data serupa, pilih **Periksa Data Serupa** setelah menyimpan draf atau menutup dialog aktif. Survei lain dalam antrean tetap dapat diproses.
+- Jika terjadi kegagalan, data dan foto tetap berada dalam antrean selama halaman terbuka. Gunakan **Coba Lagi**. Setelah foto berhasil diunggah, percobaan penyimpanan ulang memakai URL foto yang sama. ID survei tetap digunakan dan hasil pengajuan sebelumnya diperiksa untuk menghindari pengajuan ganda setelah respons terputus.
+- Antrean berada dalam memori halaman, belum tersimpan permanen di perangkat. Tetap buka aplikasi sampai antrean selesai. Refresh, menutup browser, atau penghentian aplikasi oleh Android dapat menghilangkan antrean; browser akan memperingatkan sebelum meninggalkan halaman jika mendukungnya. Proses ini tidak menjamin pengiriman ketika aplikasi ditutup atau ditangguhkan di latar belakang oleh sistem operasi.
+- **Simpan Draf**, Tambah/Edit Data biasa, endpoint backend, dan struktur sheet tetap menggunakan alur sebelumnya.
+
 ## Deployment
 
-Peningkatan GPS otomatis hanya mengubah frontend dan tidak memerlukan deployment Apps Script baru. Jika pembaruan berikutnya mengubah `Backend/Code.gs`, buat deployment Apps Script versi baru dan pastikan URL aktif tetap digunakan oleh `SCRIPT_URL` pada frontend.
+Peningkatan GPS otomatis dan antrean pengajuan hanya mengubah frontend dan tidak memerlukan deployment Apps Script baru. Jika pembaruan berikutnya mengubah `Backend/Code.gs`, buat deployment Apps Script versi baru dan pastikan URL aktif tetap digunakan oleh `SCRIPT_URL` pada frontend.
