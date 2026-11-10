@@ -62,7 +62,7 @@ const c = vm.createContext({
   _mRoutes: {}, _mMks: {}, _mLbls: {}, _mRouteRunId: 0,
   _mRouteClassPromise: null, _mRouteNoticeTimer: null,
   _mRouteNoticeSessionKey: 'dbp_measure_route_notice_dismissed',
-  _mMapType: 'roadmap',
+  _isViewerRole: () => false,
   _mOsmLines: [], _mOsmMarkers: [], _mOsmLabels: [],
   _mDpIds: ['1', '2', '3', '4', '5', '6'],
   _mRouteColors: { '1': '#e60023' },
@@ -76,6 +76,16 @@ class Polyline {
   set(k, value) { if (k === 'icons') this.icons = value; }
 }
 c.google = { maps: {
+  Map: class {
+    constructor(el, options) { this.el = el; this.options = options; this.events = {}; }
+    addListener(name, handler) { this.events[name] = handler; }
+    getMapTypeId() { return this.options.mapTypeId; }
+    setMapTypeId(type) { this.options.mapTypeId = type; this.events.maptypeid_changed(); }
+    fitBounds(bounds, padding) { this.padding = padding; }
+  },
+  MapTypeControlStyle: { HORIZONTAL_BAR: 'HORIZONTAL_BAR' },
+  ControlPosition: { TOP_RIGHT: 'TOP_RIGHT' },
+  event: { trigger() {} },
   Polyline, LatLngBounds: class { extend() {} },
   Point: class { constructor(x, y) { this.x = x; this.y = y; } },
   Size: class { constructor(width, height) { this.width = width; this.height = height; } },
@@ -86,7 +96,7 @@ c.google = { maps: {
 c.window.google = c.google;
 for (const name of [
   '_mOsmStopDashAnimation', '_mOsmDashTick', '_mOsmSyncDashAnimation', '_mSyncLineVisibility',
-  'toggleMeasurementLines', 'mZoomMeasurement', '_mSyncMapLayerButtons', 'setMeasurementMapLayer',
+  'toggleMeasurementLines', 'mZoomMeasurement', '_mInitMap', '_mFitGoogleBounds',
   '_mPinScaleForZoom', '_mPinDimensions', '_mPinSvg', '_mBuildGooglePinIcon', '_mSyncGoogleMarkerScale',
   '_mCreateRoutePolyline', '_mRoutePathToPins',
   '_mParse', '_mHaversine', '_mFmtDist', '_mFmtMeters',
@@ -104,12 +114,27 @@ async function settle() {
 }
 
 (async function main() {
-  c.setMeasurementMapLayer('satellite');
-  assert.equal(c._mMap.mapTypeId, 'satellite', 'Lapisan satelit diterapkan ke Google Maps');
-  assert.equal(node('mLayerSatellite').attributes['aria-pressed'], 'true');
+  const routeMap = c._mMap;
+  c._mInitMap();
+  const { options } = c._mMap;
+  assert.equal(options.mapTypeId, 'hybrid', 'Lapisan awal mengikuti peta utama');
+  assert.equal(options.cameraControl, true);
+  assert.equal(options.streetViewControl, true);
+  assert.equal(options.mapTypeControl, true);
+  assert.deepEqual(Array.from(options.mapTypeControlOptions.mapTypeIds), ['roadmap', 'satellite', 'hybrid']);
+  assert.equal(options.mapTypeControlOptions.style, 'HORIZONTAL_BAR');
+  assert.equal(options.mapTypeControlOptions.position, 'TOP_RIGHT');
+  c._mMap.setMapTypeId('satellite');
   assert.equal(c.localStorage.value, 'satellite', 'Pilihan lapisan disimpan untuk sesi berikutnya');
-  c.setMeasurementMapLayer('roadmap');
-  assert.equal(node('mLayerRoadmap').attributes['aria-pressed'], 'true');
+  c._mInitMap();
+  assert.equal(c._mMap.options.mapTypeId, 'satellite', 'Preferensi lapisan sebelumnya tetap terbaca');
+  node('measureMap').clientHeight = 160;
+  c._mFitGoogleBounds({});
+  assert.equal(c._mMap.padding, 40, 'Padding mengikuti tinggi peta pada layar pendek');
+  node('measureMap').clientHeight = 600;
+  c._mFitGoogleBounds({});
+  assert.equal(c._mMap.padding, 80);
+  c._mMap = routeMap;
   assert.match(c._mFriendlyRouteError({ errors:[{}, new Error('REQUEST_DENIED')] }), /Routes API belum aktif/);
 
   // Rute Google modern harus mempertahankan geometri jalan, jarak, dan durasi.
@@ -167,8 +192,6 @@ async function settle() {
   assert.equal(labelCalls.at(-1).length, 2, 'Label pin Google tidak menerima teks jarak');
   assert.equal(labelCalls.at(-1)[1], '1', 'Label pin Google hanya mengidentifikasi Data 1');
   assert.match(node('mRouteNoticeText').textContent, /Rute jalan Google aktif/);
-  c.mZoomMeasurement(1);
-  assert.equal(c._mMap.getZoom(), 15);
 
   // Bila modern dan kompatibilitas gagal, fallback harus eksplisit dan dapat dicoba lagi.
   modernMode = 'fail';
@@ -272,7 +295,8 @@ async function settle() {
   assert.match(html, /renderer: L\.svg\(\)/, 'Leaflet memakai jalur SVG');
   assert.doesNotMatch(html, /requestAnimationFrame\(_mDashTick\)/);
   assert.match(html, /\.mmap-zoom \{ grid-column: span 2; \}/);
-  assert.match(html, /\.mmap-layer-toggle \{ grid-column:span 2;/);
+  assert.match(html, /\.measurement-google \.mmap-zoom \{ display: none; \}/);
+  assert.doesNotMatch(html, /#measureMap \.gm-style-mtc/);
   assert.match(html, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(html, /Route\.computeRoutes/);
   assert.match(html, /_mMakePin\(coord, _mGetDataColor\(id\)/, 'Pin Google memakai warna data dari panel');
