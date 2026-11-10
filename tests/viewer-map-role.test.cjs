@@ -65,7 +65,7 @@ test('Measurement menampilkan status OSM terkunci yang aksesibel', () => {
   assert.match(extract('_mRenderModeButton'), /btn\.disabled = !!viewerOnly/);
   assert.match(extract('_mRenderModeButton'), /Mode OpenStreetMap terkunci untuk Viewer/);
   assert.match(extract('_mForceViewerOsmMode'), /_mOsmActive = true/);
-  assert.match(extract('_mForceViewerOsmMode'), /layerToggle\.hidden = true/);
+  assert.match(extract('_mForceViewerOsmMode'), /overlay\.classList\.remove\('measurement-google'\)/);
   assert.match(html, /\.mmap-osm-toggle\.viewer-locked/);
 });
 

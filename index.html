@@ -817,7 +817,17 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
 .msb-reset:hover { background: rgba(220,38,38,.22); color: rgba(220,38,38,1); }
 
 .measure-map-wrap { flex: 1; position: relative; overflow: hidden; }
-#measureMap { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+#measureMap { position: relative; grid-row: 2; min-height: 0; z-index: 1; }
+
+.measurement-google .measure-map-wrap { display: grid; grid-template: auto minmax(0, 1fr) / minmax(0, 1fr); }
+.measurement-google .mmap-topbar {
+  position: relative; inset: auto; grid-row: 1; max-width: none; margin: 8px 12px;
+}
+.measurement-google .mmap-zoom { display: none; }
+.measurement-google .mroute-loading, .measurement-google .mroute-notice {
+  grid-row: 2; top: 52px;
+}
+.measurement-google .mroute-notice { max-height: calc(100% - 52px); overflow-y: auto; }
 
 .mmap-topbar {
   position: absolute; top: 12px; left: 12px; z-index: 500;
@@ -852,18 +862,6 @@ button:disabled, .btn-disabled { opacity: 0.5 !important; cursor: not-allowed !i
   gap: 6px; white-space: nowrap; backdrop-filter: blur(8px);
 }
 .mmap-lines:hover, .mmap-lines.active { border-color: #ffd966; color: #ffd966; }
-.mmap-layer-toggle {
-  display:flex; min-height:40px; overflow:hidden; border:1px solid rgba(255,255,255,.38);
-  border-radius:8px; background:rgba(20,40,72,.9); box-shadow:0 2px 10px rgba(0,0,0,.2);
-  backdrop-filter:blur(8px);
-}
-.mmap-layer-toggle[hidden] { display:none !important; }
-.mmap-layer-toggle button {
-  min-width:72px; min-height:40px; padding:7px 10px; border:0; background:transparent; color:#fff;
-  font:700 11px var(--font); cursor:pointer; touch-action:manipulation;
-}
-.mmap-layer-toggle button + button { border-left:1px solid rgba(255,255,255,.25); }
-.mmap-layer-toggle button.active { background:#fff; color:#1e3a5f; }
 .mmap-zoom { display: flex; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .mmap-zoom button {
   width: 40px; min-height: 40px; border: 1px solid #cbd5e1;
@@ -1525,11 +1523,8 @@ body.mmode-picking .mpick-hint { display: flex; }
   }
   .mmap-topbar .mmap-mobile-label, .mmap-mode-short { display: inline; }
   .mmap-topbar .mmap-desktop-label, .mmap-mode-full { display: none; }
-  .mmap-layer-toggle { grid-column:span 2; width:100%; }
-  .mmap-layer-toggle button { flex:1; min-width:0; min-height:44px; padding:7px 4px; }
   .mmap-zoom { grid-column: span 2; }
   .mmap-zoom button { flex: 1; min-height: 44px; }
-  #measureMap .gm-style-mtc { display: none; }
 
   /* ---------- AVM RaLAT panel grid ---------- */
   #ralatAsetBody { grid-template-columns: 1fr !important; }
@@ -1695,6 +1690,9 @@ body.mmode-picking .mpick-hint { display: flex; }
   .mpt-pick { right:2px; min-width:44px; min-height:44px; font-size:18px; }
   .msb-reset { min-height:44px; }
   .measure-map-wrap { min-height:54dvh; }
+  .measurement-google .measure-map-wrap { min-height: 0; margin-bottom: min(46dvh, 430px); }
+  .measurement-google #measureSidebar.hidden + .measure-map-wrap { margin-bottom: 56px; }
+  .measurement-google .mmap-topbar { margin: max(8px, env(safe-area-inset-top, 0px)) 8px 8px; }
   .mroute-notice { top:104px; width:calc(100% - 20px); align-items:flex-start; }
   .mroute-notice button { min-height:40px; }
   .mroute-notice .mroute-close { width:40px; }
@@ -2747,10 +2745,6 @@ body.mmode-picking .mpick-hint { display: flex; }
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17L9 11L14 14L21 7" stroke-dasharray="3 2"/><circle cx="3" cy="17" r="1"/><circle cx="21" cy="7" r="1"/></svg>
         <span class="mmap-desktop-label" id="mLinesBtnTxt">Sembunyikan Garis</span><span class="mmap-mobile-label">Garis</span>
       </button>
-      <div class="mmap-layer-toggle" id="mMeasureLayers" role="group" aria-label="Lapisan Google Maps" hidden>
-        <button type="button" id="mLayerRoadmap" class="active" onclick="setMeasurementMapLayer('roadmap')" aria-pressed="true">Default</button>
-        <button type="button" id="mLayerSatellite" onclick="setMeasurementMapLayer('satellite')" aria-pressed="false">Satelit</button>
-      </div>
       <div class="mmap-zoom" role="group" aria-label="Zoom peta pengukuran">
         <button type="button" onclick="mZoomMeasurement(1)" aria-label="Perbesar peta" title="Perbesar">+</button>
         <button type="button" onclick="mZoomMeasurement(-1)" aria-label="Perkecil peta" title="Perkecil">−</button>
@@ -9336,7 +9330,6 @@ var _mMks = {}, _mLbls = {};            // markers, labels
 var _mRoutes = {};                       // Google Maps road/fallback polylines per DP id
 var _mDirSvc = null;                     // compatibility fallback DirectionsService (Legacy)
 var _mRouteClassPromise = null;           // modern google.maps.routes.Route
-var _mMapType = 'roadmap';
 var _mDpIds = [];                       // Registered cards, including dynamically added data
 var _mLinesVisible = true;
 var _mRouteRunId = 0;
@@ -9454,16 +9447,15 @@ function _mForceViewerOsmMode() {
   _mOsmStopDashAnimation();
   var gMapEl = document.getElementById('measureMap');
   var oMapEl = document.getElementById('measureOsmMap');
-  var layerToggle = document.getElementById('mMeasureLayers');
+  var overlay = document.getElementById('measureOverlay');
   var loadingEl = document.getElementById('mRouteLoading');
   if (gMapEl) gMapEl.style.display = 'none';
   if (oMapEl) oMapEl.classList.add('active');
-  if (layerToggle) layerToggle.hidden = true;
+  if (overlay) overlay.classList.remove('measurement-google');
   if (loadingEl) loadingEl.classList.remove('show');
   _mShowRouteNotice('', '');
   _mRenderModeButton(true);
 
-  var overlay = document.getElementById('measureOverlay');
   if (overlay && overlay.classList.contains('open')) {
     if (!_mOsmInited) { _mInitMeasureOsm(); _mOsmInited = true; }
     else if (_mOsmMap) _mOsmMap.invalidateSize();
@@ -9502,11 +9494,9 @@ function toggleMeasurementLines() {
 }
 
 function mZoomMeasurement(direction) {
-  if (_mOsmActive) {
-    if (_mOsmMap) { if (direction > 0) _mOsmMap.zoomIn(); else _mOsmMap.zoomOut(); }
-  } else if (_mMap) {
-    _mMap.setZoom(_mMap.getZoom() + (direction > 0 ? 1 : -1));
-  }
+  if (!_mOsmActive || !_mOsmMap) return;
+  if (direction > 0) _mOsmMap.zoomIn();
+  else _mOsmMap.zoomOut();
 }
 
 function _mCreateRoutePolyline(path, color) {
@@ -9564,49 +9554,39 @@ function toggleMSidebar() {
   }, 320);
 }
 
-function _mSyncMapLayerButtons() {
-  var roadmapBtn = document.getElementById('mLayerRoadmap');
-  var satelliteBtn = document.getElementById('mLayerSatellite');
-  if (roadmapBtn) {
-    roadmapBtn.classList.toggle('active', _mMapType === 'roadmap');
-    roadmapBtn.setAttribute('aria-pressed', String(_mMapType === 'roadmap'));
-  }
-  if (satelliteBtn) {
-    satelliteBtn.classList.toggle('active', _mMapType === 'satellite');
-    satelliteBtn.setAttribute('aria-pressed', String(_mMapType === 'satellite'));
-  }
-}
-
-function setMeasurementMapLayer(type) {
-  if (type !== 'roadmap' && type !== 'satellite') return;
-  _mMapType = type;
-  if (_mMap && typeof _mMap.setMapTypeId === 'function') _mMap.setMapTypeId(type);
-  _mSyncMapLayerButtons();
-  try { localStorage.setItem('dbp_measure_map_type', type); } catch (error) {}
-}
-
 // ── INIT PETA MEASUREMENT ────
 function _mInitMap() {
   if (_isViewerRole()) return;
   var el = document.getElementById('measureMap');
   if (!el || !window.google || !google.maps) return;
 
+  var mapTypeIds = ['roadmap', 'satellite', 'hybrid'];
+  var mapType = 'hybrid';
   try {
     var savedMapType = localStorage.getItem('dbp_measure_map_type');
-    if (savedMapType === 'roadmap' || savedMapType === 'satellite') _mMapType = savedMapType;
+    if (mapTypeIds.includes(savedMapType)) mapType = savedMapType;
   } catch (error) {}
 
   _mMap = new google.maps.Map(el, {
     center: { lat: -6.2, lng: 106.816 },
     zoom: 14,
-    mapTypeId: _mMapType,
-    zoomControl: false,
-    mapTypeControl: false,
-    streetViewControl: false,
+    mapTypeId: mapType,
+    cameraControl: true,
+    mapTypeControl: true,
+    streetViewControl: true,
     fullscreenControl: false,
+    mapTypeControlOptions: {
+      style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+      position: google.maps.ControlPosition.TOP_RIGHT,
+      mapTypeIds: mapTypeIds
+    },
     gestureHandling: 'greedy'
   });
-  _mSyncMapLayerButtons();
+  _mMap.addListener('maptypeid_changed', function() {
+    var selectedType = _mMap.getMapTypeId();
+    if (!mapTypeIds.includes(selectedType)) return;
+    try { localStorage.setItem('dbp_measure_map_type', selectedType); } catch (error) {}
+  });
 
   _mDirSvc = typeof google.maps.DirectionsService === 'function' ? new google.maps.DirectionsService() : null;
 
@@ -9996,6 +9976,11 @@ function retryMeasurementRoutes() {
 }
 
 // ── REDRAW PETA ───────────────────────────────────────────
+function _mFitGoogleBounds(bounds) {
+  var height = document.getElementById('measureMap').clientHeight;
+  _mMap.fitBounds(bounds, height ? Math.min(80, Math.floor(height / 4)) : 80);
+}
+
 function _mRedraw() {
   if (!_mMap || !window.google || !google.maps) return;
 
@@ -10101,7 +10086,7 @@ function _mRedraw() {
         }).join('');
       } else { sumEl.style.display = 'none'; }
       if (loadingEl) loadingEl.classList.remove('show');
-      if (hasBounds) _mMap.fitBounds(bounds, 80);
+      if (hasBounds) _mFitGoogleBounds(bounds);
 
       var fallbackRows = summaryData.filter(function(row){ return row.fallback; });
       var legacyRows = summaryData.filter(function(row){ return row.source === 'legacy'; });
@@ -10124,7 +10109,7 @@ function _mRedraw() {
     _mShowRouteNotice('', '');
     if (hasBounds) {
       if (activeDps.length === 0 && cObj) _mMap.setCenter(cObj), _mMap.setZoom(17);
-      else _mMap.fitBounds(bounds, 80);
+      else _mFitGoogleBounds(bounds);
     }
   }
 }
@@ -10194,7 +10179,7 @@ function toggleMeasureOSM() {
   var btn = document.getElementById('btnMeasureOsm');
   var gMap = document.getElementById('measureMap');
   var oMap = document.getElementById('measureOsmMap');
-  var layerToggle = document.getElementById('mMeasureLayers');
+  document.getElementById('measureOverlay').classList.toggle('measurement-google', !_mOsmActive);
 
   if (_mOsmActive) {
     // Switch ke OSM
@@ -10207,7 +10192,6 @@ function toggleMeasureOSM() {
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">Google Maps</span><span class="mmap-mode-short">Google</span>';
     gMap.style.display = 'none';
     oMap.classList.add('active');
-    if (layerToggle) layerToggle.hidden = true;
 
     if (!_mOsmInited) {
       _mInitMeasureOsm();
@@ -10225,8 +10209,6 @@ function toggleMeasureOSM() {
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span class="mmap-mode-full">OpenStreetMap</span><span class="mmap-mode-short">OSM</span>';
     oMap.classList.remove('active');
     gMap.style.display = '';
-    if (layerToggle) layerToggle.hidden = false;
-    _mSyncMapLayerButtons();
 
     // Init Google Maps measurement saat pertama kali dipakai (karena default-nya OSM)
     if (!_mMapInited) {
