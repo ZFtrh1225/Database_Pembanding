@@ -2558,7 +2558,7 @@ body.mmode-picking .mpick-hint { display: flex; }
           <label class="form-label" id="fotoLabel">Foto Properti</label>
           <details class="foto-source-chooser" id="fotoSourceChooser">
             <summary class="foto-upload-area">
-              <span class="foto-upload-label">📷 <span>Klik untuk pilih foto</span><br><small style="font-size:10px;color:var(--text-xs);">JPG, PNG, WEBP — maks 5MB</small></span>
+              <span class="foto-upload-label">📷 <span>Klik untuk pilih foto</span><br><small style="font-size:10px;color:var(--text-xs);">JPG, PNG, WEBP — maks 10MB</small></span>
             </summary>
             <div class="foto-source-options" role="group" aria-label="Sumber foto">
               <button type="button" onclick="selectPhotoSource('camera')" aria-controls="f_foto">📷 Kamera</button>
@@ -5648,7 +5648,7 @@ function _renderSelectedPhoto(sourceDataUrl, done, failed) {
 
 function handleFotoChange(input) {
   var file = input.files[0]; if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { toast('Ukuran foto maks 5MB', 'error'); input.value = ''; return; }
+  if (file.size > 10 * 1024 * 1024) { toast('Ukuran foto maks 10MB', 'error'); input.value = ''; return; }
   _fotoFilename = file.name; var reader = new FileReader();
   reader.onload = function (ev) {
     if (_dataEntryMode === 'survey') {
@@ -9026,7 +9026,7 @@ function exportData() {
 function triggerFotoUpdate(rowId, koordinat, sumber) { 
   var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = function () {
-    var file = inp.files[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { toast('Ukuran foto maks 5MB', 'error'); return; }
+    var file = inp.files[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { toast('Ukuran foto maks 10MB', 'error'); return; }
     toast('Mohon ditunggu...', 'loading');
     var reader = new FileReader();
     reader.onload = function (ev) {
